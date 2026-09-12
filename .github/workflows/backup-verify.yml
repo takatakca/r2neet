@@ -1,0 +1,46 @@
+name: Restore drill
+
+# An untested backup is a guess. This proves, on a schedule, that a dump can
+# be restored into an empty database and that the application works against
+# the restored copy.
+on:
+  schedule:
+    - cron: '0 8 * * 1' # Mondays, 08:00 UTC
+  workflow_dispatch:
+
+jobs:
+  drill:
+    name: Backup and restore
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: r2nette_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/r2nette_test
+      PRISMA_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/r2nette_test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/r2nette_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci && npx prisma generate
+      - run: npx prisma migrate deploy
+      - name: Install postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Run the drill
+        run: npx vite-node scripts/restore-drill.ts

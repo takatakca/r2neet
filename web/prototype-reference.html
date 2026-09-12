@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07283F">
+<title>Book a cleaning — R2NETTE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   R2NETTE design tokens
+   Palette derived from the existing R2NETTE mark (marine blue +
+   fresh green). Citrus is reserved exclusively for money the
+   customer saves — it appears nowhere else.
+   ============================================================ */
+:root{
+  --ink:#07283F;        /* deep marine — text, header */
+
+  --deep:#0B3A5C;
+  --aqua:#00C2A0;       /* fresh — primary action */
+  --aqua-dk:#00A386;
+  --citrus:#FF9E1B;     /* savings only */
+  --paper:#FBFCFD;
+  --mist:#EDF3F7;
+  --line:#DCE7EE;
+  --muted:#5B7386;
+  --white:#fff;
+  --radius:18px;
+  --radius-sm:12px;
+  --shadow-sm:0 1px 2px rgba(7,40,63,.06),0 2px 8px rgba(7,40,63,.05);
+  --shadow-md:0 4px 12px rgba(7,40,63,.08),0 12px 32px rgba(7,40,63,.08);
+  --shadow-lg:0 8px 24px rgba(7,40,63,.12),0 32px 64px rgba(7,40,63,.14);
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:'Instrument Sans',system-ui,-apple-system,sans-serif;
+  font-size:16px;line-height:1.5;
+  padding-bottom:calc(112px + env(safe-area-inset-bottom));
+}
+h1,h2,h3,.display{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;letter-spacing:-.02em;line-height:1.08;margin:0}
+.money{font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:500;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--aqua);outline-offset:2px;border-radius:6px}
+.wrap{max-width:1160px;margin:0 auto;padding:0 20px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- promo ribbon ---------- */
+#ribbon{
+  background:linear-gradient(90deg,var(--ink),var(--deep));color:#fff;
+  font-size:13.5px;font-weight:500;position:relative;overflow:hidden;
+}
+#ribbon .rib-in{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 44px;text-align:center}
+#ribbon b{color:var(--citrus);font-weight:700}
+#ribbon .spark{width:6px;height:6px;border-radius:50%;background:var(--aqua);flex:none;animation:pulse 2.4s var(--ease) infinite}
+@keyframes pulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.25)}}
+#ribbon button{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;color:rgba(255,255,255,.6);padding:8px 10px;cursor:pointer;font-size:16px;line-height:1}
+#ribbon button:hover{color:#fff}
+
+/* ---------- header ---------- */
+header{position:sticky;top:0;z-index:60;background:rgba(251,252,253,.86);backdrop-filter:saturate(1.6) blur(14px);border-bottom:1px solid var(--line)}
+.hd{display:flex;align-items:center;gap:16px;height:66px}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);flex:none}
+.logo-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(140deg,var(--aqua),var(--deep));display:grid;place-items:center;color:#fff;font-family:'Bricolage Grotesque';font-weight:800;font-size:15px;box-shadow:var(--shadow-sm)}
+.logo-txt{font-family:'Bricolage Grotesque';font-weight:800;font-size:19px;letter-spacing:-.03em}
+.logo-txt span{color:var(--aqua-dk)}
+nav.mainnav{display:none;gap:26px;margin-left:auto}
+nav.mainnav a{color:var(--muted);text-decoration:none;font-size:14.5px;font-weight:500}
+nav.mainnav a:hover{color:var(--ink)}
+.hd-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.tel{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink);font-weight:600;font-size:14.5px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:#fff}
+.tel .num{display:none}
+.tel:hover{border-color:var(--aqua);color:var(--aqua-dk)}
+.icon-btn{width:40px;height:40px;border-radius:999px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;cursor:pointer}
+.icon-btn:hover{border-color:var(--aqua)}
+@media(min-width:900px){
+  nav.mainnav{display:flex}
+  .hd-right{margin-left:24px}
+  .tel .num{display:inline}
+}
+
+/* ---------- hero ---------- */
+.hero{padding:44px 0 8px}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 14px 7px 9px;font-size:13px;font-weight:600;box-shadow:var(--shadow-sm);margin-bottom:20px}
+.stars{color:var(--citrus);letter-spacing:1px;font-size:13px}
+.hero h1{font-size:clamp(34px,7.4vw,60px);max-width:16ch}
+.hero h1 em{font-style:normal;color:var(--aqua-dk)}
+.hero p.lede{color:var(--muted);font-size:clamp(16px,2.4vw,18.5px);max-width:46ch;margin:18px 0 26px}
+.hero-cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn{border:0;border-radius:999px;padding:15px 26px;font-weight:600;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:9px;transition:transform .18s var(--ease),box-shadow .18s var(--ease),background .18s}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--aqua);color:#04262E;box-shadow:0 4px 14px rgba(0,194,160,.34)}
+.btn-primary:hover{background:var(--aqua-dk);box-shadow:0 6px 20px rgba(0,194,160,.42)}
+.btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--ink)}
+.btn:disabled{opacity:.42;cursor:not-allowed;box-shadow:none}
+.value-row{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:30px;max-width:560px}
+.value{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--muted)}
+.value b{color:var(--ink);font-weight:600;display:block;font-size:14.5px}
+.value .tick{color:var(--aqua-dk);flex:none;margin-top:1px}
+@media(min-width:700px){.value-row{grid-template-columns:repeat(4,1fr)}}
+
+/* ---------- reviews rail ---------- */
+.reviews{padding:38px 0 10px}
+.rail-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:16px}
+.rail-head h2{font-size:clamp(21px,3.6vw,27px)}
+.rail-head .agg{font-size:13.5px;color:var(--muted)}
+.rail{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 20px 18px;margin:0 -20px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.rail::-webkit-scrollbar{display:none}
+.rev{scroll-snap-align:start;flex:0 0 84%;max-width:340px;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:11px}
+@media(min-width:760px){.rev{flex:0 0 340px}}
+.rev-top{display:flex;align-items:center;gap:10px}
+.avatar{width:38px;height:38px;border-radius:50%;background:var(--mist);color:var(--deep);display:grid;place-items:center;font-weight:700;font-size:14.5px;flex:none}
+.rev-name{font-weight:600;font-size:14.5px;line-height:1.2}
+.rev-when{font-size:12.5px;color:var(--muted)}
+.rev p{margin:0;font-size:14.5px;color:#2C4657;line-height:1.55}
+.src{margin-top:auto;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--muted);border-top:1px solid var(--line);padding-top:11px}
+.src .dot{width:14px;height:14px;border-radius:3px;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff}
+.src.google .dot{background:#4285F4}
+.src.legacy .dot{background:var(--muted)}
+.src.verified .dot{background:var(--aqua-dk)}
+
+/* ---------- booking shell ---------- */
+.booking{padding:26px 0 60px}
+.grid{display:grid;gap:26px}
+@media(min-width:1000px){.grid{grid-template-columns:minmax(0,1fr) 372px;gap:34px;align-items:start}}
+.progress{display:flex;gap:5px;margin-bottom:22px}
+.pip{height:4px;flex:1;background:var(--line);border-radius:99px;overflow:hidden}
+.pip i{display:block;height:100%;width:0;background:var(--aqua);border-radius:99px;transition:width .45s var(--ease)}
+.pip.done i{width:100%}
+.pip.now i{width:52%}
+.stepno{font-size:12.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--aqua-dk);margin-bottom:9px}
+.step{display:none;animation:rise .42s var(--ease)}
+.step.on{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.step>h2{font-size:clamp(24px,4.6vw,33px);margin-bottom:7px}
+.step>p.sub{color:var(--muted);margin:0 0 22px;font-size:15.5px}
+
+/* option cards */
+.opts{display:grid;gap:10px}
+.opts.two{grid-template-columns:1fr}
+@media(min-width:620px){.opts.two{grid-template-columns:1fr 1fr}}
+.opt{position:relative;display:flex;gap:14px;align-items:flex-start;background:#fff;border:1.5px solid var(--line);border-radius:var(--radius);padding:16px 17px;cursor:pointer;text-align:left;width:100%;transition:border-color .18s,box-shadow .18s,transform .18s var(--ease)}
+.opt:hover{border-color:#B9D2E0;box-shadow:var(--shadow-sm)}
+.opt[aria-pressed="true"]{border-color:var(--aqua);box-shadow:0 0 0 3px rgba(0,194,160,.16)}
+.opt-body{flex:1;min-width:0}
+.opt-t{font-weight:600;font-size:15.5px;display:block}
+.opt-d{font-size:13.5px;color:var(--muted);margin-top:3px;display:block}
+.opt-p{margin-left:auto;text-align:right;flex:none}
+.opt-p .amt{font-family:'JetBrains Mono';font-weight:700;font-size:16px;font-variant-numeric:tabular-nums}
+.opt-p .per{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.check{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);flex:none;display:grid;place-items:center;margin-top:1px;transition:.18s}
+.opt[aria-pressed="true"] .check{background:var(--aqua);border-color:var(--aqua);color:#fff}
+.check svg{opacity:0;transition:.18s}
+.opt[aria-pressed="true"] .check svg{opacity:1}
+.badge{position:absolute;top:-9px;right:14px;background:var(--citrus);color:#3D2400;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;letter-spacing:.02em}
+.badge.save{background:var(--citrus)}
+
+/* fields */
+.fields{display:grid;gap:14px}
+.f2{display:grid;gap:14px}
+@media(min-width:620px){.f2{grid-template-columns:1fr 1fr}}
+label.fl{display:block;font-size:13.5px;font-weight:600;margin-bottom:6px}
+label.fl span{color:var(--muted);font-weight:400}
+.inp{width:100%;background:#fff;border:1.5px solid var(--line);border-radius:var(--radius-sm);padding:13px 14px;font-size:16px;transition:border-color .18s,box-shadow .18s}
+.inp:focus{border-color:var(--aqua);box-shadow:0 0 0 3px rgba(0,194,160,.14);outline:none}
+.inp.bad{border-color:#E0575B;box-shadow:0 0 0 3px rgba(224,87,91,.12)}
+.err{color:#C4383C;font-size:13px;margin-top:6px;display:none}
+.err.on{display:block}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235B7386' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:38px}
+.qty{display:flex;align-items:center;gap:2px;background:var(--mist);border-radius:99px;padding:3px}
+.qty button{width:30px;height:30px;border-radius:50%;border:0;background:#fff;cursor:pointer;font-size:17px;line-height:1;display:grid;place-items:center;box-shadow:var(--shadow-sm)}
+.qty button:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+.qty output{min-width:22px;text-align:center;font-weight:600;font-family:'JetBrains Mono';font-size:14px}
+
+/* savings moment toast */
+#moment{position:fixed;left:50%;transform:translate(-50%,26px);bottom:calc(126px + env(safe-area-inset-bottom));z-index:80;background:var(--ink);color:#fff;border-radius:14px;padding:13px 18px;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:11px;font-size:14.5px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .3s var(--ease),transform .38s var(--ease);max-width:calc(100vw - 32px)}
+#moment.on{opacity:1;transform:translate(-50%,0)}
+#moment b{color:var(--citrus)}
+@media(min-width:1000px){#moment{bottom:26px}}
+
+/* ---------- ledger (signature element) ---------- */
+.ledger{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-md);overflow:hidden}
+@media(min-width:1000px){.ledger{position:sticky;top:88px}}
+.ledger-h{padding:17px 20px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.ledger-h h3{font-size:16px}
+.ledger-h .tag{font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.lines{padding:8px 20px;display:flex;flex-direction:column}
+.ln{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:8px 0;font-size:14.5px;animation:lnIn .38s var(--ease)}
+@keyframes lnIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.ln .lbl{color:#33566B;min-width:0}
+.ln .lbl small{display:block;color:var(--muted);font-size:12.5px;margin-top:1px}
+.ln .val{flex:none;font-family:'JetBrains Mono';font-variant-numeric:tabular-nums;font-weight:500}
+.ln.save .lbl,.ln.save .val{color:#B36A00;font-weight:600}
+.ln.muted .lbl,.ln.muted .val{color:var(--muted)}
+.ln.rule{border-top:1px dashed var(--line);margin-top:6px;padding-top:12px}
+.ln.tot{border-top:1.5px solid var(--ink);margin-top:8px;padding-top:14px;padding-bottom:16px;font-size:16px;font-weight:700}
+.ln.tot .val{font-size:22px;font-weight:700}
+.ledger-f{background:var(--mist);padding:15px 20px;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:9px}
+.duenow{display:flex;justify-content:space-between;align-items:center;color:var(--ink);font-weight:600;font-size:14.5px}
+.duenow .val{font-family:'JetBrains Mono'}
+.savepill{background:rgba(255,158,27,.14);color:#8A5200;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;display:flex;gap:8px;align-items:center}
+.nextvisit{border-top:1px solid var(--line);padding-top:10px;font-size:12.5px;line-height:1.5}
+.nextvisit b{color:var(--ink)}
+.empty{padding:26px 20px;color:var(--muted);font-size:14px;text-align:center}
+
+/* ---------- sticky mobile bar ---------- */
+.sticky{position:fixed;left:0;right:0;bottom:0;z-index:70;background:rgba(255,255,255,.94);backdrop-filter:blur(16px) saturate(1.5);border-top:1px solid var(--line);padding:11px 16px calc(11px + env(safe-area-inset-bottom));box-shadow:0 -6px 24px rgba(7,40,63,.09)}
+.sticky-in{max-width:1160px;margin:0 auto;display:flex;align-items:center;gap:14px}
+.sticky-l{flex:1;min-width:0}
+.sticky-save{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#B36A00;display:flex;align-items:center;gap:5px}
+.sticky-tot{display:flex;align-items:baseline;gap:8px}
+.sticky-tot .big{font-family:'JetBrains Mono';font-weight:700;font-size:21px;font-variant-numeric:tabular-nums}
+.sticky-tot .lil{font-size:12px;color:var(--muted)}
+.sticky .btn{padding:14px 24px;white-space:nowrap}
+.detail-toggle{background:none;border:0;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer;padding:2px 0}
+@media(min-width:1000px){.sticky{display:none}body{padding-bottom:60px}}
+
+/* ---------- modal ---------- */
+.scrim{position:fixed;inset:0;background:rgba(7,40,63,.5);backdrop-filter:blur(3px);z-index:90;display:none;align-items:center;justify-content:center;padding:20px}
+.scrim.on{display:flex;animation:fade .26s}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.modal{background:#fff;border-radius:24px;max-width:430px;width:100%;padding:32px 26px 26px;text-align:center;box-shadow:var(--shadow-lg);animation:pop .46s var(--ease);position:relative}
+@keyframes pop{from{opacity:0;transform:scale(.9) translateY(20px)}to{opacity:1;transform:none}}
+.modal .close{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;border:0;background:var(--mist);cursor:pointer;font-size:17px;color:var(--muted)}
+.modal .gift{width:62px;height:62px;border-radius:20px;background:linear-gradient(140deg,var(--aqua),var(--deep));margin:0 auto 18px;display:grid;place-items:center;box-shadow:0 8px 22px rgba(0,194,160,.32)}
+.modal h2{font-size:26px;margin-bottom:9px}
+.modal p{color:var(--muted);font-size:15px;margin:0 0 20px}
+.offers{display:grid;gap:9px;margin-bottom:20px;text-align:left}
+.offer{display:flex;align-items:center;gap:12px;background:var(--mist);border-radius:14px;padding:13px 15px}
+.offer .amt{font-family:'JetBrains Mono';font-weight:700;font-size:19px;color:var(--aqua-dk);flex:none}
+.offer .txt{font-size:14px;font-weight:500}
+.modal .fine{font-size:12px;color:var(--muted);margin:14px 0 0}
+
+/* ---------- trust ---------- */
+.trust{display:grid;grid-template-columns:1fr 1fr;gap:12px;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:22px 0}
+@media(min-width:700px){.trust{grid-template-columns:repeat(4,1fr)}}
+.trust div{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:var(--muted);line-height:1.4}
+.trust b{display:block;color:var(--ink);font-size:13.5px;font-weight:600}
+.trust .ic{color:var(--aqua-dk);flex:none;margin-top:1px}
+
+/* ---------- pay ---------- */
+.walletbox{background:#fff;border:1.5px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:16px}
+.walletbox h4{margin:0 0 4px;font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.walletbox p.wsub{font-size:13.5px;color:var(--muted);margin:0 0 14px}
+.wbtns{display:grid;gap:9px}
+.wbtn{border-radius:12px;padding:14px;font-weight:600;font-size:15px;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.wbtn.apple{background:#000;color:#fff}
+.wbtn.gpay{background:#fff;color:#3C4043;border:1.5px solid #DADCE0}
+.wbtn.link{background:#00D66F;color:#011E0F}
+.wnote{background:var(--mist);border-radius:12px;padding:14px;font-size:13.5px;color:var(--muted);line-height:1.5}
+.wnote b{color:var(--ink)}
+.orsep{display:flex;align-items:center;gap:14px;margin:18px 0;color:var(--muted);font-size:13px}
+.orsep:before,.orsep:after{content:"";flex:1;height:1px;background:var(--line)}
+.consent{display:flex;gap:11px;align-items:flex-start;background:var(--mist);border-radius:14px;padding:14px;font-size:13.5px;line-height:1.5;margin:16px 0}
+.consent input{margin-top:3px;width:18px;height:18px;accent-color:var(--aqua-dk);flex:none}
+
+/* confirmation */
+.confirm-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-md);overflow:hidden}
+.confirm-top{background:linear-gradient(150deg,var(--ink),var(--deep));color:#fff;padding:32px 24px;text-align:center}
+.confirm-top .tick-c{width:58px;height:58px;border-radius:50%;background:var(--aqua);display:grid;place-items:center;margin:0 auto 16px;animation:pop .5s var(--ease)}
+.confirm-top h2{font-size:27px;margin-bottom:6px}
+.confirm-top .bn{font-family:'JetBrains Mono';font-size:14px;opacity:.82;margin-top:10px}
+.crow{display:flex;justify-content:space-between;gap:16px;padding:13px 22px;border-bottom:1px solid var(--line);font-size:14.5px}
+.crow:last-child{border-bottom:0}
+.crow .k{color:var(--muted);flex:none}
+.crow .v{text-align:right;font-weight:500}
+footer{border-top:1px solid var(--line);padding:30px 0 40px;color:var(--muted);font-size:13.5px}
+footer a{color:var(--deep)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ============ PROMO RIBBON ============ -->
+<div id="ribbon" hidden>
+  <div class="rib-in">
+    <span class="spark"></span>
+    <span>New clients save <b>$15</b> on Basic · <b>$20</b> on Deep · Weekly plans save <b>25%</b> every visit</span>
+  </div>
+  <button type="button" onclick="dismissRibbon()" aria-label="Dismiss offer banner">×</button>
+</div>
+
+<!-- ============ HEADER ============ -->
+<header>
+  <div class="wrap hd">
+    <a class="logo" href="#top">
+      <!-- REPLACE with the real R2NETTE logo asset from the website repo -->
+      <span class="logo-mark">R2</span>
+      <span class="logo-txt">R2<span>NETTE</span></span>
+    </a>
+    <nav class="mainnav">
+      <a href="#book">Book</a>
+      <a href="#reviews">Reviews</a>
+      <a href="#why">Why R2NETTE</a>
+    </nav>
+    <div class="hd-right">
+      <a class="tel" href="tel:+15148252825" aria-label="Call R2NETTE at 514 825 2825">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"/></svg>
+        <span class="num">(514) 825-2825</span>
+      </a>
+      <button class="icon-btn" onclick="alert('Account sign-in requires the Google / Facebook credentials listed in the README.')" aria-label="Sign in">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ============ HERO ============ -->
+<section class="hero wrap" id="why">
+  <span class="eyebrow"><span class="stars">★★★★★</span> 5.0 from 21 reviews</span>
+  <h1>A cleaner home. <em>Without the back-and-forth.</em></h1>
+  <p class="lede">Pick your cleaning, see the exact price with tax before you commit, and lock in a weekly plan that saves you 25% on every visit.</p>
+  <div class="hero-cta">
+    <button class="btn btn-primary" onclick="scrollToBooking()">Book my cleaning
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+    <a class="btn btn-ghost" href="tel:+15148252825">Call (514) 825-2825</a>
+  </div>
+  <div class="value-row">
+    <div class="value"><span class="tick">✓</span><span><b>No surprise fees</b>Products and travel shown upfront</span></div>
+    <div class="value"><span class="tick">✓</span><span><b>Same crew weekly</b>Consistency on recurring plans</span></div>
+    <div class="value"><span class="tick">✓</span><span><b>Change free</b>Up to 24 hours before</span></div>
+    <div class="value"><span class="tick">✓</span><span><b>Montréal &amp; area</b>Laval, West Island, South Shore</span></div>
+  </div>
+</section>
+
+<!-- ============ REVIEWS ============ -->
+<section class="reviews wrap" id="reviews">
+  <div class="rail-head">
+    <h2>What Montréal customers say</h2>
+    <span class="agg">★ 5.0 · 21 reviews</span>
+  </div>
+  <div class="rail" id="rail"></div>
+</section>
+
+<!-- ============ BOOKING ============ -->
+<section class="booking wrap" id="book">
+  <div class="grid">
+    <div>
+      <div class="progress" id="progress"></div>
+
+      <!-- STEP 1 SERVICE -->
+      <div class="step on" data-step="0">
+        <div class="stepno">Step 1 of 7 · Service</div>
+        <h2>What kind of cleaning?</h2>
+        <p class="sub">Basic keeps a home maintained. Deep goes after what builds up over months.</p>
+        <div class="opts" id="svcCats"></div>
+        <div id="svcOpts" style="margin-top:18px"></div>
+      </div>
+
+      <!-- STEP 2 PROPERTY -->
+      <div class="step" data-step="1">
+        <div class="stepno">Step 2 of 7 · Property</div>
+        <h2>Tell us about the place</h2>
+        <p class="sub">This helps us send the right crew with the right equipment.</p>
+        <div class="fields">
+          <div>
+            <label class="fl" for="ptype">Property type</label>
+            <select class="inp" id="ptype"></select>
+          </div>
+          <div class="f2">
+            <div><label class="fl" for="beds">Bedrooms</label><input class="inp" id="beds" type="number" min="0" max="12" value="2" inputmode="numeric"></div>
+            <div><label class="fl" for="baths">Bathrooms</label><input class="inp" id="baths" type="number" min="0" max="12" value="1" inputmode="numeric"></div>
+          </div>
+          <div>
+            <label class="fl">Is this an Airbnb or short-term rental?</label>
+            <div class="opts two" id="airbnb"></div>
+          </div>
+          <div>
+            <label class="fl" for="cond">Current condition</label>
+            <select class="inp" id="cond">
+              <option value="LIGHT">Light maintenance — kept up regularly</option>
+              <option value="NORMAL" selected>Normal — usual household use</option>
+              <option value="ATTENTION">Needs attention — a few problem areas</option>
+              <option value="HEAVY">Heavy cleaning — hasn't been done in a while</option>
+              <option value="ASSESS">Very heavy — please assess before confirming</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3 PRODUCTS -->
+      <div class="step" data-step="2">
+        <div class="stepno">Step 3 of 7 · Cleaning products</div>
+        <h2>Who provides the products?</h2>
+        <p class="sub">Required — we need to know what to load in the van.</p>
+        <div class="opts" id="products"></div>
+        <div class="err" id="prodErr">Choose one to continue.</div>
+      </div>
+
+      <!-- STEP 4 FREQUENCY -->
+      <div class="step" data-step="3">
+        <div class="stepno">Step 4 of 7 · Frequency</div>
+        <h2>How often?</h2>
+        <p class="sub">Recurring plans discount the cleaning service on every single visit.</p>
+        <div class="opts" id="freq"></div>
+        <div class="err" id="freqErr"></div>
+      </div>
+
+      <!-- STEP 5 EXTRAS -->
+      <div class="step" data-step="4">
+        <div class="stepno">Step 5 of 7 · Extras</div>
+        <h2>Anything else?</h2>
+        <p class="sub">Optional. Skip it if you don't need any.</p>
+        <div class="opts" id="addons"></div>
+      </div>
+
+      <!-- STEP 6 ADDRESS + CONTACT -->
+      <div class="step" data-step="5">
+        <div class="stepno">Step 6 of 7 · Where &amp; who</div>
+        <h2>Your cleaning address</h2>
+        <p class="sub">Travel is one $25 fee per visit. First 20 km included, then $0.65/km.</p>
+        <div class="fields">
+          <div><label class="fl" for="addr">Street address</label><input class="inp" id="addr" autocomplete="street-address" placeholder="754 Av. 36e"><div class="err" id="addrErr">Enter the address we're cleaning.</div></div>
+          <div class="f2">
+            <div><label class="fl" for="unit">Unit / apt <span>(optional)</span></label><input class="inp" id="unit" autocomplete="address-line2"></div>
+            <div><label class="fl" for="city">City</label><input class="inp" id="city" autocomplete="address-level2" placeholder="Lachine"><div class="err" id="cityErr">Required.</div></div>
+          </div>
+          <div class="f2">
+            <div><label class="fl" for="postal">Postal code</label><input class="inp" id="postal" autocomplete="postal-code" placeholder="H8T 1B7" maxlength="7"><div class="err" id="postalErr">Use a Canadian postal code, like H8T 1B7.</div></div>
+            <div><label class="fl" for="km">Distance from our base <span>(km)</span></label><input class="inp" id="km" type="number" min="0" max="200" value="12" inputmode="numeric"></div>
+          </div>
+          <div style="border-top:1px solid var(--line);padding-top:18px;margin-top:4px">
+            <div class="f2">
+              <div><label class="fl" for="nm">Full name</label><input class="inp" id="nm" autocomplete="name" placeholder="Pascal Denis"><div class="err" id="nmErr">Required.</div></div>
+              <div><label class="fl" for="ph">Phone</label><input class="inp" id="ph" type="tel" autocomplete="tel" placeholder="(514) 825-2825"><div class="err" id="phErr">Required.</div></div>
+            </div>
+          </div>
+          <div><label class="fl" for="em">Email</label><input class="inp" id="em" type="email" autocomplete="email" placeholder="you@example.com"><div class="err" id="emErr">Enter a valid email — your confirmation goes here.</div></div>
+          <div><label class="fl" for="notes">Entry instructions, parking, pets <span>(optional)</span></label><textarea class="inp" id="notes" rows="3" placeholder="Buzzer 402. Park in visitor spot 12. Friendly dog."></textarea></div>
+        </div>
+      </div>
+
+      <!-- STEP 7 REVIEW + PAY -->
+      <div class="step" data-step="6">
+        <div class="stepno">Step 7 of 7 · Review &amp; confirm</div>
+        <h2>Review and confirm</h2>
+        <p class="sub">Nothing is charged until we confirm your slot.</p>
+
+        <div class="trust">
+          <div><span class="ic">🔒</span><span><b>Secure checkout</b>Payments handled by Stripe</span></div>
+          <div><span class="ic">💳</span><span><b>Card never stored</b>R2NETTE never sees your number</span></div>
+          <div><span class="ic">⭐</span><span><b>Real reviews</b>From real completed jobs</span></div>
+          <div><span class="ic">🗓</span><span><b>24-hour changes</b>Free reschedule or cancel</span></div>
+        </div>
+
+        <div class="walletbox">
+          <h4>Fast checkout</h4>
+          <p class="wsub" id="walletSub">Checking what your device supports…</p>
+          <div class="wbtns" id="wbtns"></div>
+        </div>
+
+        <div id="consentWrap"></div>
+
+        <div class="err" id="payErr"></div>
+        <button class="btn btn-primary" id="confirmBtn" style="width:100%;margin-top:6px" onclick="confirmBooking()">Confirm booking</button>
+        <p style="font-size:12.5px;color:var(--muted);text-align:center;margin:12px 0 0">By confirming you agree to our 24-hour cancellation policy.</p>
+      </div>
+
+      <!-- CONFIRMATION -->
+      <div class="step" data-step="7">
+        <div class="confirm-card">
+          <div class="confirm-top">
+            <div class="tick-c"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#04262E" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+            <h2>You're booked</h2>
+            <p style="margin:0;opacity:.88;font-size:15px">We'll confirm your time slot by phone shortly.</p>
+            <div class="bn" id="cBookingNo"></div>
+          </div>
+          <div id="cRows"></div>
+        </div>
+        <div style="text-align:center;margin-top:22px">
+          <p style="color:var(--muted);font-size:14.5px;margin-bottom:12px">Know someone who needs a clean?</p>
+          <button class="btn btn-ghost" onclick="location.reload()">Book another cleaning</button>
+        </div>
+      </div>
+
+      <!-- NAV -->
+      <div style="display:flex;gap:10px;margin-top:28px" id="navBtns">
+        <button class="btn btn-ghost" id="backBtn" onclick="go(-1)">Back</button>
+        <button class="btn btn-primary" id="nextBtn" style="flex:1" onclick="go(1)">Continue</button>
+      </div>
+    </div>
+
+    <!-- ============ LEDGER ============ -->
+    <aside>
+      <div class="ledger">
+        <div class="ledger-h"><h3>Your price</h3><span class="tag">CAD</span></div>
+        <div id="ledgerBody"><div class="empty">Pick a service and your price appears here — every line, including tax.</div></div>
+      </div>
+    </aside>
+  </div>
+</section>
+</main>
+
+<footer class="wrap">
+  <strong style="color:var(--ink)">R2NETTE — Rapide 2 Nette</strong><br>
+  Serving Montréal, Laval and surrounding areas · <a href="tel:+15148252825">(514) 825-2825</a> · <a href="mailto:rap2nette@gmail.com">rap2nette@gmail.com</a>
+  <p style="margin-top:14px;font-size:12.5px">Prices in CAD. GST 5% and QST 9.975% shown separately on every quote.</p>
+</footer>
+
+<!-- sticky mobile bar -->
+<div class="sticky" id="sticky" hidden>
+  <div class="sticky-in">
+    <div class="sticky-l">
+      <div class="sticky-save" id="stickySave" hidden></div>
+      <div class="sticky-tot"><span class="big" id="stickyTot">$0.00</span><span class="lil">total</span></div>
+      <button class="detail-toggle" onclick="scrollLedger()">See breakdown</button>
+    </div>
+    <button class="btn btn-primary" id="stickyBtn" onclick="go(1)">Continue</button>
+  </div>
+</div>
+
+<div id="moment"></div>
+
+<!-- welcome modal -->
+<div class="scrim" id="welcome">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wTitle">
+    <button class="close" onclick="closeWelcome()" aria-label="Close">×</button>
+    <div class="gift"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg></div>
+    <h2 id="wTitle">Welcome to R2NETTE</h2>
+    <p>Your first clean just got better.</p>
+    <div class="offers">
+      <div class="offer"><span class="amt">$15</span><span class="txt">off your first Basic cleaning</span></div>
+      <div class="offer"><span class="amt">$20</span><span class="txt">off your first Deep cleaning</span></div>
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="closeWelcome();scrollToBooking()">Unlock my offer</button>
+    <p class="fine">One welcome offer per customer. We apply whichever discount saves you more.</p>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   PRICING MIRROR
+   Mirrors the server pricing engine for instant visual feedback.
+   The SERVER remains authoritative: no total shown here is ever
+   sent to Stripe. See README — /api/v1/quotes recalculates.
+   Money is integer cents. Rates are micro-percent integers so
+   9.975% is exact.
+   ================================================================ */
+const MP = 1e6, DIV = 100 * MP;
+const pct = v => Math.round(v * MP);
+function divHalfUp(n, d){
+  const neg = n < 0; n = Math.abs(n);
+  const q = Math.floor(n / d), r = n - q * d;
+  const out = r * 2 >= d ? q + 1 : q;
+  return neg ? -out : out;
+}
+const rate = (cents, r) => divHalfUp(cents * r, DIV);
+const fmt = c => (c<0?'-':'') + '$' + Math.floor(Math.abs(c)/100).toLocaleString('en-CA') + '.' + String(Math.abs(c)%100).padStart(2,'0');
+
+const CFG = {
+  transportBase: 2500, includedKm: 20, perKm: 65,
+  gst: pct(5), qst: pct(9.975),
+  productBasic: 1200, productDeep: 1500
+};
+const FREQ = {
+  ONE_TIME:{label:'One-time',desc:'A single visit',rate:0},
+  MONTHLY :{label:'Monthly',desc:'Once every month, same date',rate:pct(10)},
+  BIWEEKLY:{label:'Every two weeks',desc:'Every 14 days',rate:pct(15)},
+  WEEKLY  :{label:'Weekly',desc:'Every 7 days · about 4 visits a month',rate:pct(25)}
+};
+const CATS = [
+  {id:'basic',t:'Basic cleaning',d:'Regular upkeep — kitchen, baths, floors, surfaces'},
+  {id:'deep', t:'Deep cleaning', d:'Everything in Basic, plus what builds up over months'},
+  {id:'other',t:'Other services',d:'Move-in/out, carpets, windows'}
+];
+const SERVICES = [
+  {id:'basic_1x3',cat:'basic',n:'1 cleaner · 3 hours',lab:'3 labour-hours',p:11000,staff:1,min:180,prod:'BASIC',freq:['ONE_TIME','MONTHLY','BIWEEKLY','WEEKLY']},
+  {id:'basic_2x2',cat:'basic',n:'2 cleaners · 2 hours',lab:'4 labour-hours',p:14000,staff:2,min:120,prod:'BASIC',freq:['ONE_TIME','MONTHLY','BIWEEKLY','WEEKLY']},
+  {id:'basic_2x3',cat:'basic',n:'2 cleaners · 3 hours',lab:'6 labour-hours',p:20000,staff:2,min:180,prod:'BASIC',freq:['ONE_TIME','MONTHLY','BIWEEKLY','WEEKLY']},
+  {id:'basic_2x4',cat:'basic',n:'2 cleaners · 4 hours',lab:'8 labour-hours',p:26000,staff:2,min:240,prod:'BASIC',freq:['ONE_TIME','MONTHLY','BIWEEKLY','WEEKLY']},
+  {id:'deep_1x3', cat:'deep', n:'1 cleaner · 3 hours',lab:'3 labour-hours',p:11500,staff:1,min:180,prod:'DEEP',freq:['ONE_TIME','MONTHLY','BIWEEKLY','WEEKLY']},
+  {id:'deep_2x2', cat:'deep', n:'2 cleaners · 2 hours',lab:'4 labour-hours',p:13000,staff:2,min:120,prod:'DEEP',freq:['ONE_TIME','MONTHLY','BIWEEKLY','WEEKLY']},
+  {id:'deep_2x3', cat:'deep', n:'2 cleaners · 3 hours',lab:'6 labour-hours',p:23000,staff:2,min:180,prod:'DEEP',freq:['ONE_TIME','MONTHLY','BIWEEKLY','WEEKLY']},
+  {id:'deep_2x4', cat:'deep', n:'2 cleaners · 4 hours',lab:'8 labour-hours',p:26000,staff:2,min:240,prod:'DEEP',freq:['ONE_TIME','MONTHLY','BIWEEKLY','WEEKLY']},
+  {id:'move',  cat:'other',n:'Move-in / move-out',lab:'2 cleaners · 2 hours',p:14000,staff:2,min:120,prod:'DEEP',freq:['ONE_TIME']},
+  {id:'carpet',cat:'other',n:'Carpet cleaning',lab:'2 hours',p:19900,staff:1,min:120,prod:'NONE',freq:['ONE_TIME']},
+  {id:'window',cat:'other',n:'Window cleaning',lab:'Priced after we see the job',p:null,staff:1,min:null,prod:'NONE',freq:['ONE_TIME'],quote:true}
+];
+const ADDONS = [
+  {id:'laundry',n:'Laundry — wash & fold',d:'Per load',p:1000,qty:true},
+  {id:'garbage',n:'Garbage removal',d:'Bulk items taken away',p:1500,qty:false},
+  {id:'glass',  n:'Glass / patio doors',d:'Per glass door',p:500,qty:true}
+];
+const PROMOS = [
+  {code:'NEW_CUSTOMER_BASIC',label:'New customer — $15 off Basic',cat:'basic',amt:1500,family:'NEW_CUSTOMER'},
+  {code:'NEW_CUSTOMER_DEEP', label:'New customer — $20 off Deep', cat:'deep', amt:2000,family:'NEW_CUSTOMER'}
+];
+const PROPERTY_TYPES = ['Studio / Bachelor','Apartment 1½','Apartment 2½','Apartment 3½','Apartment 4½','Apartment 5½','Apartment 6½','Apartment 7½+','Condo','Loft','Townhouse','House / Bungalow','Duplex','Triplex / Multiplex unit','Cottage','Chalet / Cabin','Spa / Wellness property','Office','Retail / Store','Restaurant / Commercial space','Other'];
+
+/* real reviews observed on the public listing — source badges preserved.
+   Google Business Profile sync replaces these once credentials exist. */
+const REVIEWS = [
+  {n:'David McNamara',r:5,when:'2 years ago',src:'legacy',t:'I took the deep clean service from Rapide 2 Nette. The service was excellent and the owner and crew were efficient and professional while also being friendly.'},
+  {n:'Sarah Rynd',r:5,when:'4 years ago',src:'legacy',t:"Had basic cleaning done for my mom's apartment. Very professional job. Arrived on time and was very friendly. I am truly satisfied with the work."},
+  {n:'Jon Rose',r:5,when:'4 years ago',src:'legacy',t:'I had such an amazing experience with Rapide 2 Nette! They were on time, kind and professional. They definitely executed!'}
+];
+
+/* ---------------- state ---------------- */
+const S = {step:0,cat:null,svc:null,prod:null,freq:null,addons:{},airbnb:null,km:12,consent:false};
+const MAX_STEP = 7;
+
+/* ---------------- quote (mirror of server engine) ---------------- */
+function quote(){
+  const svc = SERVICES.find(s=>s.id===S.svc);
+  if(!svc || svc.quote || svc.p===null) return null;
+  const lines = [];
+  const base = svc.p;
+  lines.push({t:'SERVICE',lbl:(svc.cat==='basic'?'Basic cleaning':svc.cat==='deep'?'Deep cleaning':svc.n),sub:svc.cat==='other'?svc.lab:svc.n,v:base,tax:true});
+
+  // ---- BEST_SINGLE_DISCOUNT ----
+  const cands = [];
+  const fr = FREQ[S.freq||'ONE_TIME'];
+  if(fr.rate>0) cands.push({src:'FREQ',label:fr.label+' — save '+(fr.rate/MP)+'%',amt:rate(base,fr.rate)});
+  for(const p of PROMOS){ if(p.cat===svc.cat) cands.push({src:p.code,label:p.label,amt:Math.min(p.amt,base),family:p.family}); }
+  let win=null; for(const c of cands) if(!win||c.amt>win.amt) win=c;
+
+  // subsequent-visit preview: first-booking promos no longer apply
+  let sub=null;
+  if(S.freq && S.freq!=='ONE_TIME'){
+    const subCands = fr.rate>0 ? [{src:'FREQ',label:fr.label+' discount',amt:rate(base,fr.rate)}] : [];
+    let sw=null; for(const c of subCands) if(!sw||c.amt>sw.amt) sw=c;
+    sub={disc:sw?sw.amt:0,label:sw?sw.label:'no discount',service:base-(sw?sw.amt:0)};
+  }
+  if(win) lines.push({t:'DISCOUNT',lbl:win.label,v:-win.amt,tax:true,save:true});
+
+  // products
+  if(svc.prod!=='NONE' && S.prod){
+    const amt = S.prod==='CLIENT'?0:(svc.prod==='DEEP'?CFG.productDeep:CFG.productBasic);
+    lines.push({t:'PRODUCTS',lbl:S.prod==='CLIENT'?'You provide the products':'R2NETTE '+(svc.prod==='DEEP'?'deep':'basic')+' product kit',v:amt,tax:true,muted:amt===0});
+  }
+  // add-ons
+  for(const a of ADDONS){ const q=S.addons[a.id]||0; if(q>0) lines.push({t:'ADD_ON',lbl:a.n+(a.qty&&q>1?' × '+q:''),v:a.p*q,tax:true}); }
+  // transport
+  lines.push({t:'TRANSPORT',lbl:'Travel',sub:'One fee per visit · first 20 km included',v:CFG.transportBase,tax:true});
+  const extra = Math.max(0,(Number(S.km)||0)-CFG.includedKm);
+  if(extra>0) lines.push({t:'DISTANCE',lbl:'Extra distance',sub:extra+' km beyond 20 km × $0.65',v:extra*CFG.perKm,tax:true});
+
+  const taxable = lines.filter(l=>l.tax).reduce((a,l)=>a+l.v,0);
+  const subtotal = lines.reduce((a,l)=>a+l.v,0);
+  const gst = rate(Math.max(taxable,0),CFG.gst);
+  const qst = rate(Math.max(taxable,0),CFG.qst);
+  return {lines,subtotal,gst,qst,total:subtotal+gst+qst,discount:win?win.amt:0,winner:win,sub,svc};
+}
+
+/* ---------------- ledger render ---------------- */
+let lastTotal = 0;
+function renderLedger(){
+  const q = quote(), el = document.getElementById('ledgerBody'), sticky = document.getElementById('sticky');
+  const svc = SERVICES.find(s=>s.id===S.svc);
+  if(svc && svc.quote){
+    el.innerHTML = '<div class="empty"><strong style="color:var(--ink);display:block;margin-bottom:6px">Window cleaning is quoted</strong>Window jobs depend on how many windows, how many floors, and how reachable they are. We\'ll send you a firm price — never a $0 checkout.</div>';
+    sticky.hidden = true; return;
+  }
+  if(!q){ el.innerHTML = '<div class="empty">Pick a service and your price appears here — every line, including tax.</div>'; sticky.hidden = true; return; }
+
+  let h = '<div class="lines">';
+  for(const l of q.lines){
+    h += `<div class="ln${l.save?' save':''}${l.muted?' muted':''}"><span class="lbl">${l.lbl}${l.sub?`<small>${l.sub}</small>`:''}</span><span class="val">${fmt(l.v)}</span></div>`;
+  }
+  h += `<div class="ln rule muted"><span class="lbl">Subtotal</span><span class="val">${fmt(q.subtotal)}</span></div>`;
+  h += `<div class="ln muted"><span class="lbl">GST / TPS 5%</span><span class="val">${fmt(q.gst)}</span></div>`;
+  h += `<div class="ln muted"><span class="lbl">QST / TVQ 9.975%</span><span class="val">${fmt(q.qst)}</span></div>`;
+  h += `<div class="ln tot"><span class="lbl">Total</span><span class="val" id="totVal">${fmt(q.total)}</span></div></div>`;
+
+  h += '<div class="ledger-f">';
+  h += `<div class="duenow"><span>Due today</span><span class="val">$0.00</span></div>`;
+  h += `<div style="font-size:12.5px">We confirm your slot first. Payment is collected when your cleaning is scheduled.</div>`;
+  if(q.discount>0) h += `<div class="savepill">★ You're saving ${fmt(q.discount)} on this cleaning</div>`;
+  if(q.sub){
+    h += `<div class="nextvisit"><b>After your first visit:</b> ${FREQ[S.freq].desc}. Cleaning service drops to <b>${fmt(q.sub.service)}</b> with your ${q.sub.label}. Products, travel and tax are added per visit. Each visit is priced fresh — nothing is locked in.</div>`;
+  }
+  h += '</div>';
+  el.innerHTML = h;
+
+  sticky.hidden = false;
+  countUp(document.getElementById('stickyTot'), lastTotal, q.total);
+  lastTotal = q.total;
+  const ss = document.getElementById('stickySave');
+  if(q.discount>0){ ss.hidden=false; ss.innerHTML = `★ You save ${fmt(q.discount)}`; } else ss.hidden = true;
+}
+function countUp(node, from, to){
+  if(from===to){ node.textContent = fmt(to); return; }
+  const t0 = performance.now(), dur = 480;
+  (function tick(now){
+    const p = Math.min(1,(now-t0)/dur), e = 1-Math.pow(1-p,3);
+    node.textContent = fmt(Math.round(from+(to-from)*e));
+    if(p<1) requestAnimationFrame(tick);
+  })(t0);
+}
+
+/* ---------------- savings moment ---------------- */
+let mTimer;
+function moment(html){
+  const m = document.getElementById('moment');
+  m.innerHTML = html; m.classList.add('on');
+  clearTimeout(mTimer); mTimer = setTimeout(()=>m.classList.remove('on'), 4200);
+}
+
+/* ---------------- builders ---------------- */
+const tickSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+function optHTML(sel,title,desc,price,badge){
+  return `<span class="check">${tickSvg}</span><span class="opt-body"><span class="opt-t">${title}</span>${desc?`<span class="opt-d">${desc}</span>`:''}</span>${price?`<span class="opt-p">${price}</span>`:''}${badge?`<span class="badge">${badge}</span>`:''}`;
+}
+function buildCats(){
+  document.getElementById('svcCats').innerHTML = CATS.map(c=>
+    `<button type="button" class="opt" aria-pressed="${S.cat===c.id}" onclick="pickCat('${c.id}')">${optHTML(0,c.t,c.d,'')}</button>`).join('');
+  buildSvcOpts();
+}
+function pickCat(id){ S.cat=id; if(SERVICES.find(s=>s.id===S.svc)?.cat!==id){S.svc=null;S.prod=null;} buildCats(); renderLedger(); syncNav(); }
+function buildSvcOpts(){
+  const box = document.getElementById('svcOpts');
+  if(!S.cat){ box.innerHTML=''; return; }
+  const list = SERVICES.filter(s=>s.cat===S.cat);
+  box.innerHTML = `<div class="stepno" style="margin-bottom:10px">Choose crew &amp; time</div><div class="opts">` + list.map(s=>{
+    const price = s.quote ? `<span class="amt" style="font-size:13.5px">Quote</span>` : `<span class="amt">${fmt(s.p)}</span><span class="per">per visit</span>`;
+    return `<button type="button" class="opt" aria-pressed="${S.svc===s.id}" onclick="pickSvc('${s.id}')">${optHTML(0,s.n,s.lab,price)}</button>`;
+  }).join('') + '</div>';
+}
+function pickSvc(id){
+  S.svc=id; const s=SERVICES.find(x=>x.id===id);
+  if(s.prod==='NONE') S.prod=null;
+  if(S.freq && !s.freq.includes(S.freq)) S.freq=null;
+  buildSvcOpts(); renderLedger(); syncNav();
+}
+function buildAirbnb(){
+  document.getElementById('airbnb').innerHTML = [['yes','Yes'],['no','No']].map(([v,t])=>
+    `<button type="button" class="opt" aria-pressed="${S.airbnb===v}" onclick="S.airbnb='${v}';buildAirbnb()">${optHTML(0,t,'')}</button>`).join('');
+}
+function buildProducts(){
+  const svc = SERVICES.find(s=>s.id===S.svc);
+  const box = document.getElementById('products');
+  if(!svc || svc.prod==='NONE'){
+    box.innerHTML = '<div class="wnote">This service doesn\'t use a product kit, so there\'s nothing to choose here.</div>';
+    return;
+  }
+  const deep = svc.prod==='DEEP', amt = deep?CFG.productDeep:CFG.productBasic;
+  box.innerHTML = [
+    {v:'CLIENT',t:'I\'ll provide the products',d:'Our crew uses what you have at home',p:0},
+    {v:'R2NETTE',t:`R2NETTE brings the ${deep?'deep':'basic'} kit`,d:`Professional ${deep?'deep-clean':'everyday'} products, restocked every visit`,p:amt}
+  ].map(o=>`<button type="button" class="opt" aria-pressed="${S.prod===o.v}" onclick="pickProd('${o.v}')">${optHTML(0,o.t,o.d,`<span class="amt">${o.p===0?'$0.00':'+'+fmt(o.p)}</span><span class="per">${o.p===0?'no charge':'per visit + tax'}</span>`)}</button>`).join('');
+}
+function pickProd(v){ S.prod=v; buildProducts(); renderLedger(); syncNav(); }
+function buildFreq(){
+  const svc = SERVICES.find(s=>s.id===S.svc);
+  const allowed = svc?svc.freq:Object.keys(FREQ);
+  const base = svc&&svc.p?svc.p:0;
+  document.getElementById('freq').innerHTML = Object.entries(FREQ).map(([k,f])=>{
+    const ok = allowed.includes(k);
+    const save = f.rate>0?rate(base,f.rate):0;
+    const price = f.rate>0?`<span class="amt" style="color:#B36A00">−${fmt(save)}</span><span class="per">every visit</span>`:`<span class="amt">${fmt(base)}</span><span class="per">one visit</span>`;
+    return `<button type="button" class="opt" aria-pressed="${S.freq===k}" ${ok?'':'disabled style="opacity:.42;cursor:not-allowed"'} onclick="${ok?`pickFreq('${k}')`:''}">${optHTML(0,f.label,ok?f.desc:'Not available for this service',price,f.rate===pct(25)?'BEST VALUE':'')}</button>`;
+  }).join('');
+  const e = document.getElementById('freqErr');
+  if(svc && svc.freq.length===1){ e.textContent = svc.n+' is a one-time service.'; e.classList.add('on'); } else e.classList.remove('on');
+}
+function pickFreq(k){
+  S.freq=k; buildFreq(); renderLedger(); syncNav();
+  const q = quote();
+  if(q && q.winner){
+    if(q.winner.src==='FREQ' && FREQ[k].rate>0){
+      moment(`<span>★</span><span>Nice — you save <b>${fmt(q.winner.amt)}</b> on the cleaning every ${k==='WEEKLY'?'week':k==='BIWEEKLY'?'two weeks':'month'}.</span>`);
+    } else if(q.winner.family==='NEW_CUSTOMER'){
+      moment(`<span>★</span><span>We applied your better offer: <b>${fmt(q.winner.amt)}</b> welcome discount today.</span>`);
+    }
+  }
+}
+function buildAddons(){
+  document.getElementById('addons').innerHTML = ADDONS.map(a=>{
+    const q = S.addons[a.id]||0;
+    const ctrl = a.qty
+      ? `<div class="qty" onclick="event.stopPropagation()"><button type="button" onclick="bump('${a.id}',-1)" ${q===0?'disabled':''} aria-label="Remove one">−</button><output>${q}</output><button type="button" onclick="bump('${a.id}',1)" aria-label="Add one">+</button></div>`
+      : '';
+    return `<button type="button" class="opt" aria-pressed="${q>0}" onclick="${a.qty?`bump('${a.id}',1)`:`toggleAddon('${a.id}')`}">${optHTML(0,a.n,a.d,`<span class="amt">${fmt(a.p)}</span><span class="per">${a.qty?'each':'flat'}</span>`)}${a.qty?`<span style="margin-left:12px">${ctrl}</span>`:''}</button>`;
+  }).join('');
+}
+function bump(id,d){ event.stopPropagation(); S.addons[id]=Math.max(0,(S.addons[id]||0)+d); buildAddons(); renderLedger(); }
+function toggleAddon(id){ S.addons[id]=S.addons[id]?0:1; buildAddons(); renderLedger(); }
+function buildReviews(){
+  document.getElementById('rail').innerHTML = REVIEWS.map(r=>{
+    const label = r.src==='google'?'Google review':r.src==='legacy'?'Verified booking · via Setmore':'R2NETTE verified';
+    const mark = r.src==='google'?'G':r.src==='legacy'?'S':'R';
+    return `<article class="rev"><div class="rev-top"><div class="avatar">${r.n[0]}</div><div><div class="rev-name">${r.n}</div><div class="rev-when">${'★'.repeat(r.r)} · ${r.when}</div></div></div><p>${r.t}</p><span class="src ${r.src}"><span class="dot">${mark}</span>${label}</span></article>`;
+  }).join('');
+}
+function buildPropertyTypes(){
+  document.getElementById('ptype').innerHTML = '<option value="">Select…</option>' + PROPERTY_TYPES.map(p=>`<option>${p}</option>`).join('');
+}
+
+/* ---------------- wallets (real detection, never faked) ---------------- */
+async function detectWallets(){
+  const sub = document.getElementById('walletSub'), box = document.getElementById('wbtns');
+  const hasApple = !!(window.ApplePaySession && window.ApplePaySession.canMakePayments && window.ApplePaySession.canMakePayments());
+  let hasPR = false;
+  try { hasPR = typeof window.PaymentRequest === 'function'; } catch(e){}
+  const found = [];
+  if(hasApple) found.push({c:'apple',t:' Pay'});
+  if(hasPR && !hasApple) found.push({c:'gpay',t:'Google Pay'});
+  if(found.length){
+    sub.textContent = 'One tap — no card typing.';
+    box.innerHTML = found.map(f=>`<button class="wbtn ${f.c}" onclick="walletNotice()">${f.t}</button>`).join('') +
+      `<button class="wbtn link" onclick="walletNotice()">Pay with Link</button>`;
+  } else {
+    sub.textContent = 'Wallet payments';
+    box.innerHTML = `<div class="wnote"><b>No wallet detected on this device.</b> Apple Pay, Google Pay and Link appear automatically on devices that support them — we never show a button that won't work.</div>`;
+  }
+}
+function walletNotice(){
+  alert('Stripe keys are not configured yet.\n\nAdd STRIPE_SECRET_KEY and NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, then register your payment domain with Stripe to activate wallet checkout.');
+}
+function buildConsent(){
+  const w = document.getElementById('consentWrap');
+  if(S.freq && S.freq!=='ONE_TIME'){
+    w.innerHTML = `<div class="consent"><input type="checkbox" id="consentBox" ${S.consent?'checked':''} onchange="S.consent=this.checked;syncNav()"><label for="consentBox">I authorize R2NETTE to securely save my payment method with Stripe and charge it for each scheduled visit in this recurring plan. Each visit is priced and charged separately — I can pause, skip or cancel any time.</label></div>`;
+  } else w.innerHTML = '';
+}
+
+/* ---------------- navigation ---------------- */
+const STEPS = [
+  {ok:()=>!!S.svc, msg:'Choose a service to continue.'},
+  {ok:()=>!!document.getElementById('ptype').value && !!S.airbnb, msg:'Select a property type and answer the short-term rental question.'},
+  {ok:()=>{const s=SERVICES.find(x=>x.id===S.svc); return !s||s.prod==='NONE'||!!S.prod;}, msg:'Choose who provides the cleaning products.'},
+  {ok:()=>!!S.freq, msg:'Pick how often you\'d like cleaning.'},
+  {ok:()=>true},
+  {ok:()=>validateContact(), msg:'Fill in the highlighted fields.'},
+  {ok:()=>!S.freq||S.freq==='ONE_TIME'||S.consent, msg:'Please authorize the saved payment method for your recurring plan.'}
+];
+function validateContact(){
+  let ok = true;
+  const need = [['addr','addrErr'],['city','cityErr'],['nm','nmErr'],['ph','phErr']];
+  for(const [id,err] of need){
+    const v = document.getElementById(id).value.trim();
+    document.getElementById(id).classList.toggle('bad',!v);
+    document.getElementById(err).classList.toggle('on',!v);
+    if(!v) ok=false;
+  }
+  const em = document.getElementById('em').value.trim();
+  const emOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em);
+  document.getElementById('em').classList.toggle('bad',!emOk);
+  document.getElementById('emErr').classList.toggle('on',!emOk);
+  if(!emOk) ok=false;
+  const pc = document.getElementById('postal').value.trim().toUpperCase();
+  const pcOk = /^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z] ?\d[ABCEGHJ-NPRSTV-Z]\d$/.test(pc);
+  document.getElementById('postal').classList.toggle('bad',!pcOk);
+  document.getElementById('postalErr').classList.toggle('on',!pcOk);
+  if(!pcOk) ok=false;
+  return ok;
+}
+function go(d){
+  if(d>0){
+    const g = STEPS[S.step];
+    if(g && !g.ok()){
+      if(S.step===2) document.getElementById('prodErr').classList.add('on');
+      if(g.msg && S.step!==5) moment(`<span>⚠</span><span>${g.msg}</span>`);
+      return;
+    }
+  }
+  const svc = SERVICES.find(s=>s.id===S.svc);
+  if(d>0 && svc && svc.quote){
+    moment('<span>✉</span><span>Window cleaning is quoted — call (514) 825-2825 and we\'ll price it.</span>');
+    return;
+  }
+  S.step = Math.max(0,Math.min(MAX_STEP,S.step+d));
+  render();
+  window.scrollTo({top:document.getElementById('book').offsetTop-80,behavior:'smooth'});
+}
+function render(){
+  document.querySelectorAll('.step').forEach(el=>el.classList.toggle('on',+el.dataset.step===S.step));
+  document.getElementById('progress').innerHTML = Array.from({length:7},(_,i)=>
+    `<span class="pip ${i<S.step?'done':i===S.step?'now':''}"><i></i></span>`).join('');
+  if(S.step===1) buildAirbnb();
+  if(S.step===2){ buildProducts(); document.getElementById('prodErr').classList.remove('on'); }
+  if(S.step===3) buildFreq();
+  if(S.step===4) buildAddons();
+  if(S.step===6){ detectWallets(); buildConsent(); }
+  const nav = document.getElementById('navBtns');
+  nav.style.display = S.step===MAX_STEP ? 'none' : 'flex';
+  document.getElementById('backBtn').style.display = S.step===0 ? 'none' : 'inline-flex';
+  document.getElementById('nextBtn').textContent = S.step===6 ? 'Confirm booking' : 'Continue';
+  if(S.step===6) document.getElementById('nextBtn').onclick = confirmBooking;
+  else document.getElementById('nextBtn').onclick = ()=>go(1);
+  document.getElementById('sticky').hidden = S.step===MAX_STEP;
+  syncNav(); renderLedger();
+}
+function syncNav(){
+  const b = document.getElementById('stickyBtn');
+  b.textContent = S.step===6?'Confirm':'Continue';
+  b.onclick = S.step===6?confirmBooking:()=>go(1);
+  if(S.step===2) buildProducts();
+}
+function scrollToBooking(){ document.getElementById('book').scrollIntoView({behavior:'smooth'}); }
+function scrollLedger(){ document.querySelector('.ledger').scrollIntoView({behavior:'smooth',block:'center'}); }
+
+/* ---------------- confirm ---------------- */
+function confirmBooking(){
+  if(S.freq && S.freq!=='ONE_TIME' && !S.consent){
+    moment('<span>⚠</span><span>Please authorize the saved payment method.</span>');
+    return;
+  }
+  const q = quote(); if(!q) return;
+  const no = 'R2N-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*900000)+100000);
+  document.getElementById('cBookingNo').textContent = 'Booking ' + no;
+  const addr = [document.getElementById('addr').value, document.getElementById('unit').value, document.getElementById('city').value, 'QC', document.getElementById('postal').value.toUpperCase()].filter(Boolean).join(', ');
+  const rows = [
+    ['Name', document.getElementById('nm').value],
+    ['Cleaning address', addr],
+    ['Service', q.svc.cat==='basic'?'Basic cleaning':q.svc.cat==='deep'?'Deep cleaning':q.svc.n],
+    ['Crew &amp; time', q.svc.n + ' · ' + q.svc.lab],
+    ['Products', S.prod==='CLIENT'?'Client supplying':S.prod==='R2NETTE'?('R2NETTE '+(q.svc.prod==='DEEP'?'deep':'basic')+' kit'):'Not applicable'],
+    ['Frequency', FREQ[S.freq].label],
+    ['Total', fmt(q.total)],
+    ['Due today', '$0.00'],
+    ['Payment', 'Collected when your slot is confirmed']
+  ];
+  document.getElementById('cRows').innerHTML = rows.map(([k,v])=>`<div class="crow"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+  S.step = MAX_STEP; render();
+  window.scrollTo({top:document.getElementById('book').offsetTop-80,behavior:'smooth'});
+  burst();
+}
+function burst(){
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors=['#00C2A0','#FF9E1B','#0B3A5C','#EDF3F7'];
+  for(let i=0;i<26;i++){
+    const d=document.createElement('div');
+    d.style.cssText=`position:fixed;left:50%;top:32%;width:9px;height:9px;background:${colors[i%4]};border-radius:2px;z-index:99;pointer-events:none`;
+    document.body.appendChild(d);
+    const ang=Math.random()*Math.PI*2, dist=90+Math.random()*220;
+    d.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:`translate(${Math.cos(ang)*dist}px,${Math.sin(ang)*dist+180}px) rotate(${Math.random()*720}deg)`,opacity:0}],{duration:1100+Math.random()*700,easing:'cubic-bezier(.2,.6,.3,1)'}).onfinish=()=>d.remove();
+  }
+}
+
+/* ---------------- promo layer ---------------- */
+function dismissRibbon(){ document.getElementById('ribbon').hidden=true; try{sessionStorage.setItem('r2_ribbon','1')}catch(e){} }
+function closeWelcome(){ document.getElementById('welcome').classList.remove('on'); try{sessionStorage.setItem('r2_welcome','1')}catch(e){} }
+
+/* ---------------- init ---------------- */
+buildCats(); buildReviews(); buildPropertyTypes(); buildAirbnb(); render();
+document.getElementById('km').addEventListener('input',e=>{S.km=e.target.value;renderLedger()});
+['addr','city','nm','ph','em','postal'].forEach(id=>document.getElementById(id).addEventListener('input',e=>{e.target.classList.remove('bad')}));
+
+let ribbonHidden=false, welcomeSeen=false;
+try{ ribbonHidden = sessionStorage.getItem('r2_ribbon')==='1'; welcomeSeen = sessionStorage.getItem('r2_welcome')==='1'; }catch(e){}
+if(!ribbonHidden) document.getElementById('ribbon').hidden=false;
+if(!welcomeSeen) setTimeout(()=>document.getElementById('welcome').classList.add('on'), 1400);
+
+// deep link: /book?service=deep_1x3 — skip marketing, enter booking state
+const params = new URLSearchParams(location.search);
+const deep = params.get('service');
+if(deep && SERVICES.find(s=>s.id===deep)){
+  const s = SERVICES.find(x=>x.id===deep);
+  S.cat=s.cat; S.svc=s.id; buildCats(); renderLedger();
+  try{sessionStorage.setItem('r2_welcome','1')}catch(e){}
+  document.getElementById('welcome').classList.remove('on');
+  setTimeout(scrollToBooking,300);
+}
+</script>
+</body>
+</html>

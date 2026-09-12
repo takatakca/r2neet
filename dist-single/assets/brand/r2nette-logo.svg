@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 64" role="img" aria-label="R2NETTE Cleaning Services">
+  <defs>
+    <linearGradient id="orb" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3BA9F5"/><stop offset="1" stop-color="#0B4DA2"/>
+    </linearGradient>
+    <linearGradient id="wm" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0B4DA2"/><stop offset=".55" stop-color="#10A5A0"/><stop offset="1" stop-color="#5BC236"/>
+    </linearGradient>
+  </defs>
+  <!-- orb + house + broom, derived from the brand board mark -->
+  <circle cx="30" cy="30" r="24" fill="url(#orb)"/>
+  <path d="M30 15l14 11v1h-5v13H21V27h-5v-1z" fill="#fff"/>
+  <rect x="26" y="32" width="8" height="8" fill="#0B4DA2"/>
+  <path d="M40 44l9-9 4 4-9 9z" fill="#5BC236"/>
+  <path d="M47 49l7-7 5 4-6 7z" fill="#8BD73F"/>
+  <circle cx="47" cy="12" r="5" fill="#7FD4FF" opacity=".9"/>
+  <circle cx="55" cy="20" r="3" fill="#B6E8FF" opacity=".85"/>
+  <circle cx="18" cy="12" r="2.5" fill="#B6E8FF" opacity=".7"/>
+  <text x="66" y="34" font-family="Bricolage Grotesque, Segoe UI, sans-serif" font-size="27" font-weight="800" fill="url(#wm)" letter-spacing="-.5">R2NETTE</text>
+  <text x="67" y="47" font-family="Instrument Sans, Segoe UI, sans-serif" font-size="8.5" font-weight="600" fill="#5B7386" letter-spacing="3.4">CLEANING SERVICES</text>
+</svg>

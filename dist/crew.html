@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07283F">
+<title>R2NETTE — My jobs</title>
+<link rel="manifest" href="/crew-manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#07283F;--deep:#0B3A5C;--aqua:#00C2A0;--aqua-dk:#00A386;--citrus:#FF9E1B;
+--paper:#FBFCFD;--mist:#EDF3F7;--line:#DCE7EE;--muted:#5B7386;--danger:#C4383C;--ok:#0E8A63;
+--e:cubic-bezier(.22,1,.36,1)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:'Instrument Sans',system-ui,sans-serif;font-size:16px;
+padding-bottom:env(safe-area-inset-bottom)}
+h1,h2{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;letter-spacing:-.02em;margin:0}
+.mono{font-family:'JetBrains Mono',monospace}
+button{font:inherit;cursor:pointer}
+header{background:var(--ink);color:#fff;padding:calc(16px + env(safe-area-inset-top)) 18px 18px}
+header .brand{font-family:'Bricolage Grotesque';font-weight:800;font-size:15px;opacity:.65}
+header .brand span{color:var(--aqua)}
+header h1{font-size:24px;margin-top:5px}
+header .sub{opacity:.72;font-size:14px;margin-top:4px}
+.wrap{padding:16px;max-width:640px;margin:0 auto}
+.next{background:linear-gradient(150deg,var(--deep),var(--ink));color:#fff;border-radius:20px;padding:22px;margin-bottom:16px;box-shadow:0 8px 28px rgba(7,40,63,.2)}
+.next .lbl{font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;opacity:.7;font-weight:700}
+.next .time{font-family:'JetBrains Mono';font-size:34px;font-weight:700;margin:6px 0 2px}
+.next .svc{font-size:17px;font-weight:600}
+.next .addr{opacity:.85;font-size:14.5px;margin-top:10px;line-height:1.45}
+.next .actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.btn{border:0;border-radius:999px;padding:14px 22px;font-weight:600;font-size:15.5px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;transition:transform .16s var(--e)}
+.btn:active{transform:scale(.97)}
+.btn-go{background:var(--aqua);color:#04262E;flex:1}
+.btn-map{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25)}
+.btn-full{width:100%;margin-top:10px}
+.btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.btn-done{background:var(--ok);color:#fff}
+.btn:disabled{opacity:.45}
+.job{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:11px;display:flex;gap:14px;align-items:flex-start;width:100%;text-align:left;border-left:4px solid var(--line)}
+.job.done{border-left-color:var(--ok);opacity:.65}
+.job.active{border-left-color:var(--aqua)}
+.job .t{font-family:'JetBrains Mono';font-weight:700;font-size:17px;flex:none;width:64px}
+.job .b{flex:1;min-width:0}
+.job .b b{display:block;font-size:15.5px}
+.job .b span{font-size:13.5px;color:var(--muted);display:block;margin-top:2px}
+.pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700}
+.pill.ok{background:rgba(14,138,99,.12);color:var(--ok)}
+.pill.now{background:rgba(0,194,160,.15);color:var(--aqua-dk)}
+.pill.mut{background:var(--mist);color:var(--muted)}
+.sect{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin:22px 0 10px}
+.detail{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:14px}
+.row{display:flex;justify-content:space-between;gap:16px;padding:14px 16px;border-bottom:1px solid var(--line);font-size:15px}
+.row:last-child{border-bottom:0}
+.row .k{color:var(--muted);flex:none}
+.row .v{text-align:right;font-weight:500}
+.note{background:rgba(255,158,27,.1);border:1px solid rgba(255,158,27,.3);border-radius:14px;padding:14px;font-size:14.5px;line-height:1.5;margin-bottom:14px}
+.steps{display:grid;gap:9px;margin-top:16px}
+.empty{text-align:center;padding:50px 20px;color:var(--muted)}
+.empty .big{font-size:17px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.back{background:none;border:0;color:var(--muted);font-size:15px;padding:8px 0;margin-bottom:8px}
+.issues{display:grid;gap:8px;margin-top:10px}
+.issue{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left;font-size:15px;width:100%}
+.page{display:none}.page.on{display:block}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+  <script type="module" crossorigin src="/assets/crew-d4YS54gu.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
+</head>
+<body>
+<header>
+  <div class="brand">R2<span>NETTE</span></div>
+  <h1 id="hTitle">My jobs</h1>
+  <div class="sub" id="hSub"></div>
+</header>
+<div class="wrap">
+  <div id="list" class="page on"></div>
+  <div id="detail" class="page"></div>
+</div>
+
+</body>
+</html>

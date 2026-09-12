@@ -1,0 +1,276 @@
+name: CI
+
+# Every push and every pull request. A quality regime that depends on
+# remembering to run something is not a quality regime.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A new push supersedes an in-flight run on the same branch.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # Fast signal first: typecheck and build fail in seconds, so a broken
+  # commit does not wait on a five-minute test run to say so.
+  static:
+    name: Typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build all pages
+        run: npm run build
+
+      - name: Build the standalone preview
+        run: npm run build:single
+
+      # The bundle is what customers actually load. A silent size jump usually
+      # means a dependency was pulled into the browser by accident.
+      - name: Check bundle size
+        run: |
+          TOTAL=$(du -sk dist/assets | cut -f1)
+          echo "Bundle: ${TOTAL}KB"
+          if [ "$TOTAL" -gt 400 ]; then
+            echo "::error::Bundle grew to ${TOTAL}KB (limit 400KB)."
+            exit 1
+          fi
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: r2nette_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      # Only the test database is ever named here. The safety guard refuses
+      # destructive operations against anything else.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/r2nette_test
+      PRISMA_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/r2nette_test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/r2nette_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+
+      # Migrations must apply to an EMPTY database, in order, from nothing.
+      # `db push` would hide a broken migration until deploy day.
+      - name: Apply migrations from scratch
+        run: npx prisma migrate deploy
+
+      - name: Verify schema matches migrations
+        run: |
+          # A schema edited without a matching migration passes locally and
+          # fails in production. This catches that gap.
+          npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$TEST_DATABASE_URL" \
+            --exit-code && echo "Schema and migrations agree." || {
+              echo "::error::prisma/schema.prisma has changes with no migration. Run: npx prisma migrate dev"
+              exit 1
+            }
+
+      - name: Run tests with coverage
+        run: npx vitest run --coverage --reporter=json --outputFile=/tmp/results.json
+
+      # Replaces a global minimum test count.
+      #
+      # A count of 600 against 631 tests silently permits deleting 31, cannot
+      # say which coverage was lost, and rewards padding the suite with
+      # trivia. It answers "are there enough tests?" when the question is
+      # "are the things that must never break still proven?"
+      #
+      # Each rule carries a stable [INV-...] tag embedded in the proving
+      # test's title. Matching on the tag rather than on prose means a test
+      # can be reworded freely, and a rename cannot silently rebind a rule to
+      # a different, weaker test.
+      #
+      # Fails on: missing tag, failing test, skipped test, the same tag on
+      # two tests, or a tag no invariant declares.
+      - name: Business invariants are still proven
+        run: npx vite-node scripts/check-invariants.ts -- /tmp/results.json
+
+      # Per-directory thresholds, enforced by vitest.config.ts. A single
+      # global number would let well-covered helpers mask a gap in pricing.
+      - name: Report coverage on critical paths
+        if: always()
+        run: |
+          node -e "
+            const s = require('./coverage/coverage-summary.json');
+            const crit = ['src/engine','src/payments','src/auth','src/scheduling','src/promotions'];
+            const dirs = {};
+            for (const [f, v] of Object.entries(s)) {
+              if (f === 'total') continue;
+              const d = f.replace(process.cwd() + '/', '').split('/').slice(0, 2).join('/');
+              if (!crit.includes(d)) continue;
+              dirs[d] = dirs[d] || { c: 0, t: 0 };
+              dirs[d].c += v.statements.covered; dirs[d].t += v.statements.total;
+            }
+            for (const [d, v] of Object.entries(dirs).sort())
+              console.log(d.padEnd(20) + (v.c / v.t * 100).toFixed(1) + '%');
+          "
+
+  # The checks that protect money and customer data specifically. Separated so
+  # a failure here is unmistakable in the checks list.
+  safeguards:
+    name: Safety invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: No secrets committed
+        run: |
+          # Real credentials only. Test fixtures deliberately contain
+          # obviously-fake keys, and a check that flags those gets ignored --
+          # which is worse than no check at all.
+          HITS=$(grep -rIn --exclude-dir=node_modules --exclude-dir=.git \
+                   --exclude-dir=dist --exclude-dir=dist-single \
+                   --exclude-dir=tests --exclude='*.md' --exclude='ci.yml' \
+                   -E 'sk_live_[A-Za-z0-9]{20,}|rk_live_[A-Za-z0-9]{20,}|whsec_[A-Za-z0-9]{24,}|AKIA[0-9A-Z]{16}' . \
+                 | grep -v 'AKIAIOSFODNN7EXAMPLE' || true)
+          if [ -n "$HITS" ]; then
+            echo "$HITS"
+            echo "::error::A live credential appears to be committed."
+            exit 1
+          fi
+          echo "No live credentials found."
+
+      - name: .env is not committed
+        run: |
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "::error::.env is tracked by git."
+            exit 1
+          fi
+          echo ".env is not tracked."
+
+      - name: No shared admin token reintroduced
+        run: |
+          # A single shared operator secret cannot be revoked per person and
+          # leaves no usable audit trail. It was removed deliberately.
+          #
+          # hardening.ts READS env.ADMIN_TOKEN in order to refuse it at
+          # startup, so that file is excluded; comments are excluded too.
+          # What must never return is code that authenticates with one.
+          HITS=$(grep -rIn --exclude-dir=node_modules \
+                   'ADMIN_TOKEN' src/ web/ scripts/ 2>/dev/null \
+                 | grep -v 'src/api/hardening.ts' \
+                 | grep -vE '//|[*]' || true)
+          if [ -n "$HITS" ]; then
+            echo "$HITS"
+            echo "::error::ADMIN_TOKEN reappeared in live code. Staff auth is per-person."
+            exit 1
+          fi
+          echo "No shared admin token in live code."
+
+      - name: Staff routes use a session, not a bearer token
+        run: |
+          # The specific regression this prevents: reintroducing a token
+          # header check on an operations route.
+          if grep -rn "header('authorization')" src/api/ops.ts 2>/dev/null; then
+            echo "::error::ops.ts reads an Authorization header. Staff auth is cookie-session based."
+            exit 1
+          fi
+          echo "Operations routes use the staff session."
+
+      - name: Frontend has no inline event handlers
+        run: |
+          # Inline handlers reference globals that may not exist in a bundled
+          # build. This was a real outage; the guard keeps it fixed.
+          if grep -n 'onclick=' web/index.html; then
+            echo "::error::web/index.html reintroduced an inline onclick handler."
+            exit 1
+          fi
+          echo "Booking page uses delegated listeners only."
+
+      - name: Browser storage is not used in the customer app
+        run: |
+          if grep -rn 'localStorage\|sessionStorage' web/src/ web/index.html \
+               | grep -v 'persistLocale\|loadDraft\|saveDraft\|clearDraft'; then
+            echo "::warning::Unexpected browser storage use; confirm it is non-sensitive."
+          fi
+          echo "Checked."
+
+  # Proves a fresh machine can actually run this, which local success does not.
+  container:
+    name: Container builds and starts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t r2nette:ci .
+
+      - name: Refuses an unsafe production configuration
+        run: |
+          # Startup validation must block a leftover shared token.
+          OUT=$(docker run --rm \
+            -e NODE_ENV=production \
+            -e DATABASE_URL=postgresql://u@db/live \
+            -e PRISMA_DATABASE_URL=postgresql://u@db/live \
+            -e ADMIN_TOKEN=leftover \
+            r2nette:ci npm start 2>&1 || true)
+          echo "$OUT"
+          if echo "$OUT" | grep -q 'ADMIN_TOKEN'; then
+            echo "Startup correctly refused an unsafe configuration."
+          else
+            echo "::error::Production startup did not reject ADMIN_TOKEN."
+            exit 1
+          fi
+
+  # A single required check, so branch protection needs one rule rather than
+  # one per job.
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    needs: [static, test, safeguards, container]
+    if: always()
+    steps:
+      - name: Verify every job passed
+        run: |
+          RESULTS='${{ join(needs.*.result, ' ') }}'
+          echo "Results: $RESULTS"
+          for r in $RESULTS; do
+            if [ "$r" != "success" ]; then
+              echo "::error::A required job did not pass."
+              exit 1
+            fi
+          done
+          echo "All checks passed."

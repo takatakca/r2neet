@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R2NETTE Operations</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#07283F;--deep:#0B3A5C;--aqua:#00C2A0;--aqua-dk:#00A386;--citrus:#FF9E1B;
+--paper:#F6F9FB;--mist:#EDF3F7;--line:#DCE7EE;--muted:#5B7386;--danger:#C4383C;--ok:#0E8A63;
+--sh:0 1px 2px rgba(7,40,63,.06),0 2px 8px rgba(7,40,63,.05);--e:cubic-bezier(.22,1,.36,1)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:'Instrument Sans',system-ui,sans-serif;font-size:15px}
+h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;letter-spacing:-.02em;margin:0}
+.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer}
+[hidden]{display:none!important}
+a{color:inherit}
+.shell{display:flex;min-height:100vh}
+/* Sign-in gate. The console is never rendered before a session resolves. */
+.gate{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:24px;
+background:radial-gradient(900px 500px at 70% 10%,rgba(59,169,245,.28),transparent 62%),
+linear-gradient(165deg,#0B4DA2,#0A2547)}
+.gate-card{background:#fff;border-radius:22px;padding:32px 26px;width:100%;max-width:380px;
+box-shadow:0 24px 60px rgba(6,26,51,.4)}
+.gate-brand{background:#0A2547;margin:-32px -26px 22px;padding:22px 26px;border-radius:22px 22px 0 0}
+.gate-brand img{height:30px;display:block}
+.gate-card h1{font-size:23px;margin-bottom:8px}
+.gate-sub{color:var(--muted);font-size:14px;margin:0 0 20px}
+.gl{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+.gi{width:100%;border:1.5px solid var(--line);border-radius:11px;padding:13px 14px;font-size:16px;background:#fff}
+.gi:focus{border-color:var(--aqua);box-shadow:0 0 0 3px rgba(18,167,155,.15);outline:none}
+.gbtn{width:100%;margin-top:20px;border:0;border-radius:999px;padding:15px;font-weight:700;font-size:16px;
+background:linear-gradient(135deg,#3FAE49,#12A79B);color:#fff}
+.gbtn:disabled{opacity:.5}
+.gerr{color:var(--danger);font-size:13.5px;margin-top:12px}
+.gfine{color:var(--muted);font-size:12.5px;margin:16px 0 0;text-align:center}
+.gi.mono{font-family:'JetBrains Mono',monospace;font-size:22px;letter-spacing:.14em;text-align:center}
+.tfa-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:14px}
+.tfa-codes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0;
+font-family:'JetBrains Mono',monospace;font-size:14px}
+.tfa-codes div{background:var(--mist);padding:9px 12px;border-radius:8px;text-align:center}
+.tfa-uri{word-break:break-all;font-family:'JetBrains Mono',monospace;font-size:11.5px;
+background:var(--mist);padding:12px;border-radius:10px;margin:12px 0;color:var(--muted)}
+.whoami{margin-top:auto;padding:14px 12px;border-top:1px solid rgba(255,255,255,.12);font-size:13px;color:rgba(255,255,255,.7)}
+.whoami b{display:block;color:#fff;font-size:14px}
+.whoami .role{display:inline-block;margin-top:6px;padding:3px 9px;border-radius:99px;
+background:rgba(255,255,255,.14);font-size:11px;font-weight:700;letter-spacing:.05em}
+.whoami button{margin-top:10px;background:none;border:0;color:rgba(255,255,255,.7);
+text-decoration:underline;font-size:13px;padding:0}
+nav.side{display:flex;flex-direction:column}
+nav.side{width:214px;background:var(--ink);color:#fff;padding:20px 12px;flex:none;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:9px;padding:0 8px 20px;font-family:'Bricolage Grotesque';font-weight:800;font-size:18px}
+.brand span{color:var(--aqua)}
+nav.side a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;text-decoration:none;color:rgba(255,255,255,.7);font-size:14.5px;font-weight:500;margin-bottom:2px}
+nav.side a:hover{background:rgba(255,255,255,.08);color:#fff}
+nav.side a.on{background:var(--aqua);color:#04262E;font-weight:600}
+nav.side .grp{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:rgba(255,255,255,.35);padding:16px 12px 6px;font-weight:700}
+main{flex:1;padding:26px 30px 60px;min-width:0}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap}
+.hdr h1{font-size:27px}
+.sub{color:var(--muted);font-size:14px;margin-top:4px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--sh)}
+.card .k{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700}
+.card .v{font-family:'JetBrains Mono';font-size:30px;font-weight:700;margin-top:8px;line-height:1}
+.card .d{font-size:13px;color:var(--muted);margin-top:6px}
+.card.alert{border-color:rgba(196,56,60,.35);background:rgba(196,56,60,.04)}
+.card.alert .v{color:var(--danger)}
+.card.good .v{color:var(--ok)}
+.panel{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);overflow:hidden;margin-bottom:22px}
+.panel-h{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.panel-h h2{font-size:16px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:10px 18px;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--line);font-weight:700}
+td{padding:13px 18px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+tr:hover td{background:var(--mist)}
+.pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11.5px;font-weight:700;letter-spacing:.02em}
+.pill.ok{background:rgba(14,138,99,.12);color:var(--ok)}
+.pill.warn{background:rgba(255,158,27,.16);color:#8A5200}
+.pill.bad{background:rgba(196,56,60,.12);color:var(--danger)}
+.pill.mut{background:var(--mist);color:var(--muted)}
+.pill.aqua{background:rgba(0,194,160,.14);color:var(--aqua-dk)}
+.btn{border:0;border-radius:9px;padding:8px 14px;font-weight:600;font-size:13.5px;background:var(--aqua);color:#04262E}
+.btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.btn.danger{background:rgba(196,56,60,.1);color:var(--danger)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.tiny{padding:3px 8px;font-size:12px}
+.banner{border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:14px;line-height:1.45}
+.banner.warn{background:rgba(255,158,27,.14);border:1px solid rgba(255,158,27,.35);color:#8A5200}
+.banner.bad{background:rgba(196,56,60,.08);border:1px solid rgba(196,56,60,.28);color:var(--danger)}
+.banner.ok{background:rgba(14,138,99,.1);border:1px solid rgba(14,138,99,.25);color:var(--ok)}
+.form-pad{padding:16px 18px}
+.skills-group{margin-bottom:14px}
+.skills-group h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.check-grid{display:grid;gap:7px}
+.check-grid label{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;cursor:pointer;line-height:1.35}
+.gi.sm{width:110px;padding:8px}
+.hint{font-size:13px;color:var(--muted);margin:0 0 12px}
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+.empty .big{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px}
+/* dispatch */
+.board{display:grid;gap:12px}
+.lane{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:start}
+.lane-name{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;font-weight:600;font-size:14px;box-shadow:var(--sh)}
+.lane-name .meta{font-size:12px;color:var(--muted);font-weight:400;margin-top:3px}
+.lane-track{position:relative;background:#fff;border:1px solid var(--line);border-radius:12px;height:74px;overflow:hidden}
+.hours{display:grid;grid-template-columns:repeat(9,1fr);height:100%;position:absolute;inset:0}
+.hours div{border-right:1px dashed var(--line);font-size:10.5px;color:var(--muted);padding:3px 5px}
+.job{position:absolute;top:8px;bottom:8px;background:linear-gradient(135deg,var(--deep),var(--ink));color:#fff;border-radius:9px;padding:7px 10px;font-size:12px;overflow:hidden;box-shadow:var(--sh)}
+.job.unassigned{background:repeating-linear-gradient(45deg,#C4383C,#C4383C 8px,#a82f33 8px,#a82f33 16px)}
+.job .t{font-weight:700;white-space:nowrap}
+.job .s{opacity:.82;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unassigned-list{display:grid;gap:10px}
+.job-row{display:flex;align-items:center;gap:14px;padding:13px 16px;background:#fff;border:1px solid var(--line);border-radius:12px}
+.job-row .when{font-family:'JetBrains Mono';font-weight:700;flex:none;width:74px}
+.job-row .who{flex:1;min-width:0}
+.job-row .who b{display:block}
+.job-row .who span{font-size:13px;color:var(--muted)}
+select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:13.5px}
+.stars{color:var(--citrus);letter-spacing:1px}
+.src{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.src .dot{width:14px;height:14px;border-radius:3px;display:grid;place-items:center;font-size:9px;color:#fff;font-weight:700}
+.src.GOOGLE .dot{background:#4285F4}
+.src.SETMORE_LEGACY .dot{background:var(--muted)}
+.src.R2NETTE_VERIFIED .dot{background:var(--aqua-dk)}
+.src.MANUAL_APPROVED .dot{background:var(--citrus)}
+.page{display:none}.page.on{display:block}
+@media(max-width:900px){
+  .shell{flex-direction:column}
+  nav.side{width:100%;height:auto;position:static;display:flex;overflow-x:auto;gap:6px;padding:12px}
+  nav.side .grp,.brand{display:none}
+  nav.side a{white-space:nowrap;margin:0}
+  main{padding:18px 16px 50px}
+  .lane{grid-template-columns:1fr}
+}
+</style>
+  <script type="module" crossorigin src="/assets/admin-CnxLPS_k.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
+</head>
+<body>
+<div id="gate" class="gate">
+  <form class="gate-card" id="loginForm" autocomplete="on">
+    <div class="gate-brand"><img src="/assets/brand/r2nette-logo-white.svg" alt="R2NETTE"
+      onerror="this.style.display='none'"></div>
+    <h1>Operations sign-in</h1>
+    <p class="gate-sub">Use your own R2NETTE account. Shared logins are no longer accepted.</p>
+    <label class="gl" for="email">Email</label>
+    <input class="gi" id="email" type="email" autocomplete="username" required>
+    <label class="gl" for="password">Password</label>
+    <input class="gi" id="password" type="password" autocomplete="current-password" required>
+    <div class="gerr" id="loginErr" hidden></div>
+    <button class="gbtn" type="submit" id="loginBtn">Sign in</button>
+    <p class="gfine">Trouble signing in? Call the owner — passwords are never sent by email.</p>
+  </form>
+
+  <form class="gate-card" id="totpForm" hidden autocomplete="off">
+    <div class="gate-brand"><img src="/assets/brand/r2nette-logo-white.svg" alt="R2NETTE"
+      onerror="this.style.display='none'"></div>
+    <h1>Two-step verification</h1>
+    <p class="gate-sub" id="totpWho">Enter the 6-digit code from your authenticator app.</p>
+    <label class="gl" for="totpCode">Code</label>
+    <input class="gi mono" id="totpCode" inputmode="numeric" autocomplete="one-time-code"
+      maxlength="14" placeholder="000000">
+    <div class="gerr" id="totpErr" hidden></div>
+    <button class="gbtn" type="submit" id="totpBtn">Verify</button>
+    <p class="gfine">Lost your phone? Enter one of your recovery codes instead.</p>
+  </form>
+</div>
+
+<div class="shell" id="shell" hidden style="display:none">
+  <nav class="side">
+    <div class="brand">R2<span>NETTE</span> Ops</div>
+    <div class="grp" data-group="ops">Operations</div>
+    <a href="#dashboard" data-nav="dashboard" class="on">Dashboard</a>
+    <a href="#dispatch" data-nav="dispatch">Dispatch</a>
+    <a href="#roster" data-nav="roster">Staff &amp; Cleaners</a>
+    <a href="#callbacks" data-nav="callbacks">Callbacks</a>
+    <a href="#billing" data-nav="billing">Billing</a>
+    <div class="grp" data-group="content">Content</div>
+    <a href="#reviews" data-nav="reviews">Reviews</a>
+    <div class="grp" data-group="setup">Setup</div>
+    <a href="#integrations" data-nav="integrations">Integrations</a>
+    <a href="#cutover" data-nav="cutover">Setmore cutover</a>
+    <a href="#security" data-nav="security">Security</a>
+    <a href="#operations" data-nav="operations">Automation</a>
+    <div class="whoami" id="whoami"></div>
+  </nav>
+  <main>
+    <div id="dashboard" class="page on"></div>
+    <div id="dispatch" class="page"></div>
+    <div id="roster" class="page"></div>
+    <div id="callbacks" class="page"></div>
+    <div id="billing" class="page"></div>
+    <div id="reviews" class="page"></div>
+    <div id="integrations" class="page"></div>
+    <div id="cutover" class="page"></div>
+    <div id="security" class="page"></div>
+    <div id="operations" class="page"></div>
+  </main>
+</div>
+
+</body>
+</html>

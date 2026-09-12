@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R2NETTE Operations</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#07283F;--deep:#0B3A5C;--aqua:#00C2A0;--aqua-dk:#00A386;--citrus:#FF9E1B;
+--paper:#F6F9FB;--mist:#EDF3F7;--line:#DCE7EE;--muted:#5B7386;--danger:#C4383C;--ok:#0E8A63;
+--sh:0 1px 2px rgba(7,40,63,.06),0 2px 8px rgba(7,40,63,.05);--e:cubic-bezier(.22,1,.36,1)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:'Instrument Sans',system-ui,sans-serif;font-size:15px}
+h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;letter-spacing:-.02em;margin:0}
+.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer}
+[hidden]{display:none!important}
+a{color:inherit}
+.shell{display:flex;min-height:100vh}
+/* Sign-in gate. The console is never rendered before a session resolves. */
+.gate{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:24px;
+background:radial-gradient(900px 500px at 70% 10%,rgba(59,169,245,.28),transparent 62%),
+linear-gradient(165deg,#0B4DA2,#0A2547)}
+.gate-card{background:#fff;border-radius:22px;padding:32px 26px;width:100%;max-width:380px;
+box-shadow:0 24px 60px rgba(6,26,51,.4)}
+.gate-brand{background:#0A2547;margin:-32px -26px 22px;padding:22px 26px;border-radius:22px 22px 0 0}
+.gate-brand img{height:30px;display:block}
+.gate-card h1{font-size:23px;margin-bottom:8px}
+.gate-sub{color:var(--muted);font-size:14px;margin:0 0 20px}
+.gl{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+.gi{width:100%;border:1.5px solid var(--line);border-radius:11px;padding:13px 14px;font-size:16px;background:#fff}
+.gi:focus{border-color:var(--aqua);box-shadow:0 0 0 3px rgba(18,167,155,.15);outline:none}
+.gbtn{width:100%;margin-top:20px;border:0;border-radius:999px;padding:15px;font-weight:700;font-size:16px;
+background:linear-gradient(135deg,#3FAE49,#12A79B);color:#fff}
+.gbtn:disabled{opacity:.5}
+.gerr{color:var(--danger);font-size:13.5px;margin-top:12px}
+.gfine{color:var(--muted);font-size:12.5px;margin:16px 0 0;text-align:center}
+.gi.mono{font-family:'JetBrains Mono',monospace;font-size:22px;letter-spacing:.14em;text-align:center}
+.tfa-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:14px}
+.tfa-codes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0;
+font-family:'JetBrains Mono',monospace;font-size:14px}
+.tfa-codes div{background:var(--mist);padding:9px 12px;border-radius:8px;text-align:center}
+.tfa-uri{word-break:break-all;font-family:'JetBrains Mono',monospace;font-size:11.5px;
+background:var(--mist);padding:12px;border-radius:10px;margin:12px 0;color:var(--muted)}
+.whoami{margin-top:auto;padding:14px 12px;border-top:1px solid rgba(255,255,255,.12);font-size:13px;color:rgba(255,255,255,.7)}
+.whoami b{display:block;color:#fff;font-size:14px}
+.whoami .role{display:inline-block;margin-top:6px;padding:3px 9px;border-radius:99px;
+background:rgba(255,255,255,.14);font-size:11px;font-weight:700;letter-spacing:.05em}
+.whoami button{margin-top:10px;background:none;border:0;color:rgba(255,255,255,.7);
+text-decoration:underline;font-size:13px;padding:0}
+nav.side{display:flex;flex-direction:column}
+nav.side{width:214px;background:var(--ink);color:#fff;padding:20px 12px;flex:none;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:9px;padding:0 8px 20px;font-family:'Bricolage Grotesque';font-weight:800;font-size:18px}
+.brand span{color:var(--aqua)}
+nav.side a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;text-decoration:none;color:rgba(255,255,255,.7);font-size:14.5px;font-weight:500;margin-bottom:2px}
+nav.side a:hover{background:rgba(255,255,255,.08);color:#fff}
+nav.side a.on{background:var(--aqua);color:#04262E;font-weight:600}
+nav.side .grp{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:rgba(255,255,255,.35);padding:16px 12px 6px;font-weight:700}
+main{flex:1;padding:26px 30px 60px;min-width:0}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap}
+.hdr h1{font-size:27px}
+.sub{color:var(--muted);font-size:14px;margin-top:4px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--sh)}
+.card .k{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700}
+.card .v{font-family:'JetBrains Mono';font-size:30px;font-weight:700;margin-top:8px;line-height:1}
+.card .d{font-size:13px;color:var(--muted);margin-top:6px}
+.card.alert{border-color:rgba(196,56,60,.35);background:rgba(196,56,60,.04)}
+.card.alert .v{color:var(--danger)}
+.card.good .v{color:var(--ok)}
+.panel{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);overflow:hidden;margin-bottom:22px}
+.panel-h{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.panel-h h2{font-size:16px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:10px 18px;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--line);font-weight:700}
+td{padding:13px 18px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+tr:hover td{background:var(--mist)}
+.pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11.5px;font-weight:700;letter-spacing:.02em}
+.pill.ok{background:rgba(14,138,99,.12);color:var(--ok)}
+.pill.warn{background:rgba(255,158,27,.16);color:#8A5200}
+.pill.bad{background:rgba(196,56,60,.12);color:var(--danger)}
+.pill.mut{background:var(--mist);color:var(--muted)}
+.pill.aqua{background:rgba(0,194,160,.14);color:var(--aqua-dk)}
+.btn{border:0;border-radius:9px;padding:8px 14px;font-weight:600;font-size:13.5px;background:var(--aqua);color:#04262E}
+.btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.btn.danger{background:rgba(196,56,60,.1);color:var(--danger)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.tiny{padding:3px 8px;font-size:12px}
+.banner{border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:14px;line-height:1.45}
+.banner.warn{background:rgba(255,158,27,.14);border:1px solid rgba(255,158,27,.35);color:#8A5200}
+.banner.bad{background:rgba(196,56,60,.08);border:1px solid rgba(196,56,60,.28);color:var(--danger)}
+.banner.ok{background:rgba(14,138,99,.1);border:1px solid rgba(14,138,99,.25);color:var(--ok)}
+.form-pad{padding:16px 18px}
+.skills-group{margin-bottom:14px}
+.skills-group h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.check-grid{display:grid;gap:7px}
+.check-grid label{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;cursor:pointer;line-height:1.35}
+.gi.sm{width:110px;padding:8px}
+.hint{font-size:13px;color:var(--muted);margin:0 0 12px}
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+.empty .big{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px}
+/* dispatch */
+.board{display:grid;gap:12px}
+.lane{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:start}
+.lane-name{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;font-weight:600;font-size:14px;box-shadow:var(--sh)}
+.lane-name .meta{font-size:12px;color:var(--muted);font-weight:400;margin-top:3px}
+.lane-track{position:relative;background:#fff;border:1px solid var(--line);border-radius:12px;height:74px;overflow:hidden}
+.hours{display:grid;grid-template-columns:repeat(9,1fr);height:100%;position:absolute;inset:0}
+.hours div{border-right:1px dashed var(--line);font-size:10.5px;color:var(--muted);padding:3px 5px}
+.job{position:absolute;top:8px;bottom:8px;background:linear-gradient(135deg,var(--deep),var(--ink));color:#fff;border-radius:9px;padding:7px 10px;font-size:12px;overflow:hidden;box-shadow:var(--sh)}
+.job.unassigned{background:repeating-linear-gradient(45deg,#C4383C,#C4383C 8px,#a82f33 8px,#a82f33 16px)}
+.job .t{font-weight:700;white-space:nowrap}
+.job .s{opacity:.82;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unassigned-list{display:grid;gap:10px}
+.job-row{display:flex;align-items:center;gap:14px;padding:13px 16px;background:#fff;border:1px solid var(--line);border-radius:12px}
+.job-row .when{font-family:'JetBrains Mono';font-weight:700;flex:none;width:74px}
+.job-row .who{flex:1;min-width:0}
+.job-row .who b{display:block}
+.job-row .who span{font-size:13px;color:var(--muted)}
+select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:13.5px}
+.stars{color:var(--citrus);letter-spacing:1px}
+.src{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.src .dot{width:14px;height:14px;border-radius:3px;display:grid;place-items:center;font-size:9px;color:#fff;font-weight:700}
+.src.GOOGLE .dot{background:#4285F4}
+.src.SETMORE_LEGACY .dot{background:var(--muted)}
+.src.R2NETTE_VERIFIED .dot{background:var(--aqua-dk)}
+.src.MANUAL_APPROVED .dot{background:var(--citrus)}
+.page{display:none}.page.on{display:block}
+@media(max-width:900px){
+  .shell{flex-direction:column}
+  nav.side{width:100%;height:auto;position:static;display:flex;overflow-x:auto;gap:6px;padding:12px}
+  nav.side .grp,.brand{display:none}
+  nav.side a{white-space:nowrap;margin:0}
+  main{padding:18px 16px 50px}
+  .lane{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div id="gate" class="gate">
+  <form class="gate-card" id="loginForm" autocomplete="on">
+    <div class="gate-brand"><img src="/assets/brand/r2nette-logo-white.svg" alt="R2NETTE"
+      onerror="this.style.display='none'"></div>
+    <h1>Operations sign-in</h1>
+    <p class="gate-sub">Use your own R2NETTE account. Shared logins are no longer accepted.</p>
+    <label class="gl" for="email">Email</label>
+    <input class="gi" id="email" type="email" autocomplete="username" required>
+    <label class="gl" for="password">Password</label>
+    <input class="gi" id="password" type="password" autocomplete="current-password" required>
+    <div class="gerr" id="loginErr" hidden></div>
+    <button class="gbtn" type="submit" id="loginBtn">Sign in</button>
+    <p class="gfine">Trouble signing in? Call the owner — passwords are never sent by email.</p>
+  </form>
+
+  <form class="gate-card" id="totpForm" hidden autocomplete="off">
+    <div class="gate-brand"><img src="/assets/brand/r2nette-logo-white.svg" alt="R2NETTE"
+      onerror="this.style.display='none'"></div>
+    <h1>Two-step verification</h1>
+    <p class="gate-sub" id="totpWho">Enter the 6-digit code from your authenticator app.</p>
+    <label class="gl" for="totpCode">Code</label>
+    <input class="gi mono" id="totpCode" inputmode="numeric" autocomplete="one-time-code"
+      maxlength="14" placeholder="000000">
+    <div class="gerr" id="totpErr" hidden></div>
+    <button class="gbtn" type="submit" id="totpBtn">Verify</button>
+    <p class="gfine">Lost your phone? Enter one of your recovery codes instead.</p>
+  </form>
+</div>
+
+<div class="shell" id="shell" hidden style="display:none">
+  <nav class="side">
+    <div class="brand">R2<span>NETTE</span> Ops</div>
+    <div class="grp" data-group="ops">Operations</div>
+    <a href="#dashboard" data-nav="dashboard" class="on">Dashboard</a>
+    <a href="#dispatch" data-nav="dispatch">Dispatch</a>
+    <a href="#roster" data-nav="roster">Staff &amp; Cleaners</a>
+    <a href="#callbacks" data-nav="callbacks">Callbacks</a>
+    <a href="#billing" data-nav="billing">Billing</a>
+    <div class="grp" data-group="content">Content</div>
+    <a href="#reviews" data-nav="reviews">Reviews</a>
+    <div class="grp" data-group="setup">Setup</div>
+    <a href="#integrations" data-nav="integrations">Integrations</a>
+    <a href="#cutover" data-nav="cutover">Setmore cutover</a>
+    <a href="#security" data-nav="security">Security</a>
+    <a href="#operations" data-nav="operations">Automation</a>
+    <div class="whoami" id="whoami"></div>
+  </nav>
+  <main>
+    <div id="dashboard" class="page on"></div>
+    <div id="dispatch" class="page"></div>
+    <div id="roster" class="page"></div>
+    <div id="callbacks" class="page"></div>
+    <div id="billing" class="page"></div>
+    <div id="reviews" class="page"></div>
+    <div id="integrations" class="page"></div>
+    <div id="cutover" class="page"></div>
+    <div id="security" class="page"></div>
+    <div id="operations" class="page"></div>
+  </main>
+</div>
+
+<script type="module">
+/** Set once the session resolves; drives which nav items exist at all. */
+let ME = null;
+
+/** Nav item -> the permission it needs. Hidden if the role lacks it. */
+const NAV_PERMISSION = {
+  dashboard: 'dashboard.view',
+  dispatch: 'dispatch.view',
+  roster: 'dispatch.view',
+  callbacks: 'callbacks.view',
+  billing: 'dashboard.view',
+  reviews: 'reviews.view',
+  integrations: 'integrations.view',
+  cutover: 'cutover.view',
+  security: null, // every signed-in operator manages their own account
+  operations: 'integrations.view',
+};
+const money = c => '$' + (c/100).toFixed(2);
+const time = iso => new Intl.DateTimeFormat('en-CA',{timeZone:'America/Toronto',hour:'numeric',minute:'2-digit'}).format(new Date(iso));
+
+async function api(path, opts={}){
+  // The session is an HttpOnly cookie. No token in a header, none in the URL.
+  const r = await fetch(path, {...opts, credentials:'same-origin',
+    headers:{'Content-Type':'application/json',...(opts.headers||{})}});
+  const isLogin = path.includes('/staff/login');
+  if(r.status === 401 && !isLogin){ showGate(); throw new Error('Please sign in.'); }
+  if(!r.ok){
+    const body = await r.json().catch(()=>({}));
+    const err = new Error(body.error?.message || r.statusText);
+    err.code = body.error?.code;
+    throw err;
+  }
+  return r.json();
+}
+
+function showGate(msg){
+  document.getElementById('gate').style.display='grid';
+  const shell = document.getElementById('shell');
+  shell.hidden = true;
+  shell.style.display = 'none';
+  if(msg){ const e=document.getElementById('loginErr'); e.textContent=msg; e.hidden=false; }
+}
+
+function applyRole(){
+  const allowed = new Set(ME?.permissions ?? []);
+  let firstVisible = null;
+  for(const a of document.querySelectorAll('nav.side a[data-nav]')){
+    const need = NAV_PERMISSION[a.dataset.nav];
+    const ok = need === null || !need || allowed.has(need);
+    a.hidden = !ok;
+    if(ok && !firstVisible) firstVisible = a.dataset.nav;
+  }
+  // A section heading with nothing under it is noise; hide it too.
+  const GROUPS = { ops:['dashboard','dispatch','roster','callbacks','billing'], content:['reviews'], setup:['integrations','cutover','security','operations'] };
+  for(const [group, items] of Object.entries(GROUPS)){
+    const heading = document.querySelector(`.grp[data-group="${group}"]`);
+    if(heading) heading.hidden = !items.some(i => NAV_PERMISSION[i] === null || allowed.has(NAV_PERMISSION[i]));
+  }
+  document.getElementById('whoami').innerHTML =
+    `<b>${esc(ME.user.displayName)}</b>${esc(ME.user.email)}
+     <span class="role">${esc(ME.user.role)}</span>
+     <button type="button" onclick="signOut()">Sign out</button>`;
+  // A cleaner has no admin surface at all — send them to their own app.
+  if(!firstVisible){
+    document.querySelector('main').innerHTML =
+      `<div class="panel"><div class="empty"><div class="big">This account is for cleaners</div>
+       Your jobs live in the crew app.<br><br>
+       <a class="btn" href="/crew">Open my jobs</a></div></div>`;
+    return null;
+  }
+  return firstVisible;
+}
+
+window.signOut = async () => {
+  await fetch('/api/v1/staff/logout',{method:'POST',credentials:'same-origin'});
+  location.reload();
+};
+
+let CHALLENGE = null;
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginErr');
+  err.hidden = true; btn.disabled = true; btn.textContent = 'Signing in…';
+  try{
+    const res = await api('/api/v1/staff/login',{method:'POST',body:JSON.stringify({
+      email:document.getElementById('email').value,
+      password:document.getElementById('password').value})});
+    // The password alone does not sign anyone in when 2FA is on.
+    if(res.twoFactorRequired){
+      CHALLENGE = res.challengeToken;
+      document.getElementById('loginForm').hidden = true;
+      const f = document.getElementById('totpForm');
+      f.hidden = false;
+      document.getElementById('totpWho').textContent =
+        `Hi ${res.displayName}. Enter the 6-digit code from your authenticator app.`;
+      document.getElementById('totpCode').focus();
+      return;
+    }
+    location.reload();
+  }catch(ex){
+    err.textContent = ex.message; err.hidden = false;
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+});
+
+document.getElementById('totpForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('totpBtn');
+  const err = document.getElementById('totpErr');
+  err.hidden = true; btn.disabled = true; btn.textContent = 'Verifying…';
+  try{
+    await api('/api/v1/staff/login/totp',{method:'POST',body:JSON.stringify({
+      challengeToken: CHALLENGE,
+      code: document.getElementById('totpCode').value})});
+    location.reload();
+  }catch(ex){
+    err.textContent = ex.message; err.hidden = false;
+    btn.disabled = false; btn.textContent = 'Verify';
+    document.getElementById('totpCode').value = '';
+    document.getElementById('totpCode').focus();
+  }
+});
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function err(el, e){ el.innerHTML = `<div class="panel"><div class="empty"><div class="big">Couldn't load this</div>${esc(e.message)}</div></div>`; }
+
+/* ---------------- dashboard ---------------- */
+async function dashboard(){
+  const el = document.getElementById('dashboard');
+  el.innerHTML = '<div class="panel"><div class="empty">Loading…</div></div>';
+  try{
+    const d = await api('/api/v1/admin/dashboard');
+    const n = d.needsAttention;
+    const attention = n.callbacksWaiting + (n.dunningCases||0) + n.unassignedJobs + n.reviewsPendingModeration;
+    el.innerHTML = `
+      <div class="hdr"><div><h1>Today</h1><div class="sub">${d.date} · America/Toronto</div></div></div>
+      <div class="cards">
+        <div class="card"><div class="k">Bookings today</div><div class="v">${d.today.bookings}</div></div>
+        <div class="card"><div class="k">Cleaners active</div><div class="v">${d.today.cleanersActive}</div></div>
+        <div class="card"><div class="k">Booked value</div><div class="v">${money(d.today.revenueCents)}</div><div class="d">Taxes included</div></div>
+        <div class="card ${attention>0?'alert':'good'}"><div class="k">Needs attention</div><div class="v">${attention}</div>
+          <div class="d">${n.unassignedJobs} unassigned · ${n.callbacksWaiting} callbacks · ${n.dunningCases||0} billing</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h2>Next jobs</h2><a class="btn ghost" href="#dispatch">Open dispatch</a></div>
+        ${d.upcoming.length ? `<table><thead><tr><th>When</th><th>Customer</th><th>Service</th><th>Address</th><th>Crew</th><th>Status</th></tr></thead><tbody>
+          ${d.upcoming.map(b=>`<tr>
+            <td class="mono">${time(b.startAt)}</td>
+            <td>${esc(b.customerName)}<div style="font-size:12px;color:var(--muted)" class="mono">${b.bookingNumber}</div></td>
+            <td>${esc(b.service)}</td><td>${esc(b.address)}</td>
+            <td><span class="pill ${b.crewSize>=b.requiredStaffCount?'ok':'bad'}">${b.crewSize}/${b.requiredStaffCount}</span></td>
+            <td><span class="pill mut">${b.status}</span></td></tr>`).join('')}
+        </tbody></table>` : `<div class="empty"><div class="big">No upcoming jobs</div>New bookings appear here as they come in.</div>`}
+      </div>`;
+  }catch(e){ err(el,e); }
+}
+
+/* ---------------- dispatch ---------------- */
+async function dispatch(){
+  const el = document.getElementById('dispatch');
+  el.innerHTML = '<div class="panel"><div class="empty">Loading…</div></div>';
+  try{
+    const d = await api('/api/v1/admin/dispatch');
+    const OPEN=8, CLOSE=17, span=(CLOSE-OPEN)*60;
+    const pos = iso => {
+      const p = new Intl.DateTimeFormat('en-CA',{timeZone:'America/Toronto',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date(iso));
+      const h=+p.find(x=>x.type==='hour').value, m=+p.find(x=>x.type==='minute').value;
+      return ((h*60+m)-OPEN*60)/span*100;
+    };
+    const unassigned = d.bookings.filter(b=>b.assignedStaffIds.length < b.requiredStaffCount);
+
+    el.innerHTML = `
+      <div class="hdr"><div><h1>Dispatch</h1><div class="sub">${d.date} · ${d.bookings.length} jobs · ${d.staff.length} cleaners</div></div></div>
+      ${unassigned.length ? `<div class="panel">
+        <div class="panel-h"><h2>Needs a crew (${unassigned.length})</h2></div>
+        <div style="padding:14px" class="unassigned-list">
+        ${unassigned.map(b=>`<div class="job-row">
+          <div class="when">${time(b.startAt)}</div>
+          <div class="who"><b>${esc(b.service)}</b><span>${esc(b.customerName)} · ${esc(b.city)} · ${b.assignedStaffIds.length}/${b.requiredStaffCount} assigned</span></div>
+          <select id="sel-${b.id}">${d.staff.filter(s=>!s.onTimeOff && !b.assignedStaffIds.includes(s.id)).map(s=>`<option value="${s.id}">${esc(s.displayName)}</option>`).join('')}</select>
+          <button class="btn" onclick="assign('${b.id}')">Assign</button>
+        </div>`).join('')}
+        </div></div>` : ''}
+      <div class="panel">
+        <div class="panel-h"><h2>Day board</h2><span class="sub">8:00 – 17:00</span></div>
+        <div style="padding:16px" class="board">
+        ${d.staff.map(s=>{
+          const jobs = d.bookings.filter(b=>b.assignedStaffIds.includes(s.id));
+          return `<div class="lane">
+            <div class="lane-name">${esc(s.displayName)}<div class="meta">${s.onTimeOff?'Time off':`${jobs.length} job${jobs.length===1?'':'s'}`}</div></div>
+            <div class="lane-track"><div class="hours">${Array.from({length:9},(_,i)=>`<div>${OPEN+i}:00</div>`).join('')}</div>
+            ${jobs.map(b=>{
+              const l=pos(b.startAt), w=b.durationMinutes/span*100;
+              return `<div class="job" style="left:${l}%;width:${w}%" title="${esc(b.customerName)} — ${esc(b.address)}">
+                <div class="t">${time(b.startAt)}</div><div class="s">${esc(b.service)}</div></div>`;
+            }).join('')}
+            </div></div>`;
+        }).join('')}
+        </div>
+        ${d.staff.length===0?'<div class="empty"><div class="big">No active cleaners</div>Add staff before dispatching.</div>':''}
+      </div>`;
+  }catch(e){ err(el,e); }
+}
+window.assign = async (bookingId) => {
+  const staffId = document.getElementById('sel-'+bookingId).value;
+  try{ await api(`/api/v1/admin/bookings/${bookingId}/assign`,{method:'POST',body:JSON.stringify({staffId})}); dispatch(); }
+  catch(e){ alert(e.message); }
+};
+
+/* ---------------- staff & cleaners ---------------- */
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const mins = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+const canManage = () => (ME?.permissions||[]).includes('staff.manage');
+const canAssign = () => (ME?.permissions||[]).includes('dispatch.assign');
+const torontoDay = iso => new Intl.DateTimeFormat('en-CA',{
+  timeZone:'America/Toronto', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date(iso));
+const throughDay = iso => torontoDay(new Date(new Date(iso).getTime() - 60_000).toISOString());
+
+let ROSTER_NOTICE = null;
+let ROSTER_DATA = null;
+
+function bannerHtml(){
+  if(!ROSTER_NOTICE) return '';
+  const n = ROSTER_NOTICE;
+  ROSTER_NOTICE = null;
+  return `<div class="banner ${n.kind}"><b>${esc(n.title)}</b><div style="margin-top:6px">${n.body}</div></div>`;
+}
+
+function skillSummary(s, services){
+  if(!s.skills.length) return '<span class="pill mut">All services</span>';
+  const labels = {cat_basic:'Basic', cat_deep:'Deep', cat_other:'Specialty'};
+  const counts = {};
+  for(const id of s.skills){
+    const svc = services.find(x=>x.id===id);
+    if(svc) counts[svc.categoryId] = (counts[svc.categoryId]||0)+1;
+  }
+  const pills = Object.entries(counts).map(([id,n])=>`<span class="pill aqua">${labels[id]||id} ${n}</span>`);
+  return pills.join(' ') || '<span class="pill mut">Custom</span>';
+}
+
+function skillPicker(services, categories, selected){
+  const sel = new Set(selected||[]);
+  return (categories||[]).map(cat=>{
+    const items = services.filter(s=>s.categoryId===cat.id);
+    if(!items.length) return '';
+    return `<div class="skills-group">
+      <h3>${esc(cat.name)}
+        <button type="button" class="btn ghost tiny" onclick="toggleSkillGroup('${esc(cat.id)}',true)">All</button>
+        <button type="button" class="btn ghost tiny" onclick="toggleSkillGroup('${esc(cat.id)}',false)">None</button>
+      </h3>
+      <div class="check-grid">${items.map(s=>
+        `<label><input type="checkbox" class="skill-box" data-cat="${esc(cat.id)}" value="${esc(s.id)}" ${sel.has(s.id)?'checked':''}> ${esc(s.name)}</label>`
+      ).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectedSkills(){
+  return [...document.querySelectorAll('.skill-box:checked')].map(el=>el.value);
+}
+
+window.toggleSkillGroup = (catId, on) => {
+  for(const el of document.querySelectorAll(`.skill-box[data-cat="${catId}"]`)) el.checked = on;
+};
+
+function bookingListHtml(rows){
+  return `<ul style="margin:8px 0 0;padding-left:18px" class="mono">${
+    rows.map(r=>`<li>${esc(r.bookingNumber)}${r.startAt?' — '+new Date(r.startAt).toLocaleString('en-CA',{timeZone:'America/Toronto'}):''}</li>`).join('')
+  }</ul>`;
+}
+
+async function rosterPage(){
+  const el = document.getElementById('roster');
+  el.innerHTML = '<div class="panel"><div class="empty">Loading…</div></div>';
+  try{
+    const d = await api('/api/v1/admin/roster');
+    ROSTER_DATA = d;
+    const active = d.staff.filter(s=>s.active);
+    const gaps = d.coverage.filter(c=>!c.canStaffTwoPersonJobs);
+    const owner = canManage();
+    const timeOffOk = canAssign();
+
+    el.innerHTML = `
+      <div class="hdr"><div><h1>Staff &amp; Cleaners</h1>
+        <div class="sub">Who works, and when. Availability is what the booking page can offer.</div></div>
+        ${owner?`<button class="btn" onclick="addCleaner()">Add cleaner</button>`:''}</div>
+      ${bannerHtml()}
+
+      <div class="cards">
+        <div class="card"><div class="k">Active</div><div class="v">${active.length}</div></div>
+        <div class="card ${gaps.length?'alert':'good'}"><div class="k">Days without a pair</div>
+          <div class="v">${gaps.length}</div><div class="d">Two-cleaner services need two people free</div></div>
+        <div class="card"><div class="k">Hours offered</div>
+          <div class="v">${active.reduce((n,s)=>n+s.weeklyHours,0)}</div><div class="d">Per week</div></div>
+      </div>
+
+      <div class="panel"><div class="panel-h"><h2>Weekly coverage</h2></div>
+      <table><thead><tr><th>Day</th><th>Cleaners</th><th>From</th><th>To</th><th>Two-cleaner jobs</th></tr></thead><tbody>
+        ${d.coverage.map(c=>`<tr>
+          <td><b>${c.name}</b></td>
+          <td><span class="pill ${c.cleaners===0?'bad':c.cleaners===1?'warn':'ok'}">${c.cleaners}</span></td>
+          <td class="mono">${c.earliest ?? '—'}</td><td class="mono">${c.latest ?? '—'}</td>
+          <td>${c.canStaffTwoPersonJobs?'<span class="pill ok">Yes</span>':'<span class="pill bad">No</span>'}</td>
+        </tr>`).join('')}
+      </tbody></table></div>
+
+      <div class="panel"><div class="panel-h"><h2>Team</h2></div>
+      ${d.staff.length ? `<table><thead><tr><th>Name</th><th>Skills</th><th>Week</th><th>Hours</th><th>Upcoming</th><th>Status</th><th></th></tr></thead><tbody>
+        ${d.staff.map(s=>`<tr>
+          <td><b>${esc(s.displayName)}</b>${s.hasLogin?' <span class="pill mut">has login</span>':''}</td>
+          <td>${skillSummary(s, d.services)}</td>
+          <td style="font-size:12.5px" class="mono">${
+            s.availability.length
+              ? [...new Set(s.availability.map(a=>a.weekday))].sort().map(w=>DAYS[w]).join(' ')
+              : '<span style="color:var(--danger)">none — cannot be booked</span>'}</td>
+          <td class="mono">${s.weeklyHours}h</td>
+          <td class="mono">${s.upcomingJobs}</td>
+          <td>${s.onTimeOffUntil
+              ? '<span class="pill warn">Time off</span>'
+              : s.active ? '<span class="pill ok">Active</span>' : '<span class="pill mut">Inactive</span>'}</td>
+          <td style="white-space:nowrap">
+            ${owner?`<button class="btn ghost" onclick="editWeek('${s.id}')">Hours</button>`:''}
+            ${owner?`<button class="btn ghost" onclick="editSkills('${s.id}')">Skills</button>`:''}
+            ${timeOffOk?`<button class="btn ghost" onclick="editTimeOff('${s.id}')">Time off</button>`:''}
+            ${owner?(s.active
+              ?`<button class="btn ghost" onclick="setActive('${s.id}',false)">Deactivate</button>`
+              :`<button class="btn" onclick="setActive('${s.id}',true)">Reactivate</button>`):''}
+          </td></tr>`).join('')}
+      </tbody></table>` : '<div class="empty"><div class="big">No cleaners yet</div>Nothing can be booked until at least one cleaner has availability.</div>'}
+      </div>
+      <div id="rosterEdit"></div>`;
+  }catch(e){ err(el,e); }
+}
+
+function closeRosterEdit(){
+  const box = document.getElementById('rosterEdit');
+  if(box) box.innerHTML = '';
+}
+
+window.addCleaner = () => {
+  if(!canManage()) return;
+  const d = ROSTER_DATA || {services:[], categories:[]};
+  const box = document.getElementById('rosterEdit');
+  box.innerHTML = `<div class="panel"><div class="panel-h"><h2>Hire a cleaner</h2></div>
+    <div class="form-pad">
+      <label class="gl" for="newName">Name</label>
+      <input class="gi" id="newName" placeholder="First and last name" autocomplete="off">
+      <label style="display:flex;gap:8px;align-items:center;margin:16px 0 18px;cursor:pointer">
+        <input type="checkbox" id="useDefaultWeek" checked>
+        Monday–Friday 08:00–17:00 (uncheck to create them unbookable for now)
+      </label>
+      <p class="hint">Leave skills empty to allow every service. Most hires should have Basic, Deep, and at least one specialty.</p>
+      ${skillPicker(d.services, d.categories, [])}
+      <div style="margin-top:8px">
+        <button class="btn" onclick="saveNewCleaner()">Hire</button>
+        <button class="btn ghost" onclick="closeRosterEdit()">Cancel</button>
+      </div>
+    </div></div>`;
+  box.scrollIntoView({behavior:'smooth'});
+  document.getElementById('newName').focus();
+};
+
+window.saveNewCleaner = async () => {
+  const name = document.getElementById('newName').value.trim();
+  if(!name){ alert('A cleaner needs a name.'); return; }
+  try{
+    await api('/api/v1/admin/roster',{method:'POST',body:JSON.stringify({
+      displayName:name,
+      useDefaultWeek: document.getElementById('useDefaultWeek').checked,
+      skills: selectedSkills(),
+    })});
+    ROSTER_NOTICE = {kind:'ok', title:'Hired', body:esc(name)+' is on the roster.'};
+    rosterPage();
+  }catch(e){ alert(e.message); }
+};
+
+window.editWeek = async (id) => {
+  if(!canManage()) return;
+  const d = ROSTER_DATA || await api('/api/v1/admin/roster');
+  const s = d.staff.find(x=>x.id===id);
+  const byDay = {};
+  for(const a of s.availability){
+    (byDay[a.weekday] ||= []).push(a);
+  }
+  const box = document.getElementById('rosterEdit');
+  box.innerHTML = `<div class="panel"><div class="panel-h"><h2>${esc(s.displayName)} — weekly hours</h2></div>
+    <div class="form-pad"><p class="hint">A second window on the same day is a split shift. Overlapping windows are rejected, not merged.</p></div>
+    <table><thead><tr><th>Day</th><th>Works</th><th>From</th><th>To</th><th>Split from</th><th>Split to</th></tr></thead><tbody>
+    ${DAYS.map((name,w)=>{
+      const wins = (byDay[w]||[]).slice().sort((a,b)=>a.startMinute-b.startMinute);
+      const a = wins[0], b = wins[1];
+      return `<tr><td><b>${name}</b></td>
+        <td><input type="checkbox" id="on-${w}" ${a?'checked':''}></td>
+        <td><input class="gi sm" id="from-${w}" value="${a?mins(a.startMinute):'08:00'}"></td>
+        <td><input class="gi sm" id="to-${w}" value="${a?mins(a.endMinute):'17:00'}"></td>
+        <td><input class="gi sm" id="from2-${w}" value="${b?mins(b.startMinute):''}" placeholder="—"></td>
+        <td><input class="gi sm" id="to2-${w}" value="${b?mins(b.endMinute):''}" placeholder="—"></td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>
+    <div class="form-pad"><button class="btn" onclick="saveWeek('${id}')">Save week</button>
+    <button class="btn ghost" onclick="closeRosterEdit()">Cancel</button></div></div>`;
+  box.scrollIntoView({behavior:'smooth'});
+};
+
+window.saveWeek = async (id) => {
+  const toMin = v => { const m=/^(\d{1,2}):(\d{2})$/.exec((v||'').trim()); return m?+m[1]*60+ +m[2]:null; };
+  const availability = [];
+  for(let w=0;w<7;w++){
+    if(!document.getElementById('on-'+w).checked) continue;
+    const a = toMin(document.getElementById('from-'+w).value);
+    const b = toMin(document.getElementById('to-'+w).value);
+    if(a===null||b===null){ alert(`${DAY_NAMES[w]}: use times like 08:00.`); return; }
+    availability.push({weekday:w,startMinute:a,endMinute:b});
+    const a2 = toMin(document.getElementById('from2-'+w).value);
+    const b2 = toMin(document.getElementById('to2-'+w).value);
+    if(a2!==null || b2!==null){
+      if(a2===null||b2===null){ alert(`${DAY_NAMES[w]}: fill both split-shift times, or leave both blank.`); return; }
+      availability.push({weekday:w,startMinute:a2,endMinute:b2});
+    }
+  }
+  try{
+    const res = await api(`/api/v1/admin/roster/${id}/availability`,{method:'PUT',
+      body:JSON.stringify({availability})});
+    if(res.conflicts?.length){
+      ROSTER_NOTICE = {
+        kind:'warn',
+        title:`Saved, but ${res.conflicts.length} already-booked job${res.conflicts.length===1?'':'s'} now fall outside this week`,
+        body: bookingListHtml(res.conflicts) + '<div style="margin-top:8px">Reassign them in Dispatch. They were not cancelled.</div>',
+      };
+    }
+    closeRosterEdit();
+    rosterPage();
+  }catch(e){ alert(e.message); }
+};
+
+window.editSkills = (id) => {
+  if(!canManage()) return;
+  const d = ROSTER_DATA;
+  const s = d.staff.find(x=>x.id===id);
+  const box = document.getElementById('rosterEdit');
+  box.innerHTML = `<div class="panel"><div class="panel-h"><h2>${esc(s.displayName)} — skills</h2></div>
+    <div class="form-pad">
+      <p class="hint">Empty means they can do every service. The booking engine reads this list.</p>
+      ${skillPicker(d.services, d.categories, s.skills)}
+      <button class="btn" onclick="saveSkills('${id}')">Save skills</button>
+      <button class="btn ghost" onclick="closeRosterEdit()">Cancel</button>
+    </div></div>`;
+  box.scrollIntoView({behavior:'smooth'});
+};
+
+window.saveSkills = async (id) => {
+  try{
+    await api(`/api/v1/admin/roster/${id}/skills`,{method:'PUT',body:JSON.stringify({skills:selectedSkills()})});
+    closeRosterEdit();
+    rosterPage();
+  }catch(e){ alert(e.message); }
+};
+
+window.editTimeOff = (id) => {
+  if(!canAssign()) return;
+  const d = ROSTER_DATA;
+  const s = d.staff.find(x=>x.id===id);
+  const upcoming = s.upcomingTimeOff || [];
+  const box = document.getElementById('rosterEdit');
+  box.innerHTML = `<div class="panel"><div class="panel-h"><h2>${esc(s.displayName)} — time off</h2></div>
+    <div class="form-pad">
+      <p class="hint">Dates are inclusive, America/Toronto. If this covers a booking, the booking numbers are named so they can be reassigned.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+        <div><label class="gl" for="offFrom">From</label>
+          <input class="gi" id="offFrom" type="date"></div>
+        <div><label class="gl" for="offThrough">Through</label>
+          <input class="gi" id="offThrough" type="date"></div>
+        <div style="flex:1;min-width:160px"><label class="gl" for="offReason">Reason</label>
+          <input class="gi" id="offReason" placeholder="Vacation, sick, …"></div>
+      </div>
+      <button class="btn" onclick="saveTimeOff('${id}')">Add time off</button>
+      <button class="btn ghost" onclick="closeRosterEdit()">Cancel</button>
+    </div>
+    ${upcoming.length ? `<div class="panel-h"><h2>Upcoming</h2></div>
+      ${upcoming.map(t=>`<div class="job-row">
+        <div class="when">${torontoDay(t.startAt)}</div>
+        <div class="who"><b>${torontoDay(t.startAt)} → ${throughDay(t.endAt)}</b>
+          <span>${esc(t.reason||'Time off')}</span></div>
+        <button class="btn ghost" onclick="removeTimeOff('${t.id}')">Remove</button>
+      </div>`).join('')}` : '<div class="empty">No upcoming time off.</div>'}
+    </div>`;
+  box.scrollIntoView({behavior:'smooth'});
+};
+
+window.saveTimeOff = async (id) => {
+  const from = document.getElementById('offFrom').value;
+  const through = document.getElementById('offThrough').value;
+  if(!from || !through){ alert('Pick a start and end date.'); return; }
+  try{
+    const res = await api(`/api/v1/admin/roster/${id}/time-off`,{method:'POST',
+      body:JSON.stringify({from, through, reason: document.getElementById('offReason').value || 'Time off'})});
+    if(res.affectedBookings?.length){
+      ROSTER_NOTICE = {
+        kind:'warn',
+        title:`Recorded. ${res.affectedBookings.length} booked job${res.affectedBookings.length===1?'':'s'} fall in this period`,
+        body: bookingListHtml(res.affectedBookings) + '<div style="margin-top:8px">Reassign them in Dispatch. They were not cancelled.</div>',
+      };
+    }
+    closeRosterEdit();
+    rosterPage();
+  }catch(e){ alert(e.message); }
+};
+
+window.removeTimeOff = async (id) => {
+  try{
+    await api(`/api/v1/admin/roster/time-off/${id}`,{method:'DELETE'});
+    rosterPage();
+  }catch(e){ alert(e.message); }
+};
+
+window.setActive = async (id, active) => {
+  if(!canManage()) return;
+  try{ await api(`/api/v1/admin/roster/${id}/active`,{method:'POST',body:JSON.stringify({active})});
+    rosterPage();
+  }catch(e){ alert(e.message); }
+};
+
+/* ---------------- callbacks ---------------- */
+async function callbacksPage(){
+  const el = document.getElementById('callbacks');
+  el.innerHTML = '<div class="panel"><div class="empty">Loading…</div></div>';
+  try{
+    const d = await api('/api/v1/admin/callbacks');
+    const waiting = d.callbacks.filter(c=>['REQUESTED','QUEUED','STAFF_RINGING'].includes(c.status));
+    const overdue = waiting.filter(c=>c.overdue);
+    el.innerHTML = `
+      <div class="hdr"><div><h1>Callback center</h1><div class="sub">Operational target: about ${d.targetMinutes} minutes — not a guarantee</div></div></div>
+      <div class="cards">
+        <div class="card"><div class="k">Waiting</div><div class="v">${waiting.length}</div></div>
+        <div class="card ${overdue.length?'alert':'good'}"><div class="k">Past target</div><div class="v">${overdue.length}</div></div>
+        <div class="card"><div class="k">Total today</div><div class="v">${d.callbacks.length}</div></div>
+      </div>
+      <div class="panel"><div class="panel-h"><h2>Requests</h2></div>
+      ${d.callbacks.length? `<table><thead><tr><th>Phone</th><th>Reason</th><th>Waiting</th><th>Status</th><th>Attempts</th><th></th></tr></thead><tbody>
+        ${d.callbacks.map(c=>`<tr>
+          <td class="mono">${esc(c.phoneE164)}</td>
+          <td>${esc(c.reason||'—')}<div style="font-size:12px;color:var(--muted)">${esc(c.source)}</div></td>
+          <td><span class="pill ${c.overdue?'bad':'mut'}">${c.ageMinutes} min</span></td>
+          <td><span class="pill ${c.status==='CONNECTED'||c.status==='COMPLETED'?'ok':c.status==='FAILED'||c.status==='NO_ANSWER'?'bad':'aqua'}">${c.status}</span></td>
+          <td class="mono">${c.attemptCount}</td>
+          <td style="white-space:nowrap">
+            <button class="btn" onclick="cbAction('${c.id}','dial')">Call</button>
+            <button class="btn ghost" onclick="cbAction('${c.id}','complete')">Done</button>
+          </td></tr>`).join('')}
+      </tbody></table>` : `<div class="empty"><div class="big">No callback requests</div>Requests from the booking flow and concierge land here.</div>`}
+      </div>`;
+  }catch(e){ err(el,e); }
+}
+window.cbAction = async (id, action) => {
+  try{ const r = await api(`/api/v1/admin/callbacks/${id}/${action}`,{method:'POST'});
+    if(r.dialed === false) alert(r.reason === 'VOICE_NOT_CONFIGURED' ? 'Twilio Voice is not configured — the request stays queued for a manual call.' : `Not dialled: ${r.reason}`);
+    callbacksPage();
+  }catch(e){ alert(e.message); }
+};
+
+/* ---------------- billing ---------------- */
+async function billingPage(){
+  const el = document.getElementById('billing');
+  el.innerHTML = '<div class="panel"><div class="empty">Loading…</div></div>';
+  try{
+    const d = await api('/api/v1/admin/billing');
+    const s2 = d.summary;
+    el.innerHTML = `
+      <div class="hdr"><div><h1>Billing</h1>
+        <div class="sub">Failed payments that need a person. The cleaning is never cancelled for a failed card.</div></div></div>
+      <div class="cards">
+        <div class="card ${s2.open?'alert':'good'}"><div class="k">Needs contact</div><div class="v">${s2.open}</div></div>
+        <div class="card"><div class="k">Contacted</div><div class="v">${s2.contacted}</div></div>
+        <div class="card"><div class="k">Outstanding</div><div class="v">${money(s2.totalOwedCents)}</div></div>
+      </div>
+      <div class="panel"><div class="panel-h"><h2>Customers to chase</h2></div>
+      ${d.cases.length ? `<table><thead><tr><th>Customer</th><th>Reason</th><th>Owed</th><th>Upcoming</th><th>Open</th><th></th></tr></thead><tbody>
+        ${d.cases.map(c=>`<tr>
+          <td><b>${esc(c.customerName)}</b><div style="font-size:12px;color:var(--muted)" class="mono">${esc(c.phone||'—')}</div></td>
+          <td>${esc(c.reason)}<div style="font-size:12px;color:var(--muted)">${c.failedCount} failed</div></td>
+          <td class="mono">${money(c.totalOwedCents)}</td>
+          <td><span class="pill ${c.upcomingBookings>0?'warn':'mut'}">${c.upcomingBookings}</span></td>
+          <td><span class="pill ${c.daysOpen>3?'bad':'mut'}">${c.daysOpen}d</span></td>
+          <td style="white-space:nowrap">
+            ${c.status==='OPEN'?`<button class="btn" onclick="caseAction('${c.id}','contacted')">Mark contacted</button>`:''}
+            <button class="btn ghost" onclick="caseAction('${c.id}','resolved')">Resolved</button>
+          </td></tr>`).join('')}
+      </tbody></table>` : `<div class="empty"><div class="big">Nothing to chase</div>Every payment is up to date.</div>`}
+      </div>
+      <div class="panel"><div class="panel-h"><h2>Recent charge failures</h2></div>
+      ${d.recentFailures.length ? `<table><thead><tr><th>Amount</th><th>Status</th><th>Reason</th><th>Attempt</th><th>Next retry</th><th></th></tr></thead><tbody>
+        ${d.recentFailures.map(f=>`<tr>
+          <td class="mono">${money(f.amountCents)}</td>
+          <td><span class="pill ${f.status==='SOFT_FAILED'?'warn':'bad'}">${f.status.replace('_',' ')}</span></td>
+          <td>${esc(f.failureCode||'—')}</td>
+          <td class="mono">${f.attemptNumber}</td>
+          <td>${f.nextRetryAt?new Date(f.nextRetryAt).toLocaleString('en-CA'):'—'}</td>
+          <td><button class="btn ghost" onclick="retryAttempt('${f.id}')">Retry now</button></td>
+        </tr>`).join('')}
+      </tbody></table>` : `<div class="empty">No recent failures.</div>`}
+      </div>`;
+  }catch(e){ err(el,e); }
+}
+window.caseAction = async (id, action) => {
+  try{ await api(`/api/v1/admin/billing/cases/${id}/${action}`,{method:'POST',body:JSON.stringify({})}); billingPage(); }
+  catch(e){ alert(e.message); }
+};
+window.retryAttempt = async (id) => {
+  try{ await api(`/api/v1/admin/billing/attempts/${id}/retry`,{method:'POST'});
+    alert('Queued. The billing worker will pick it up on its next run.'); billingPage(); }
+  catch(e){ alert(e.message); }
+};
+
+/* ---------------- reviews ---------------- */
+async function reviewsPage(){
+  const el = document.getElementById('reviews');
+  el.innerHTML = '<div class="panel"><div class="empty">Loading…</div></div>';
+  try{
+    const d = await api('/api/v1/admin/reviews');
+    const s = d.summary;
+    el.innerHTML = `
+      <div class="hdr"><div><h1>Reviews</h1><div class="sub">Aggregates are computed from published reviews only</div></div></div>
+      <div class="cards">
+        <div class="card"><div class="k">Average</div><div class="v">${s.averageRating ?? '—'}</div><div class="d">${s.averageRating===null?'No published reviews yet':'From '+s.reviewCount+' published'}</div></div>
+        <div class="card"><div class="k">Published</div><div class="v">${s.reviewCount}</div></div>
+        <div class="card"><div class="k">Pending</div><div class="v">${d.reviews.filter(r=>r.status==='PENDING').length}</div></div>
+      </div>
+      <div class="panel"><div class="panel-h"><h2>All reviews</h2><span class="sub">Source cannot be changed — it is earned at creation</span></div>
+      ${d.reviews.length? `<table><thead><tr><th>Source</th><th>Reviewer</th><th>Rating</th><th>Review</th><th>Status</th><th></th></tr></thead><tbody>
+        ${d.reviews.map(r=>`<tr>
+          <td><span class="src ${r.source}"><span class="dot">${r.source[0]}</span>${r.source==='GOOGLE'?'Google':r.source==='R2NETTE_VERIFIED'?'Verified':r.source==='SETMORE_LEGACY'?'Setmore':'Manual'}</span></td>
+          <td>${esc(r.customerDisplayName)}</td>
+          <td><span class="stars">${'★'.repeat(r.rating)}</span></td>
+          <td style="max-width:340px">${esc((r.reviewText||'').slice(0,110))}${(r.reviewText||'').length>110?'…':''}</td>
+          <td><span class="pill ${r.status==='PUBLISHED'?'ok':r.status==='PENDING'?'warn':'mut'}">${r.status}</span></td>
+          <td style="white-space:nowrap">
+            ${r.status!=='PUBLISHED'?`<button class="btn" onclick="revAction('${r.id}','publish')">Publish</button>`:`<button class="btn ghost" onclick="revAction('${r.id}','hide')">Hide</button>`}
+            <button class="btn ghost" onclick="revAction('${r.id}','feature')">${r.featured?'Unfeature':'Feature'}</button>
+          </td></tr>`).join('')}
+      </tbody></table>` : `<div class="empty"><div class="big">No reviews yet</div>Sync Google or import your Setmore history to populate this.<br><br>
+        <button class="btn" onclick="importDemo()">Run Setmore import (dry run)</button></div>`}
+      </div>`;
+  }catch(e){ err(el,e); }
+}
+window.revAction = async (id, action) => { try{ await api(`/api/v1/admin/reviews/${id}/${action}`,{method:'POST'}); reviewsPage(); }catch(e){ alert(e.message);} };
+window.importDemo = async () => {
+  const rows = [{externalId:'demo1',name:'Example Reviewer',rating:5,text:'Dry run only — nothing is written.'}];
+  const r = await api('/api/v1/admin/reviews/import',{method:'POST',body:JSON.stringify({rows,dryRun:true})});
+  alert(`Dry run: ${r.report.found} found, ${r.report.valid} valid, ${r.report.invalid} invalid, ${r.report.duplicates} duplicates. Nothing written.`);
+};
+
+/* ---------------- integrations ---------------- */
+async function integrationsPage(){
+  const el = document.getElementById('integrations');
+  try{
+    const d = await api('/api/v1/admin/integrations');
+    el.innerHTML = `
+      <div class="hdr"><div><h1>Integrations</h1><div class="sub">Status is read from the environment — never set by hand</div></div></div>
+      <div class="cards">
+      ${d.integrations.map(i=>`<div class="card ${i.status==='CONNECTED'?'good':''}">
+        <div class="k">${esc(i.label)}</div>
+        <div style="margin-top:10px"><span class="pill ${i.status==='CONNECTED'?'ok':'warn'}">${i.status.replace('_',' ')}</span></div>
+        <div class="d">${i.status==='CONNECTED'?'Ready':'Missing: '+i.missingEnv.join(', ')}</div>
+        <div class="d" style="margin-top:8px;color:var(--muted)">${esc(i.blocks)}</div>
+      </div>`).join('')}
+      </div>`;
+  }catch(e){ err(el,e); }
+}
+
+/* ---------------- cutover ---------------- */
+async function cutoverPage(){
+  const el = document.getElementById('cutover');
+  try{
+    const d = await api('/api/v1/admin/cutover');
+    const ready = d.items.filter(i=>i.status==='READY').length;
+    el.innerHTML = `
+      <div class="hdr"><div><h1>Setmore replacement status</h1><div class="sub">${ready} of ${d.items.length} ready · everything below is computed from real data</div></div></div>
+      <div class="panel"><table><thead><tr><th>Area</th><th>Status</th><th>Detail</th></tr></thead><tbody>
+      ${d.items.map(i=>`<tr><td><b>${esc(i.label)}</b></td>
+        <td><span class="pill ${i.status==='READY'?'ok':i.status==='BLOCKED'?'bad':'warn'}">${i.status.replace('_',' ')}</span></td>
+        <td style="color:var(--muted)">${esc(i.detail)}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  }catch(e){ err(el,e); }
+}
+
+/* ---------------- security ---------------- */
+async function securityPage(){
+  const el = document.getElementById('security');
+  const u = ME.user;
+  el.innerHTML = `
+    <div class="hdr"><div><h1>Security</h1>
+      <div class="sub">Your account. Changes here affect only you.</div></div></div>
+    <div class="tfa-card">
+      <h2 style="font-size:17px;margin-bottom:6px">Two-step verification</h2>
+      <p style="color:var(--muted);font-size:14px;margin:0 0 14px">
+        ${u.twoFactorEnabled
+          ? `On. Sign-in asks for a code from your authenticator app. ${u.recoveryCodesRemaining} recovery code${u.recoveryCodesRemaining===1?'':'s'} left.`
+          : u.twoFactorRecommended
+            ? 'Off. Strongly recommended for owner accounts — a stolen password alone would be enough without it.'
+            : 'Off. Adds a code from your phone to every sign-in.'}
+      </p>
+      <div id="tfaBody"></div>
+      ${u.twoFactorEnabled
+        ? `<button class="btn ghost" onclick="tfaDisable()">Turn off</button>
+           <button class="btn ghost" onclick="tfaNewCodes()">New recovery codes</button>`
+        : `<button class="btn" onclick="tfaBegin()">Turn on two-step verification</button>`}
+    </div>`;
+}
+
+window.tfaBegin = async () => {
+  try{
+    const res = await api('/api/v1/staff/totp/begin',{method:'POST'});
+    document.getElementById('tfaBody').innerHTML = `
+      <p style="font-size:14px">Add this to your authenticator app, then enter the code it shows.</p>
+      <div class="tfa-uri">${esc(res.secret)}</div>
+      <p style="font-size:12.5px;color:var(--muted)">Or open: <span class="tfa-uri" style="display:inline">${esc(res.otpauthUri)}</span></p>
+      <input class="gi mono" id="enrolCode" inputmode="numeric" maxlength="6" placeholder="000000" style="max-width:220px">
+      <div class="gerr" id="enrolErr" hidden></div>
+      <div style="margin-top:12px"><button class="btn" onclick="tfaConfirm()">Confirm</button></div>`;
+  }catch(e){ alert(e.message); }
+};
+
+window.tfaConfirm = async () => {
+  const err = document.getElementById('enrolErr');
+  err.hidden = true;
+  try{
+    const res = await api('/api/v1/staff/totp/confirm',{method:'POST',
+      body:JSON.stringify({code:document.getElementById('enrolCode').value})});
+    // Shown once. We store only hashes.
+    document.getElementById('tfaBody').innerHTML = `
+      <div class="pill ok" style="margin-bottom:12px">Two-step verification is on</div>
+      <p style="font-size:14px"><b>Save these recovery codes now.</b> Each works once, and this is
+      the only time they are shown. Without them, losing your phone means losing this account.</p>
+      <div class="tfa-codes">${res.recoveryCodes.map(c=>`<div>${esc(c)}</div>`).join('')}</div>
+      <button class="btn" onclick="location.reload()">I have saved them</button>`;
+  }catch(e){ err.textContent = e.message; err.hidden = false; }
+};
+
+window.tfaDisable = async () => {
+  const pw = prompt('Confirm your password to turn off two-step verification:');
+  if(!pw) return;
+  try{ await api('/api/v1/staff/totp/disable',{method:'POST',body:JSON.stringify({password:pw})});
+    location.reload();
+  }catch(e){ alert(e.message); }
+};
+
+window.tfaNewCodes = async () => {
+  const pw = prompt('Confirm your password to generate new recovery codes:');
+  if(!pw) return;
+  try{
+    const res = await api('/api/v1/staff/totp/recovery-codes',{method:'POST',body:JSON.stringify({password:pw})});
+    document.getElementById('tfaBody').innerHTML =
+      `<p style="font-size:14px"><b>New recovery codes. Your old ones no longer work.</b></p>
+       <div class="tfa-codes">${res.recoveryCodes.map(c=>`<div>${esc(c)}</div>`).join('')}</div>`;
+  }catch(e){ alert(e.message); }
+};
+
+/* ---------------- automation health ---------------- */
+const WORKER_STATUS = {
+  HEALTHY:{cls:'ok',label:'Running'},
+  NEVER_SUCCEEDED:{cls:'warn',label:'Never run here'},
+  OVERDUE:{cls:'bad',label:'Stopped'},
+  FAILING:{cls:'bad',label:'Failing'},
+  NOT_CONFIGURED:{cls:'mut',label:'Not configured'},
+  DISABLED:{cls:'mut',label:'Disabled'},
+};
+
+async function operationsPage(){
+  const el = document.getElementById('operations');
+  el.innerHTML = '<div class="panel"><div class="empty">Loading…</div></div>';
+  try{
+    const d = await api('/api/v1/admin/operations');
+    const never = d.workers.filter(w=>w.status==='NEVER_SUCCEEDED');
+    const broken = d.workers.filter(w=>w.status==='OVERDUE'||w.status==='FAILING');
+
+    el.innerHTML = `
+      <div class="hdr"><div><h1>Automation</h1>
+        <div class="sub">What runs without anyone remembering to run it.</div></div></div>
+      <div class="cards">
+        <div class="card ${broken.length?'alert':'good'}"><div class="k">Stopped or failing</div>
+          <div class="v">${broken.length}</div><div class="d">Worked before, not now</div></div>
+        <div class="card ${never.length?'alert':'good'}"><div class="k">Never run here</div>
+          <div class="v">${never.length}</div><div class="d">Not yet proven in this environment</div></div>
+        <div class="card ${d.alerts.length?'alert':'good'}"><div class="k">Open alerts</div>
+          <div class="v">${d.alerts.length}</div></div>
+      </div>
+
+      ${d.offHostBackupConfigured ? '' : `<div class="panel"><div style="padding:16px;background:rgba(255,198,39,.12)">
+        <b>Backups are staying on this machine.</b> Set the <span class="mono">BACKUP_S3_*</span>
+        variables so a lost server does not take the backups with it.</div></div>`}
+
+      <div class="panel"><div class="panel-h"><h2>Scheduled work</h2></div>
+      <table><thead><tr><th>Job</th><th>Status</th><th>Last success</th><th>What it means</th></tr></thead><tbody>
+        ${d.workers.map(w=>{
+          const s2 = WORKER_STATUS[w.status] || {cls:'mut',label:w.status};
+          return `<tr>
+            <td><b>${esc(w.label)}</b>${w.critical?' <span class="pill mut">required</span>':''}</td>
+            <td><span class="pill ${s2.cls}">${s2.label}</span></td>
+            <td class="mono" style="font-size:12.5px">${w.lastSuccessAt?new Date(w.lastSuccessAt).toLocaleString('en-CA'):'—'}</td>
+            <td style="color:var(--muted);font-size:13.5px">${esc(w.summary)}</td></tr>`;
+        }).join('')}
+      </tbody></table></div>
+
+      <div class="panel"><div class="panel-h"><h2>Open alerts</h2></div>
+      ${d.alerts.length ? `<table><thead><tr><th>Problem</th><th>Severity</th><th>Since</th><th>Seen</th><th>Sent</th></tr></thead><tbody>
+        ${d.alerts.map(a=>`<tr>
+          <td><b>${esc(a.title)}</b><div style="font-size:12.5px;color:var(--muted)">${esc(a.message)}</div></td>
+          <td><span class="pill ${a.severity==='CRITICAL'?'bad':'warn'}">${a.severity}</span></td>
+          <td class="mono" style="font-size:12.5px">${new Date(a.openedAt).toLocaleString('en-CA')}</td>
+          <td class="mono">${a.observations}×</td>
+          <td><span class="pill ${a.deliveryStatus==='DELIVERED'?'ok':'mut'}">${a.deliveryStatus.replace('_',' ')}</span></td>
+        </tr>`).join('')}
+      </tbody></table>` : '<div class="empty"><div class="big">Nothing wrong</div>Every required job has run recently.</div>'}
+      </div>`;
+  }catch(e){ err(el,e); }
+}
+
+/* ---------------- routing ---------------- */
+const PAGES = {dashboard, dispatch, roster:rosterPage, callbacks:callbacksPage, billing:billingPage, reviews:reviewsPage, integrations:integrationsPage, cutover:cutoverPage, security:securityPage, operations:operationsPage};
+function route(){
+  const id = (location.hash || '#dashboard').slice(1);
+  for(const el of document.querySelectorAll('.page')) el.classList.toggle('on', el.id === id);
+  for(const a of document.querySelectorAll('nav.side a')) a.classList.toggle('on', a.dataset.nav === id);
+  (PAGES[id] || dashboard)();
+}
+window.addEventListener('hashchange', route);
+
+/* Resolve the session before rendering anything. */
+(async function start(){
+  try{
+    ME = await api('/api/v1/staff/me');
+  }catch{
+    showGate();
+    return;
+  }
+  document.getElementById('gate').style.display='none';
+  const shell = document.getElementById('shell');
+  shell.hidden = false;
+  shell.style.display = 'flex';
+  const first = applyRole();
+  if(!first) return;
+  const wanted = NAV_PERMISSION[location.hash.slice(1)];
+  if(!location.hash || (wanted !== null && !ME.permissions.includes(wanted ?? ''))){
+    location.hash = '#' + first;
+  }
+  route();
+})();
+</script>
+</body>
+</html>

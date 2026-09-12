@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Book a cleaning — R2NETTE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A1F33; --ink-2:#4A6076; --ink-3:#7C90A3;
+  --brand:#0E4C7E; --brand-dk:#0A3459; --accent:#0FA968; --accent-lt:#E6F7EF;
+  --paper:#fff; --wash:#F1F6FA; --line:#DBE6F0; --warn:#B54708; --warn-bg:#FFF6ED;
+  --r:14px; --shadow:0 1px 2px rgba(10,31,51,.06),0 8px 24px rgba(10,31,51,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:"Instrument Sans",system-ui,sans-serif; color:var(--ink);
+  background:var(--wash); line-height:1.5; padding-bottom:132px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+
+/* ---------- header ---------- */
+header{background:var(--brand);color:#fff;padding:14px 0}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo{font-family:Archivo;font-weight:800;font-size:19px;letter-spacing:-.02em}
+.logo span{color:#7FE3B4}
+.callus{font-size:13px;color:#BBD6EC;text-decoration:none;white-space:nowrap}
+.callus:hover{color:#fff}
+
+/* ---------- progress ---------- */
+.prog{background:var(--paper);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.prog-in{display:flex;gap:2px;padding:10px 0;overflow-x:auto;scrollbar-width:none}
+.prog-in::-webkit-scrollbar{display:none}
+.step{
+  font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink-3);white-space:nowrap;padding:5px 10px;border-radius:99px;flex:0 0 auto;
+}
+.step.on{background:var(--brand);color:#fff}
+.step.done{color:var(--accent)}
+.step.done::before{content:"✓ "}
+
+/* ---------- layout ---------- */
+.cols{display:grid;grid-template-columns:1fr;gap:20px;padding:20px 0}
+@media(min-width:940px){
+  .cols{grid-template-columns:1fr 356px;gap:28px;padding:28px 0}
+  body{padding-bottom:32px}
+}
+
+/* ---------- panels ---------- */
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:var(--shadow)}
+.panel + .panel{margin-top:16px}
+h1{font-family:Archivo;font-weight:800;font-size:25px;letter-spacing:-.025em;line-height:1.15}
+h2{font-family:Archivo;font-weight:700;font-size:19px;letter-spacing:-.02em;margin-bottom:4px}
+.sub{color:var(--ink-2);font-size:14px;margin-bottom:16px}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+
+/* ---------- choices ---------- */
+.grid{display:grid;gap:9px}
+.grid.two{grid-template-columns:1fr 1fr}
+.opt{
+  display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;cursor:pointer;
+  background:var(--paper);border:1.5px solid var(--line);border-radius:11px;padding:13px 14px;
+  font:inherit;color:inherit;transition:border-color .12s,background .12s;min-height:52px;
+}
+.opt:hover{border-color:#9DBDD8}
+.opt:focus-visible{outline:2.5px solid var(--brand);outline-offset:2px}
+.opt[aria-pressed="true"]{border-color:var(--brand);background:#F5FAFE;box-shadow:inset 0 0 0 1px var(--brand)}
+.opt-b{flex:1;min-width:0}
+.opt-t{font-weight:600;font-size:14.5px;letter-spacing:-.01em}
+.opt-d{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.opt-p{font-family:"IBM Plex Mono";font-weight:600;font-size:14px;white-space:nowrap;padding-top:1px}
+.opt-p.free{color:var(--accent)}
+.tag{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  background:var(--accent-lt);color:#075534;padding:2px 7px;border-radius:5px;margin-left:6px;vertical-align:1px}
+
+/* ---------- fields ---------- */
+label.fl{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:var(--ink)}
+input,select,textarea{
+  width:100%;font:inherit;font-size:15px;color:var(--ink);background:var(--paper);
+  border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;min-height:46px;
+}
+input:focus,select:focus,textarea:focus{outline:2.5px solid var(--brand);outline-offset:1px;border-color:var(--brand)}
+.row{display:grid;gap:12px;margin-bottom:12px}
+.row.two{grid-template-columns:1fr 1fr}
+.hint{font-size:12px;color:var(--ink-3);margin-top:5px}
+
+/* ---------- qty ---------- */
+.qty{display:flex;align-items:center;gap:2px;border:1.5px solid var(--line);border-radius:9px;overflow:hidden}
+.qty button{width:36px;height:36px;border:0;background:var(--wash);font-size:17px;font-weight:600;color:var(--brand);cursor:pointer}
+.qty button:hover{background:#E2ECF5}
+.qty span{width:32px;text-align:center;font-family:"IBM Plex Mono";font-weight:600;font-size:14px}
+
+/* ---------- receipt (signature element) ---------- */
+.receipt{
+  background:var(--paper);border-radius:var(--r);box-shadow:var(--shadow);
+  border:1px solid var(--line);overflow:hidden;position:sticky;top:76px;
+}
+.receipt-top{
+  background:var(--brand);color:#fff;padding:14px 16px;
+  display:flex;align-items:baseline;justify-content:space-between;
+}
+.receipt-top .lb{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#9FC8E6}
+.receipt-top .sv{font-family:Archivo;font-weight:700;font-size:14px;margin-top:3px;letter-spacing:-.01em}
+.perf{height:8px;background:
+  radial-gradient(circle at 5px 0,transparent 4px,var(--paper) 4.5px) 0 0/10px 8px repeat-x;
+  background-color:var(--brand)}
+.receipt-body{padding:14px 16px 16px}
+.li{display:flex;justify-content:space-between;gap:10px;font-family:"IBM Plex Mono";font-size:12.5px;padding:5px 0;align-items:baseline}
+.li .d{color:var(--ink-2);font-family:"Instrument Sans";font-size:13px;flex:1;min-width:0}
+.li .a{font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+.li.neg .a{color:var(--accent)}
+.li.neg .d{color:#075534;font-weight:600}
+.li.mut .d,.li.mut .a{color:var(--ink-3);font-size:12px}
+.rule{border:0;border-top:1px dashed var(--line);margin:9px 0}
+.total{display:flex;justify-content:space-between;align-items:baseline;padding-top:4px}
+.total .d{font-family:Archivo;font-weight:700;font-size:15px}
+.total .a{font-family:"IBM Plex Mono";font-weight:600;font-size:23px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.duenow{background:var(--accent-lt);border-radius:9px;padding:9px 11px;margin-top:12px;font-size:12.5px;color:#075534;font-weight:500}
+.duenow b{font-family:"IBM Plex Mono";font-weight:600}
+.nextvisit{border:1px dashed var(--line);border-radius:9px;padding:10px 11px;margin-top:10px;font-size:12.5px;color:var(--ink-2)}
+.nextvisit .hd2{font-weight:600;color:var(--ink);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.nextvisit b{font-family:"IBM Plex Mono";color:var(--ink)}
+
+/* ---------- sticky mobile bar ---------- */
+.bar{
+  position:fixed;left:0;right:0;bottom:0;background:var(--paper);border-top:1px solid var(--line);
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));z-index:30;
+  box-shadow:0 -6px 20px rgba(10,31,51,.08);
+}
+@media(min-width:940px){.bar{position:static;box-shadow:none;border:0;background:transparent;padding:0}}
+.bar-in{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.bar-price{flex:1;min-width:0}
+.bar-price .l{font-size:11px;color:var(--ink-3);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.bar-price .v{font-family:"IBM Plex Mono";font-weight:600;font-size:20px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+@media(min-width:940px){.bar-price{display:none}}
+.btn{
+  font:inherit;font-weight:600;font-size:15.5px;cursor:pointer;border:0;border-radius:11px;
+  padding:14px 26px;background:var(--accent);color:#fff;min-height:50px;white-space:nowrap;
+  transition:background .12s;
+}
+.btn:hover{background:#0C8F57}
+.btn:focus-visible{outline:2.5px solid var(--ink);outline-offset:2px}
+.btn:disabled{background:#C3D2DE;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--brand);padding:14px 14px}
+.btn.ghost:hover{background:var(--wash)}
+@media(min-width:940px){.btn.wide{width:100%}}
+
+/* ---------- notes ---------- */
+.note{background:var(--warn-bg);border:1px solid #F5CDA0;border-radius:10px;padding:11px 13px;font-size:13px;color:var(--warn);margin-top:12px}
+.quote-note{background:#F5FAFE;border:1px solid #B9D8EF;border-radius:10px;padding:14px;font-size:13.5px;color:var(--brand-dk);margin-top:12px}
+.err{color:#B42318;font-size:13px;margin-top:8px;font-weight:500}
+.conf{text-align:center;padding:8px 0 4px}
+.conf .ck{width:52px;height:52px;border-radius:50%;background:var(--accent-lt);color:var(--accent);
+  display:grid;place-items:center;font-size:26px;margin:0 auto 12px}
+.bkno{font-family:"IBM Plex Mono";font-weight:600;font-size:17px;letter-spacing:.02em;background:var(--wash);
+  padding:8px 14px;border-radius:8px;display:inline-block;margin:8px 0 4px}
+.jobsheet{font-family:"IBM Plex Mono";font-size:12px;background:var(--ink);color:#9FE8C4;padding:12px;border-radius:9px;margin-top:14px;text-align:left;white-space:pre-line;line-height:1.6}
+@media(prefers-reduced-motion:no-preference){
+  .panel{animation:fade .22s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+}
+</style>
+</head>
+<body>
+
+<header><div class="wrap hd">
+  <div class="logo">R2<span>NETTE</span></div>
+  <a class="callus" href="tel:5148252825">(514) 825-2825</a>
+</div></header>
+
+<nav class="prog" aria-label="Booking progress"><div class="wrap prog-in" id="prog"></div></nav>
+
+<div class="wrap cols">
+  <main id="main"></main>
+  <aside><div class="receipt" id="receipt"></div></aside>
+</div>
+
+<div class="bar"><div class="bar-in">
+  <div class="bar-price"><div class="l" id="barLabel">Total</div><div class="v" id="barTotal">$0.00</div></div>
+  <button class="btn ghost" id="back" type="button">Back</button>
+  <button class="btn wide" id="next" type="button">Continue</button>
+</div></div>
+
+<script>
+/* ==========================================================================
+   R2NETTE booking wizard.
+
+   The pricing math below MIRRORS the authoritative server engine
+   (@r2nette/pricing). It exists so the customer sees a live total while
+   answering. It is DISPLAY ONLY. Before any charge, the server recalculates
+   from the same rules and its number wins. Never post a total from here.
+   ========================================================================== */
+
+const C = {
+  transportBase: 2500, includedKm: 20, perKm: 65,
+  productBasic: 1200, productDeep: 1500,
+  gst: 5.0, qst: 9.975,
+  quoteExpiryMin: 30,
+};
+const FREQ = {
+  ONE_TIME:{ pct:0,  label:"One-time",        note:"No commitment" },
+  MONTHLY: { pct:10, label:"Monthly",          note:"Same date each month" },
+  BIWEEKLY:{ pct:15, label:"Every 2 weeks",    note:"Every 14 days" },
+  WEEKLY:  { pct:25, label:"Weekly",           note:"Every 7 days · about 4 visits a month" },
+};
+const ALL = ["ONE_TIME","MONTHLY","BIWEEKLY","WEEKLY"], ONCE = ["ONE_TIME"];
+
+const SERVICES = [
+  {id:"basic_1x3", cat:"basic", name:"Basic Cleaning", opt:"1 cleaner × 3 hours", price:11000, staff:1, mins:180, freq:ALL, prod:"REQUIRED", kit:"BASIC"},
+  {id:"basic_2x2", cat:"basic", name:"Basic Cleaning", opt:"2 cleaners × 2 hours", price:14000, staff:2, mins:120, freq:ALL, prod:"REQUIRED", kit:"BASIC"},
+  {id:"basic_2x3", cat:"basic", name:"Basic Cleaning", opt:"2 cleaners × 3 hours", price:20000, staff:2, mins:180, freq:ALL, prod:"REQUIRED", kit:"BASIC"},
+  {id:"basic_2x4", cat:"basic", name:"Basic Cleaning", opt:"2 cleaners × 4 hours", price:26000, staff:2, mins:240, freq:ALL, prod:"REQUIRED", kit:"BASIC"},
+  {id:"deep_1x3",  cat:"deep",  name:"Deep Cleaning",  opt:"1 cleaner × 3 hours",  price:11500, staff:1, mins:180, freq:ALL, prod:"REQUIRED", kit:"DEEP"},
+  {id:"deep_2x2",  cat:"deep",  name:"Deep Cleaning",  opt:"2 cleaners × 2 hours", price:13000, staff:2, mins:120, freq:ALL, prod:"REQUIRED", kit:"DEEP"},
+  {id:"deep_2x3",  cat:"deep",  name:"Deep Cleaning",  opt:"2 cleaners × 3 hours", price:23000, staff:2, mins:180, freq:ALL, prod:"REQUIRED", kit:"DEEP"},
+  {id:"deep_2x4",  cat:"deep",  name:"Deep Cleaning",  opt:"2 cleaners × 4 hours", price:26000, staff:2, mins:240, freq:ALL, prod:"REQUIRED", kit:"DEEP"},
+  {id:"move",      cat:"other", name:"Move-In / Move-Out", opt:"2 cleaners × 2 hours", price:14000, staff:2, mins:120, freq:ONCE, prod:"REQUIRED", kit:"DEEP"},
+  {id:"carpet",    cat:"other", name:"Carpet Cleaning", opt:"2 hours", price:19900, staff:1, mins:120, freq:ONCE, prod:"NONE"},
+  {id:"window",    cat:"other", name:"Window Cleaning", opt:"Price depends on your windows", price:null, staff:1, mins:null, freq:ONCE, prod:"NONE", quoteOnly:true},
+];
+const ADDONS = [
+  {id:"laundry", name:"Laundry wash & fold", unit:1000, per:"per load", qty:true, max:10},
+  {id:"garbage", name:"Garbage removal",     unit:1500, per:"flat",     qty:false,max:1},
+  {id:"glass",   name:"Glass / patio doors", unit:500,  per:"per door", qty:true, max:20},
+];
+const PROMOS = { basic:{code:"NEW_CUSTOMER_BASIC",amount:1500,label:"New customer — $15 off"},
+                 deep: {code:"NEW_CUSTOMER_DEEP", amount:2000,label:"New customer — $20 off"} };
+const PROPERTY_TYPES = ["Studio / Bachelor","Apartment 1½","Apartment 2½","Apartment 3½","Apartment 4½","Apartment 5½","Apartment 6½","Apartment 7½+","Condo","Loft","Townhouse","House / Bungalow","Duplex","Triplex / Multiplex Unit","Cottage","Chalet / Cabin","Spa / Wellness Property","Office","Retail / Store","Restaurant / Commercial Space","Other"];
+const CONDITIONS = [["light","Light maintenance","Kept up regularly"],["normal","Normal","Typical lived-in home"],["attention","Needs attention","Behind on cleaning"],["heavy","Heavy cleaning","Significant build-up"],["assess","Very heavy","We'll review before confirming"]];
+
+/* ---------- money ---------- */
+const half=(n,d)=>{const q=Math.floor(n/d),r=n-q*d;return r*2>=d?q+1:q};
+const rate=(cents,pct)=>half(cents*Math.round(pct*1e6),1e8);
+const $$=c=>"$"+(c/100).toFixed(2);
+
+/* ---------- state ---------- */
+const S={step:0,service:null,propType:"",propOther:"",airbnb:null,beds:2,baths:1,cond:"normal",
+  product:null,addons:{},freq:null,addr:"",unit:"",city:"",prov:"QC",post:"",km:12,
+  name:"",phone:"",email:"",access:"",newCustomer:true,booked:false,bookingNo:""};
+
+/* ---------- pricing (mirrors server engine) ---------- */
+function price(){
+  const s=S.service; if(!s||s.quoteOnly) return null;
+  const base=s.price, lines=[];
+  lines.push({t:"SERVICE",d:`${s.name} — ${s.opt}`,a:base});
+
+  // BEST_SINGLE_DISCOUNT: compute every eligible discount, apply only the largest.
+  const cands=[];
+  const f=S.freq?FREQ[S.freq]:null;
+  if(f&&f.pct>0) cands.push({src:f.label+" discount",a:rate(base,f.pct),code:"FREQ"});
+  const promo=PROMOS[s.cat];
+  if(promo&&S.newCustomer) cands.push({src:promo.label,a:promo.amount,code:promo.code});
+  let win=null; for(const c of cands) if(!win||c.a>win.a) win=c;
+  if(win) lines.push({t:"DISCOUNT",d:win.src,a:-win.a});
+
+  if(S.product){
+    const amt=S.product==="CLIENT"?0:(s.kit==="DEEP"?C.productDeep:C.productBasic);
+    const d=S.product==="CLIENT"?"You supply the products":`R2NETTE ${s.kit==="DEEP"?"deep":"basic"} product kit`;
+    lines.push({t:"PRODUCTS",d,a:amt});
+  }
+  for(const a of ADDONS){const q=S.addons[a.id]||0; if(q>0) lines.push({t:"ADDON",d:`${a.name} × ${q}`,a:a.unit*q});}
+
+  // One transport per visit — never one per cleaner.
+  lines.push({t:"TRANSPORT",d:`Transportation (first ${C.includedKm} km included)`,a:C.transportBase});
+  const extra=Math.max(0,Math.ceil((S.km||0)-C.includedKm));
+  if(extra>0) lines.push({t:"DISTANCE",d:`Extra distance — ${extra} km`,a:extra*C.perKm});
+
+  const sub=lines.reduce((t,l)=>t+l.a,0);
+  // GST and QST both come off the PRE-TAX subtotal. QST never compounds on GST.
+  const gst=rate(sub,C.gst), qst=rate(sub,C.qst);
+
+  let next=null;
+  if(S.freq&&S.freq!=="ONE_TIME"){
+    // Subsequent visits: the first-visit winner is gone, the frequency discount applies.
+    const fd=rate(base,FREQ[S.freq].pct);
+    const nSub=sub+(win?win.a:0)-fd;
+    next={service:base-fd,total:nSub+rate(nSub,C.gst)+rate(nSub,C.qst),label:FREQ[S.freq].label};
+  }
+  return {lines,sub,gst,qst,total:sub+gst+qst,winner:win,next,promoLost:win&&win.code==="FREQ"&&cands.length>1};
+}
+
+/* ---------- steps ---------- */
+const STEPS=[
+  {k:"service", t:"Service"},
+  {k:"property",t:"Property"},
+  {k:"products",t:"Products"},
+  {k:"frequency",t:"How often"},
+  {k:"extras",  t:"Extras"},
+  {k:"address", t:"Address"},
+  {k:"contact", t:"Contact"},
+  {k:"review",  t:"Review"},
+];
+const visibleSteps=()=>S.service&&S.service.quoteOnly
+  ? [STEPS[0],STEPS[1],STEPS[5],STEPS[6],STEPS[7]] : STEPS;
+
+const el=(h)=>{const d=document.createElement("div");d.innerHTML=h.trim();return d.firstElementChild};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function optBtn(sel,title,desc,priceTxt,cls=""){
+  return `<button class="opt ${cls}" type="button" aria-pressed="${sel}">
+    <div class="opt-b"><div class="opt-t">${title}</div>${desc?`<div class="opt-d">${desc}</div>`:""}</div>
+    ${priceTxt!==null?`<div class="opt-p ${priceTxt==="Free"||priceTxt==="$0.00"?"free":""}">${priceTxt}</div>`:""}
+  </button>`;
+}
+
+function render(){
+  const steps=visibleSteps(), cur=steps[Math.min(S.step,steps.length-1)];
+  document.getElementById("prog").innerHTML=steps.map((s,i)=>
+    `<span class="step ${i===S.step?"on":i<S.step?"done":""}">${s.t}</span>`).join("");
+  const m=document.getElementById("main"); m.innerHTML="";
+  ({service:vService,property:vProperty,products:vProducts,frequency:vFrequency,
+    extras:vExtras,address:vAddress,contact:vContact,review:vReview})[cur.k](m);
+  drawReceipt(); syncButtons();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+/* ----- step: service ----- */
+function vService(m){
+  const cats=[["basic","Basic Cleaning","Regular upkeep — kitchen, bathrooms, floors, surfaces."],
+              ["deep","Deep Cleaning","Detailed work — build-up, edges, fixtures, inside appliances on request."],
+              ["other","Other Services","Move-outs, carpets and windows."]];
+  const p=el(`<section class="panel">
+    <div class="eyebrow">Step 1</div>
+    <h1>What kind of cleaning do you need?</h1>
+    <p class="sub">Every price below is the full service price. Products and transportation are shown separately as you go — nothing is hidden at the end.</p>
+    <div id="cats"></div></section>`);
+  const box=p.querySelector("#cats");
+  for(const [cat,label,blurb] of cats){
+    box.appendChild(el(`<h2 style="margin-top:18px">${label}</h2><p class="sub">${blurb}</p>`));
+    const g=el(`<div class="grid"></div>`);
+    for(const s of SERVICES.filter(x=>x.cat===cat)){
+      const sel=S.service?.id===s.id;
+      const txt=s.quoteOnly?"Quote":$$(s.price);
+      const desc=s.staff>1?`${s.opt} · ${s.staff*s.mins/60} total labour-hours`:s.opt;
+      const b=el(optBtn(sel,esc(s.name==="Basic Cleaning"||s.name==="Deep Cleaning"?s.opt:s.name),
+        s.name==="Basic Cleaning"||s.name==="Deep Cleaning"?(s.staff>1?`${s.staff*s.mins/60} total labour-hours`:"Single cleaner"):s.opt,txt));
+      b.onclick=()=>{S.service=s; if(!s.freq.includes(S.freq))S.freq=null;
+        if(s.prod==="NONE")S.product=null; render();};
+      g.appendChild(b);
+    }
+    box.appendChild(g);
+  }
+  m.appendChild(p);
+  if(S.service?.quoteOnly) m.appendChild(el(`<div class="panel"><div class="quote-note">
+    <b>Window cleaning is quoted, not fixed-price.</b><br>The price depends on how many windows you have,
+    how many floors, and whether we can reach them safely. Tell us about the property and we'll send you a
+    real price — we will never show you "Free" and then surprise you.</div></div>`));
+}
+
+/* ----- step: property ----- */
+function vProperty(m){
+  const p=el(`<section class="panel">
+    <div class="eyebrow">Step 2</div><h1>Tell us about the property</h1>
+    <p class="sub">This helps us send the right team with the right equipment.</p>
+    <div class="row"><label class="fl" for="pt">Property type</label>
+      <select id="pt">${["<option value=''>Select…</option>"].concat(
+        PROPERTY_TYPES.map(t=>`<option ${S.propType===t?"selected":""}>${t}</option>`)).join("")}</select></div>
+    <div class="row" id="otherRow" style="display:${S.propType==="Other"?"grid":"none"}">
+      <label class="fl" for="po">Describe the property</label>
+      <input id="po" value="${esc(S.propOther)}" placeholder="e.g. converted warehouse loft"></div>
+    <div class="row"><label class="fl">Is this an Airbnb or short-term rental?</label>
+      <div class="grid two" id="ab">
+        ${optBtn(S.airbnb===true,"Yes","",null)}${optBtn(S.airbnb===false,"No","",null)}</div>
+      <p class="hint">Asked separately because an Airbnb can be a condo, a house or a chalet.</p></div>
+    <div class="row two">
+      <div><label class="fl" for="bd">Bedrooms</label><input id="bd" type="number" min="0" max="12" value="${S.beds}"></div>
+      <div><label class="fl" for="ba">Bathrooms</label><input id="ba" type="number" min="0" max="12" value="${S.baths}"></div>
+    </div>
+    <label class="fl" style="margin-top:4px">Current condition</label>
+    <div class="grid" id="cond">${CONDITIONS.map(([k,t,d])=>optBtn(S.cond===k,t,d,null)).join("")}</div>
+  </section>`);
+  p.querySelector("#pt").onchange=e=>{S.propType=e.target.value;
+    p.querySelector("#otherRow").style.display=S.propType==="Other"?"grid":"none";syncButtons();};
+  p.querySelector("#po").oninput=e=>{S.propOther=e.target.value;syncButtons();};
+  p.querySelectorAll("#ab .opt").forEach((b,i)=>b.onclick=()=>{S.airbnb=i===0;render();});
+  p.querySelector("#bd").oninput=e=>S.beds=+e.target.value;
+  p.querySelector("#ba").oninput=e=>S.baths=+e.target.value;
+  p.querySelectorAll("#cond .opt").forEach((b,i)=>b.onclick=()=>{S.cond=CONDITIONS[i][0];render();});
+  m.appendChild(p);
+  if(S.cond==="assess") m.appendChild(el(`<div class="panel"><div class="note">
+    We'll review this booking before confirming it, and call you if the job needs more time than the
+    option you picked. You won't be charged extra without agreeing first.</div></div>`));
+}
+
+/* ----- step: products (mandatory) ----- */
+function vProducts(m){
+  const deep=S.service.kit==="DEEP", amt=deep?C.productDeep:C.productBasic;
+  m.appendChild(el(`<section class="panel">
+    <div class="eyebrow">Step 3 · Required</div><h1>Who provides the cleaning products?</h1>
+    <p class="sub">You have to answer this one — it changes what our cleaners bring in the van.</p>
+    <div class="grid" id="pr">
+      ${optBtn(S.product==="CLIENT","I will provide the cleaning products",
+        "Our cleaners use what you already have at home","$0.00")}
+      ${optBtn(S.product==="R2NETTE",`R2NETTE provides ${deep?"DEEP":"BASIC"} cleaning products`,
+        "We bring a full kit — plus applicable tax",`+${$$(amt)}`)}
+    </div>
+    <p class="hint" style="margin-top:12px">Choosing your own products means a $0 charge, not "free products". Your cleaner's job sheet will say exactly which one you picked.</p>
+  </section>`));
+  m.querySelectorAll("#pr .opt").forEach((b,i)=>b.onclick=()=>{S.product=i===0?"CLIENT":"R2NETTE";render();});
+}
+
+/* ----- step: frequency ----- */
+function vFrequency(m){
+  const base=S.service.price;
+  const p=el(`<section class="panel">
+    <div class="eyebrow">Step 4</div><h1>How often would you like us?</h1>
+    <p class="sub">Recurring discounts apply to the cleaning service. Products and transportation stay the same each visit.</p>
+    <div class="grid" id="fq"></div>
+    <p class="hint" style="margin-top:12px">Weekly means every 7 days — some months that's five visits, and you get all of them.</p>
+  </section>`);
+  const g=p.querySelector("#fq");
+  for(const k of S.service.freq){
+    const f=FREQ[k], save=rate(base,f.pct);
+    const b=el(optBtn(S.freq===k, f.label+(f.pct?`<span class="tag">save ${f.pct}%</span>`:""),
+      f.note, f.pct?`−${$$(save)}`:"—"));
+    b.onclick=()=>{S.freq=k;render();};
+    g.appendChild(b);
+  }
+  m.appendChild(p);
+  if(S.service.freq.length===1) m.appendChild(el(`<div class="panel"><div class="note">
+    ${esc(S.service.name)} is booked as a one-time service. Recurring plans are available on Basic and Deep cleaning.
+  </div></div>`));
+}
+
+/* ----- step: extras ----- */
+function vExtras(m){
+  const p=el(`<section class="panel">
+    <div class="eyebrow">Step 5</div><h1>Anything else while we're there?</h1>
+    <p class="sub">Optional. Add-ons are charged per visit and aren't discounted.</p>
+    <div id="ao"></div></section>`);
+  const box=p.querySelector("#ao");
+  for(const a of ADDONS){
+    const q=S.addons[a.id]||0;
+    const row=el(`<div class="opt" style="cursor:default;align-items:center">
+      <div class="opt-b"><div class="opt-t">${a.name}</div>
+        <div class="opt-d">${$$(a.unit)} ${a.per}</div></div>
+      <div class="qty"><button type="button" aria-label="Remove one">−</button>
+        <span>${q}</span><button type="button" aria-label="Add one">+</button></div></div>`);
+    const [minus,plus]=row.querySelectorAll(".qty button");
+    minus.onclick=()=>{S.addons[a.id]=Math.max(0,q-1);render();};
+    plus.onclick=()=>{S.addons[a.id]=Math.min(a.max,q+1);render();};
+    if(!a.qty&&q>0) plus.disabled=true;
+    box.appendChild(row);
+  }
+  m.appendChild(p);
+}
+
+/* ----- step: address ----- */
+function vAddress(m){
+  const p=el(`<section class="panel">
+    <div class="eyebrow">Step 6</div><h1>Where are we cleaning?</h1>
+    <p class="sub">This is the service address — the property we're coming to, not our office.</p>
+    <div class="row"><label class="fl" for="a1">Street address</label>
+      <input id="a1" value="${esc(S.addr)}" placeholder="754 Av. 36e" autocomplete="address-line1"></div>
+    <div class="row two">
+      <div><label class="fl" for="a2">Unit / apt</label><input id="a2" value="${esc(S.unit)}" placeholder="Optional"></div>
+      <div><label class="fl" for="ct">City</label><input id="ct" value="${esc(S.city)}" placeholder="Lachine" autocomplete="address-level2"></div>
+    </div>
+    <div class="row two">
+      <div><label class="fl" for="pv">Province</label><input id="pv" value="${esc(S.prov)}"></div>
+      <div><label class="fl" for="pc">Postal code</label><input id="pc" value="${esc(S.post)}" placeholder="H8T 1B7" autocomplete="postal-code"></div>
+    </div>
+    <div class="row"><label class="fl" for="km">Distance from our Lachine base</label>
+      <input id="km" type="range" min="0" max="60" step="1" value="${S.km}" style="padding:0;min-height:34px">
+      <p class="hint"><b id="kmv">${S.km} km</b> — first ${C.includedKm} km are included in the $25 transportation fee.
+      Beyond that it's $0.65/km. We confirm the real distance from your address before charging.</p></div>
+  </section>`);
+  const bind=(id,k)=>p.querySelector(id).oninput=e=>{S[k]=e.target.value;syncButtons();};
+  bind("#a1","addr");bind("#a2","unit");bind("#ct","city");bind("#pv","prov");bind("#pc","post");
+  p.querySelector("#km").oninput=e=>{S.km=+e.target.value;
+    p.querySelector("#kmv").textContent=S.km+" km";drawReceipt();};
+  m.appendChild(p);
+}
+
+/* ----- step: contact ----- */
+function vContact(m){
+  const p=el(`<section class="panel">
+    <div class="eyebrow">Step 7</div><h1>How do we reach you?</h1>
+    <p class="sub">We'll send your confirmation here and text you when the cleaner is on the way.</p>
+    <div class="row"><label class="fl" for="nm">Full name</label>
+      <input id="nm" value="${esc(S.name)}" autocomplete="name"></div>
+    <div class="row two">
+      <div><label class="fl" for="ph">Phone</label><input id="ph" type="tel" value="${esc(S.phone)}" placeholder="514 825 2825" autocomplete="tel"></div>
+      <div><label class="fl" for="em">Email</label><input id="em" type="email" value="${esc(S.email)}" autocomplete="email"></div>
+    </div>
+    <div class="row"><label class="fl" for="ac">Parking, buzzer or entry notes</label>
+      <textarea id="ac" rows="3" placeholder="Buzz 204, park in the alley, key under the mat…">${esc(S.access)}</textarea></div>
+  </section>`);
+  const bind=(id,k)=>p.querySelector(id).oninput=e=>{S[k]=e.target.value;syncButtons();};
+  bind("#nm","name");bind("#ph","phone");bind("#em","email");bind("#ac","access");
+  m.appendChild(p);
+}
+
+/* ----- step: review / confirmation ----- */
+function vReview(m){
+  if(S.booked){ vConfirmed(m); return; }
+  if(S.service.quoteOnly){
+    m.appendChild(el(`<section class="panel">
+      <div class="eyebrow">Step 5</div><h1>Request your window cleaning quote</h1>
+      <p class="sub">We'll look at what you've told us and send a real price — usually the same day.</p>
+      <div class="quote-note">No payment is taken now. Once you accept the quote you'll pick a date,
+      and only then does the appointment get scheduled.</div>
+      <div style="margin-top:16px">
+        <div class="li"><span class="d">Property</span><span class="a">${esc(S.propType||"—")}</span></div>
+        <div class="li"><span class="d">Address</span><span class="a">${esc(S.addr||"—")}, ${esc(S.city||"")}</span></div>
+        <div class="li"><span class="d">Contact</span><span class="a">${esc(S.name||"—")}</span></div>
+      </div></section>`));
+    return;
+  }
+  const r=price(), s=S.service, f=FREQ[S.freq];
+  m.appendChild(el(`<section class="panel">
+    <div class="eyebrow">Step 8</div><h1>Check everything over</h1>
+    <p class="sub">This is the exact price. Nothing gets added after you book.</p>
+    <div class="li"><span class="d">Service</span><span class="a">${esc(s.name)}</span></div>
+    <div class="li"><span class="d">Option</span><span class="a">${esc(s.opt)}</span></div>
+    <div class="li"><span class="d">Cleaners</span><span class="a">${s.staff}</span></div>
+    <div class="li"><span class="d">Time on site</span><span class="a">${s.mins/60} h</span></div>
+    <div class="li"><span class="d">Total labour-hours</span><span class="a">${s.staff*s.mins/60}</span></div>
+    <div class="li"><span class="d">How often</span><span class="a">${esc(f.label)}</span></div>
+    <div class="li"><span class="d">Products</span><span class="a">${S.product==="CLIENT"?"You supply":"R2NETTE "+s.kit+" kit"}</span></div>
+    <div class="li"><span class="d">Where</span><span class="a">${esc(S.addr)}${S.unit?" #"+esc(S.unit):""}, ${esc(S.city)}</span></div>
+    <div class="li"><span class="d">Who</span><span class="a">${esc(S.name)} · ${esc(S.phone)}</span></div>
+    <hr class="rule">
+    <div class="li"><span class="d">Due today</span><span class="a" style="font-weight:600">$0.00</span></div>
+    <p class="hint">You pay after the cleaning, not now. We'll confirm your slot by phone or text first.</p>
+    ${r.next?`<div class="note" style="background:#F5FAFE;border-color:#B9D8EF;color:var(--brand-dk)">
+      <b>Your ${esc(f.label.toLowerCase())} plan.</b> This first visit is ${$$(r.total)}.
+      Later visits are estimated at ${$$(r.next.total)} using today's rates — we'll confirm each one before it happens.
+      Cancel or change any visit up to 24 hours ahead.</div>`:""}
+    ${r.promoLost?`<div class="hint" style="margin-top:10px">Your ${esc(f.label.toLowerCase())} discount is worth more than the new-customer offer, so we applied the bigger one. Your new-customer discount stays unused.</div>`:""}
+  </section>`));
+}
+
+function vConfirmed(m){
+  const r=price(), s=S.service;
+  m.appendChild(el(`<section class="panel"><div class="conf">
+    <div class="ck">✓</div>
+    <h1>You're booked, ${esc(S.name.split(" ")[0]||"there")}.</h1>
+    <p class="sub" style="margin-top:6px">We've emailed your confirmation to ${esc(S.email)}.</p>
+    <div class="bkno">${esc(S.bookingNo)}</div>
+    <div style="text-align:left;margin-top:18px">
+      <div class="li"><span class="d">Service</span><span class="a">${esc(s.name)} — ${esc(s.opt)}</span></div>
+      <div class="li"><span class="d">Service address</span><span class="a">${esc(S.addr)}${S.unit?" #"+esc(S.unit):""}, ${esc(S.city)}</span></div>
+      <div class="li"><span class="d">Frequency</span><span class="a">${esc(FREQ[S.freq].label)}</span></div>
+      <div class="li"><span class="d">Total per visit</span><span class="a">${$$(r.total)}</span></div>
+      <div class="li"><span class="d">Paid today</span><span class="a">$0.00</span></div>
+    </div>
+    <div class="jobsheet">CLEANER JOB SHEET
+${esc(S.addr)}${S.unit?" #"+esc(S.unit):""}, ${esc(S.city)} ${esc(S.post)}
+CREW: ${s.staff} · ON SITE: ${s.mins/60}h
+PRODUCTS: ${S.product==="CLIENT"?"CLIENT SUPPLYING":"R2NETTE "+s.kit+" KIT"}
+ACCESS: ${esc(S.access||"none given")}</div>
+    <p class="hint" style="margin-top:14px">The address above is <b>your</b> property — never our office.</p>
+  </div></section>`));
+}
+
+/* ---------- receipt ---------- */
+function drawReceipt(){
+  const box=document.getElementById("receipt"), s=S.service;
+  if(!s){box.innerHTML=`<div class="receipt-top"><div><div class="lb">Your price</div>
+    <div class="sv">Pick a service to start</div></div></div>
+    <div class="receipt-body"><p class="hint">Every fee appears here the moment it applies. No surprises at checkout.</p></div>`;
+    document.getElementById("barTotal").textContent="$0.00"; return;}
+  if(s.quoteOnly){box.innerHTML=`<div class="receipt-top"><div><div class="lb">Your price</div>
+    <div class="sv">Window Cleaning</div></div></div>
+    <div class="receipt-body"><p class="hint">Quoted after we see the property. We never show "Free" for work that has a price.</p></div>`;
+    document.getElementById("barTotal").textContent="Quote"; return;}
+
+  const r=price();
+  box.innerHTML=`
+    <div class="receipt-top">
+      <div><div class="lb">${S.freq&&S.freq!=="ONE_TIME"?"Per visit":"Your price"}</div>
+        <div class="sv">${esc(s.name)} · ${esc(s.opt)}</div></div>
+    </div><div class="perf"></div>
+    <div class="receipt-body">
+      ${r.lines.map(l=>`<div class="li ${l.a<0?"neg":""}">
+        <span class="d">${l.d}</span><span class="a">${l.a<0?"−":""}${$$(Math.abs(l.a))}</span></div>`).join("")}
+      <hr class="rule">
+      <div class="li mut"><span class="d">Subtotal</span><span class="a">${$$(r.sub)}</span></div>
+      <div class="li mut"><span class="d">TPS / GST 5%</span><span class="a">${$$(r.gst)}</span></div>
+      <div class="li mut"><span class="d">TVQ / QST 9.975%</span><span class="a">${$$(r.qst)}</span></div>
+      <hr class="rule">
+      <div class="total"><span class="d">Total</span><span class="a">${$$(r.total)}</span></div>
+      <div class="duenow">Due today <b>$0.00</b> — you pay after the cleaning.</div>
+      ${r.next?`<div class="nextvisit"><div class="hd2">After the first visit</div>
+        About <b>${$$(r.next.total)}</b> per ${esc(r.next.label.toLowerCase())} visit at today's rates.
+        Each visit is confirmed before it happens.</div>`:""}
+    </div>`;
+  document.getElementById("barTotal").textContent=$$(r.total);
+  document.getElementById("barLabel").textContent=S.freq&&S.freq!=="ONE_TIME"?"Per visit":"Total";
+}
+
+/* ---------- navigation ---------- */
+function canAdvance(){
+  const k=visibleSteps()[S.step].k;
+  if(k==="service")   return !!S.service;
+  if(k==="property")  return !!S.propType && (S.propType!=="Other"||S.propOther.trim()) && S.airbnb!==null;
+  if(k==="products")  return !!S.product;                 // mandatory
+  if(k==="frequency") return !!S.freq;
+  if(k==="address")   return S.addr.trim()&&S.city.trim()&&/^[A-Za-z]\d[A-Za-z] ?\d[A-Za-z]\d$/.test(S.post.trim());
+  if(k==="contact")   return S.name.trim()&&S.phone.trim()&&/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(S.email);
+  return true;
+}
+function syncButtons(){
+  const steps=visibleSteps(), last=S.step===steps.length-1;
+  const nx=document.getElementById("next"), bk=document.getElementById("back");
+  bk.style.visibility=S.step===0?"hidden":"visible";
+  nx.disabled=!canAdvance();
+  nx.textContent=S.booked?"Book another cleaning":last?(S.service?.quoteOnly?"Send my quote request":"Confirm booking"):"Continue";
+}
+document.getElementById("next").onclick=()=>{
+  const steps=visibleSteps();
+  if(S.booked){Object.assign(S,{step:0,service:null,product:null,freq:null,addons:{},booked:false});return render();}
+  if(S.step===steps.length-1){
+    S.booked=true;
+    S.bookingNo="R2N-"+new Date().getFullYear()+"-"+String(Math.floor(Math.random()*900000+100000));
+    return render();
+  }
+  S.step++; render();
+};
+document.getElementById("back").onclick=()=>{if(S.step>0){S.step--;render();}};
+render();
+</script>
+</body>
+</html>

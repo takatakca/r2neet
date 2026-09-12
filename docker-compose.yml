@@ -1,0 +1,83 @@
+# Production topology.
+#
+#   docker compose up -d
+#
+# Four roles from one image:
+#   web         — customer, admin and crew traffic
+#   billing     — money. Isolated so it can be watched and restarted alone.
+#   scheduler   — recurrence, notifications, reminders, digest
+#   backup      — nightly pg_dump, off-host
+#
+# Billing is deliberately its own process. Sharing a process with, say,
+# notification retries means a notification bug can delay a charge, and a
+# restart to fix notifications interrupts billing.
+
+x-app: &app
+  build: .
+  image: r2nette:latest
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    NODE_ENV: production
+    TRUST_PROXY: "true"
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-r2nette}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-r2nette}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-r2nette}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Applies migrations once, then exits. Everything else waits for it, so no
+  # process ever serves traffic against an un-migrated schema.
+  migrate:
+    <<: *app
+    restart: "no"
+    command: npx prisma migrate deploy
+
+  web:
+    <<: *app
+    command: npm start
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  billing:
+    <<: *app
+    command: npm run loop:billing
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  scheduler:
+    <<: *app
+    command: npm run loop:scheduler
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  backup:
+    <<: *app
+    command: npm run loop:backup
+    volumes:
+      - ./backups:/app/backups
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

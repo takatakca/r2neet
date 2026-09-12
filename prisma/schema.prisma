@@ -1,0 +1,1087 @@
+// R2NETTE reservation platform — PostgreSQL schema.
+//
+// Money is ALWAYS integer cents. There is no Float anywhere in this file.
+// Rates are micro-percent integers (9.975% = 9_975_000) so QST arithmetic
+// stays exact.
+//
+// Timezone strategy: every instant is stored as UTC (`timestamptz`). Local
+// business meaning — opening hours, the customer's 9am — is applied at the
+// edges via America/Toronto. Staff availability is stored as weekday +
+// minute-of-day, never as an absolute instant, because "Mondays 8-5" is a
+// local rule that must survive DST.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PRISMA_DATABASE_URL")
+}
+
+/* ------------------------------------------------------------------ */
+/* customers & identity                                                */
+/* ------------------------------------------------------------------ */
+
+model Customer {
+  /// Deterministic id from a legacy system, so re-importing never duplicates.
+  legacyExternalId String? @unique
+  id                 String   @id @default(uuid())
+  firstName          String?
+  lastName           String?
+  email              String?  @unique
+  preferredStaffId   String?
+  lastServiceOptionId String?
+  lastProductSupply  String?
+  lastFrequency      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  phones      CustomerPhone[]
+  addresses   CustomerAddress[]
+  quotes      Quote[]
+  holds       BookingHold[]
+  bookings    Booking[]
+  redemptions PromotionRedemption[]
+  series      RecurrenceSeries[]
+
+  @@index([preferredStaffId])
+}
+
+/// Verified phone identity. OTP codes are never stored — Twilio Verify owns
+/// generation, expiry and checking. `verifiedAt` is the only proof we keep.
+model CustomerPhone {
+  id         String    @id @default(uuid())
+  customerId String
+  phoneE164  String    @unique
+  verifiedAt DateTime?
+  isPrimary  Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+/// Where the cleaning happens. Structurally distinct from the business
+/// origin in BusinessConfiguration — a confirmation must never be able to
+/// render the office address by accident.
+model CustomerAddress {
+  id               String   @id @default(uuid())
+  customerId       String
+  label            String?
+  formattedAddress String
+  streetNumber     String?
+  route            String?
+  unit             String?
+  city             String
+  province         String   @default("QC")
+  postalCode       String
+  country          String   @default("CA")
+  placeId          String?
+  latitude         Float?
+  longitude        Float?
+  isDefault        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+  series   RecurrenceSeries[]
+
+  @@index([customerId])
+  @@index([placeId])
+}
+
+/* ------------------------------------------------------------------ */
+/* catalogue                                                           */
+/* ------------------------------------------------------------------ */
+
+model ServiceCategory {
+  id        String   @id
+  slug      String   @unique
+  nameEn    String
+  nameFr    String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  options ServiceOption[]
+}
+
+model ServiceOption {
+  id                        String  @id
+  slug                      String  @unique
+  categoryId                String
+  nameEn                    String
+  nameFr                    String
+  legacySetmoreName         String?
+  basePriceCents            Int?
+  currency                  String  @default("CAD")
+  pricingMode               String  @default("FIXED")
+  durationMode              String  @default("FIXED")
+  appointmentDurationMinutes Int?
+  requiredStaffCount        Int
+  labourMinutes             Int?
+  productSupplyMode         String
+  allowedFrequencies        String[]
+  paymentPolicy             String  @default("PAY_LATER")
+  taxable                   Boolean @default(true)
+  active                    Boolean @default(true)
+  publiclyBookable          Boolean @default(true)
+  sortOrder                 Int     @default(0)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  category ServiceCategory    @relation(fields: [categoryId], references: [id])
+  quotes   Quote[]
+  holds    BookingHold[]
+  bookings Booking[]
+  skills   StaffSkill[]
+  series   RecurrenceSeries[]
+
+  @@index([categoryId])
+  @@index([active, publiclyBookable])
+}
+
+model AddOn {
+  id             String   @id
+  slug           String   @unique
+  nameEn         String
+  nameFr         String
+  unitPriceCents Int
+  quantityBased  Boolean  @default(false)
+  taxable        Boolean  @default(true)
+  discountEligible Boolean @default(false)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+}
+
+/* ------------------------------------------------------------------ */
+/* pricing configuration                                               */
+/* ------------------------------------------------------------------ */
+
+model TaxRule {
+  id                     String    @id
+  code                   String    @unique
+  name                   String
+  /// micro-percent: 9.975% = 9975000
+  rateMicroPercent       Int
+  compounding            String    @default("NON_COMPOUNDED")
+  registrationNumber     String?
+  displayOrder           Int       @default(0)
+  active                 Boolean   @default(true)
+  effectiveFrom          DateTime  @default(now())
+  effectiveTo            DateTime?
+  appliesToServices      Boolean   @default(true)
+  appliesToProducts      Boolean   @default(true)
+  appliesToTransportation Boolean  @default(true)
+  appliesToMileage       Boolean   @default(true)
+  appliesToAddOns        Boolean   @default(true)
+}
+
+model TransportationRule {
+  id                  String   @id @default("default")
+  baseAmountCents     Int      @default(2500)
+  includedDistanceKm  Int      @default(20)
+  extraKmRateCents    Int      @default(65)
+  quantityPerVisit    Int      @default(1)
+  taxable             Boolean  @default(true)
+  discountEligible    Boolean  @default(false)
+  enabled             Boolean  @default(true)
+  updatedAt           DateTime @updatedAt
+}
+
+model Promotion {
+  id                String   @id
+  code              String   @unique
+  label             String
+  type              String
+  amountCents       Int?
+  percentMicro      Int?
+  family            String?
+  lifetimeMaxPerCustomer Int?
+  categoryId        String?
+  active            Boolean  @default(false)
+  ownerReviewRequired Boolean @default(false)
+  startsAt          DateTime?
+  endsAt            DateTime?
+  createdAt         DateTime @default(now())
+
+  redemptions PromotionRedemption[]
+
+  @@index([family, active])
+}
+
+/// Written ONLY when a promotion is actually applied to a paid booking.
+/// Quote generation never writes here — that is what stops an abandoned
+/// quote from burning a customer's one lifetime welcome offer.
+model PromotionRedemption {
+  id          String   @id @default(uuid())
+  promotionId String
+  customerId  String
+  bookingId   String   @unique
+  family      String?
+  amountCents Int
+  redeemedAt  DateTime @default(now())
+
+  promotion Promotion @relation(fields: [promotionId], references: [id])
+  customer  Customer  @relation(fields: [customerId], references: [id])
+  booking   Booking   @relation(fields: [bookingId], references: [id])
+
+  @@index([customerId, family])
+}
+
+model BusinessConfiguration {
+  id                      String   @id @default("default")
+  timezone                String   @default("America/Toronto")
+  currency                String   @default("CAD")
+  originFormattedAddress  String?
+  originLatitude          Float?
+  originLongitude         Float?
+  quoteExpiryMinutes      Int      @default(30)
+  holdExpiryMinutes       Int      @default(10)
+  minimumLeadMinutes      Int      @default(120)
+  preJobBufferMinutes     Int      @default(0)
+  postJobBufferMinutes    Int      @default(30)
+  openMinute              Int      @default(480)
+  closeMinute             Int      @default(1020)
+  generalHourlyMinimumMinutes Int  @default(180)
+  monthlyDiscountMicro    Int      @default(10000000)
+  biweeklyDiscountMicro   Int      @default(15000000)
+  weeklyDiscountMicro     Int      @default(25000000)
+  productBasicCents       Int      @default(1200)
+  productDeepCents        Int      @default(1500)
+  defaultPaymentPolicy    String   @default("PAY_LATER")
+  recurringPaymentTiming  String   @default("24_HOURS_BEFORE")
+  promotionStackingPolicy String   @default("BEST_SINGLE_DISCOUNT")
+  updatedAt               DateTime @updatedAt
+}
+
+/* ------------------------------------------------------------------ */
+/* staff                                                               */
+/* ------------------------------------------------------------------ */
+
+model Staff {
+  id          String   @id @default(uuid())
+  displayName String
+  email       String?  @unique
+  phoneE164   String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  skills       StaffSkill[]
+  availability StaffAvailability[]
+  timeOff      StaffTimeOff[]
+  assignments  BookingStaff[]
+
+  @@index([active])
+}
+
+model StaffSkill {
+  id              String @id @default(uuid())
+  staffId         String
+  serviceOptionId String
+
+  staff   Staff         @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  service ServiceOption @relation(fields: [serviceOptionId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, serviceOptionId])
+  @@index([serviceOptionId])
+}
+
+/// Local recurring rule, not an instant. 0 = Sunday. Minutes from local
+/// midnight. Storing this as a timestamp would break twice a year.
+model StaffAvailability {
+  id          String @id @default(uuid())
+  staffId     String
+  weekday     Int
+  startMinute Int
+  endMinute   Int
+
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId, weekday])
+}
+
+model StaffTimeOff {
+  id      String   @id @default(uuid())
+  staffId String
+  startAt DateTime
+  endAt   DateTime
+  reason  String?
+
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId, startAt, endAt])
+}
+
+/* ------------------------------------------------------------------ */
+/* quotes                                                              */
+/* ------------------------------------------------------------------ */
+
+/// An immutable pricing snapshot. Changing ServiceOption.basePriceCents
+/// later must never alter one of these rows — every amount is copied in,
+/// not referenced.
+model Quote {
+  id                       String   @id @default(uuid())
+  customerId               String?
+  serviceOptionId          String
+  currency                 String   @default("CAD")
+  frequency                String
+  status                   String   @default("ACTIVE")
+
+  baseServiceCents         Int
+  frequencyDiscountCents   Int      @default(0)
+  promotionDiscountCents   Int      @default(0)
+  productsCents            Int      @default(0)
+  transportationCents      Int      @default(0)
+  distanceCents            Int      @default(0)
+  addOnsCents              Int      @default(0)
+  subtotalCents            Int
+  gstCents                 Int
+  qstCents                 Int
+  taxTotalCents            Int
+  grandTotalCents          Int
+
+  /// Copies of the rates used, so a later rate change cannot rewrite history.
+  gstRateMicroPercent      Int
+  qstRateMicroPercent      Int
+  pricingVersion           String
+
+  winningDiscountSource    String?
+  discountCandidates       Json?
+  firstVisit               Json?
+  subsequentVisitPreview   Json?
+  warningCodes             String[]
+  requestSnapshot          Json?
+  newCustomerProvisional   Boolean  @default(false)
+
+  /// The complete frozen quote as handed to the booking. Columns above are
+  /// for querying; this is the authoritative historical record.
+  priceSnapshot            Json
+
+  createdAt                DateTime @default(now())
+  expiresAt                DateTime
+
+  customer Customer?     @relation(fields: [customerId], references: [id])
+  service  ServiceOption @relation(fields: [serviceOptionId], references: [id])
+  lines    QuoteLine[]
+  holds    BookingHold[]
+  bookings Booking[]
+
+  @@index([customerId])
+  @@index([expiresAt])
+}
+
+model QuoteLine {
+  id            String  @id @default(uuid())
+  quoteId       String
+  type          String
+  description   String
+  quantity      Int     @default(1)
+  unitAmountCents Int
+  subtotalCents Int
+  taxable       Boolean @default(true)
+  sortOrder     Int     @default(0)
+
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId])
+}
+
+/* ------------------------------------------------------------------ */
+/* holds & bookings                                                    */
+/* ------------------------------------------------------------------ */
+
+/// Capacity reservation during checkout. Availability treats
+/// status=ACTIVE AND expiresAt > now() as consuming capacity, so an expired
+/// hold stops blocking immediately whether or not cleanup has run.
+model BookingHold {
+  id                String   @id @default(uuid())
+  customerId        String
+  quoteId           String?
+  serviceOptionId   String
+  startAt           DateTime
+  endAt             DateTime
+  requiredStaffCount Int
+  staffIds          String[]
+  status            String   @default("ACTIVE")
+  idempotencyKey    String?  @unique
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  expiresAt         DateTime
+  consumedAt        DateTime?
+
+  customer Customer      @relation(fields: [customerId], references: [id])
+  quote    Quote?        @relation(fields: [quoteId], references: [id])
+  service  ServiceOption @relation(fields: [serviceOptionId], references: [id])
+
+  @@index([status, expiresAt])
+  @@index([startAt, endAt])
+  @@index([customerId])
+}
+
+model Booking {
+  /// Set when this booking came from a legacy system import.
+  legacyExternalId String? @unique
+  id              String   @id @default(uuid())
+  bookingNumber   String   @unique
+  customerId      String
+  serviceOptionId String
+  addressId       String
+  quoteId         String
+  startAt         DateTime
+  endAt           DateTime
+  status          String   @default("CONFIRMED")
+
+  /// Frozen financials. Never recomputed from today's catalogue.
+  grandTotalCents Int
+  priceSnapshot   Json
+
+  idempotencyKey  String?  @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  customer Customer        @relation(fields: [customerId], references: [id])
+  service  ServiceOption   @relation(fields: [serviceOptionId], references: [id])
+  address  CustomerAddress @relation(fields: [addressId], references: [id])
+  quote    Quote           @relation(fields: [quoteId], references: [id])
+  staff    BookingStaff[]
+  history  BookingStatusHistory[]
+  redemption PromotionRedemption?
+  payments Payment[]
+
+  @@index([customerId])
+  @@index([startAt, endAt])
+  @@index([status])
+}
+
+/// A two-cleaner booking produces exactly two rows here, so capacity is
+/// never ambiguous after the fact.
+model BookingStaff {
+  id        String   @id @default(uuid())
+  bookingId String
+  staffId   String
+  role      String   @default("CLEANER")
+  createdAt DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  staff   Staff   @relation(fields: [staffId], references: [id])
+
+  @@unique([bookingId, staffId])
+  @@index([staffId])
+}
+
+model BookingStatusHistory {
+  id        String   @id @default(uuid())
+  bookingId String
+  status    String
+  actor     String?
+  reason    String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+}
+
+/// Durable per-year counter. Incremented with an atomic UPDATE ... RETURNING
+/// inside the booking transaction — never SELECT MAX()+1, which races.
+model BookingNumberSequence {
+  year      Int      @id
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+/* ------------------------------------------------------------------ */
+/* recurrence                                                          */
+/* ------------------------------------------------------------------ */
+
+model RecurrenceSeries {
+  id                  String   @id @default(uuid())
+  customerId          String
+  serviceOptionId     String
+  addressId           String
+  frequency           String
+  recurrenceKind      String   @default("FIXED_INTERVAL_DAYS")
+  preferredDayOfMonth Int?
+  shortMonthPolicy    String   @default("CLAMP_TO_LAST_DAY")
+  timezone            String   @default("America/Toronto")
+  preferredStaffId    String?
+  sameCleanerPreference Boolean @default(true)
+  productSupply       String?
+  paymentTimingPolicy String   @default("24_HOURS_BEFORE")
+  status              String   @default("ACTIVE")
+  startAt             DateTime
+  endAt               DateTime?
+  configSnapshot      Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  customer Customer        @relation(fields: [customerId], references: [id])
+  service  ServiceOption   @relation(fields: [serviceOptionId], references: [id])
+  address  CustomerAddress @relation(fields: [addressId], references: [id])
+
+  @@index([customerId, status])
+}
+
+/* ------------------------------------------------------------------ */
+/* audit                                                               */
+/* ------------------------------------------------------------------ */
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String
+  entityType String
+  entityId   String?
+  actorType  String   @default("SYSTEM")
+  actorId    String?
+  metadata   Json?
+  requestId  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+
+/* ------------------------------------------------------------------ */
+/* durable sessions & idempotency                                      */
+/* ------------------------------------------------------------------ */
+
+/// Server-side session. The cookie carries a random opaque token; only its
+/// SHA-256 hash is stored, so a database leak does not hand out live
+/// sessions. Survives process restart and works across instances.
+model CustomerSession {
+  id               String    @id @default(uuid())
+  sessionTokenHash String    @unique
+  customerId       String
+  phoneVerifiedAt  DateTime
+  createdAt        DateTime  @default(now())
+  lastSeenAt       DateTime  @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  userAgentHash    String?
+  ipHash           String?
+
+  @@index([customerId])
+  @@index([expiresAt])
+}
+
+/// Durable idempotency. The unique constraint on (scope, actorId, key) is
+/// what makes concurrent retries safe: the second inserter loses on the
+/// database, not on a JavaScript check-then-act.
+model IdempotencyRecord {
+  id             String    @id @default(uuid())
+  scope          String
+  actorId        String
+  key            String
+  requestHash    String
+  /// IN_PROGRESS | SUCCEEDED | FAILED_RETRYABLE | FAILED_FINAL
+  status         String    @default("IN_PROGRESS")
+  responseStatus Int?
+  responseBody   Json?
+  /// Stable key sent to Stripe. Reused verbatim on retry of the SAME logical
+  /// operation, so an ambiguous timeout cannot create a second PaymentIntent.
+  providerIdempotencyKey String?
+  /// Whatever the provider created (pi_..., seti_...), once we learn it.
+  providerOperationId    String?
+  lastErrorCode  String?
+  attempts       Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  completedAt    DateTime?
+  expiresAt      DateTime
+
+  @@unique([scope, actorId, key])
+  @@index([expiresAt])
+  @@index([status])
+}
+
+/* ------------------------------------------------------------------ */
+/* payments                                                            */
+/* ------------------------------------------------------------------ */
+
+/// Maps an R2NETTE customer to exactly one Stripe Customer.
+model PaymentProviderCustomer {
+  id               String   @id @default(uuid())
+  customerId       String   @unique
+  provider         String   @default("stripe")
+  providerCustomerId String @unique
+  createdAt        DateTime @default(now())
+}
+
+/// A saved payment method reference. Never a PAN, never a CVC — only the
+/// provider token plus the display crumbs Stripe allows us to keep.
+model PaymentMethodReference {
+  id               String   @id @default(uuid())
+  customerId       String
+  provider         String   @default("stripe")
+  providerMethodId String   @unique
+  methodType       String
+  walletType       String?
+  brand            String?
+  last4            String?
+  expMonth         Int?
+  expYear          Int?
+  isDefault        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  @@index([customerId])
+}
+
+model Payment {
+  id                    String    @id @default(uuid())
+  bookingId             String?
+  customerId            String
+  quoteId               String?
+  currency              String    @default("CAD")
+  amountCents           Int
+  status                String    @default("PENDING")
+  policy                String
+  provider              String    @default("stripe")
+  stripeCustomerId      String?
+  stripePaymentIntentId String?   @unique
+  stripeSetupIntentId   String?   @unique
+  stripePaymentMethodId String?
+  paymentMethodType     String?
+  walletType            String?
+  captureMethod         String    @default("automatic")
+  offSession            Boolean   @default(false)
+  requiresAction        Boolean   @default(false)
+  failureCode           String?
+  failureMessage        String?
+  riskLevel             String?
+  riskScore             Int?
+  threeDSecureStatus    String?
+  refundedAmountCents   Int       @default(0)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  paidAt                DateTime?
+  failedAt              DateTime?
+
+  booking  Booking?  @relation(fields: [bookingId], references: [id])
+  refunds  Refund[]
+
+  @@index([customerId])
+  @@index([bookingId])
+  @@index([status])
+}
+
+model Refund {
+  id               String   @id @default(uuid())
+  paymentId        String
+  amountCents      Int
+  reason           String?
+  status           String   @default("PENDING")
+  stripeRefundId   String?  @unique
+  requestedByType  String   @default("ADMIN")
+  requestedById    String?
+  createdAt        DateTime @default(now())
+  completedAt      DateTime?
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+}
+
+/// Every Stripe event we have already applied. The unique event id is what
+/// makes webhook replay a no-op instead of a double transition.
+/// Every Stripe event we have seen. The primary key IS the Stripe event id,
+/// so a replayed delivery collides on insert and becomes a no-op.
+model StripeEvent {
+  id          String    @id
+  type        String
+  status      String    @default("PROCESSED")
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  error       String?
+  payload     Json?
+
+  @@index([type])
+}
+
+
+/// A stateful claim on a limited promotion family.
+///
+/// Replaces a simple redeemed-yes/no flag because the interesting states are
+/// in between: a checkout that has reserved the welcome offer but has not yet
+/// committed. RESERVED blocks a second concurrent claim; RELEASED gives the
+/// offer back when a checkout dies; REDEEMED is final.
+///
+/// A partial unique index (see migration) enforces at most ONE active claim
+/// (RESERVED or REDEEMED) per customer per family. That is the invariant that
+/// makes concurrency safe without a process-local lock.
+model PromotionClaim {
+  id              String    @id @default(uuid())
+  customerId      String
+  promotionFamily String
+  promotionId     String
+  bookingId       String?
+  quoteId         String?
+  status          String    @default("RESERVED")
+  amountCents     Int
+  reservedAt      DateTime  @default(now())
+  expiresAt       DateTime?
+  redeemedAt      DateTime?
+  releasedAt      DateTime?
+  releaseReason   String?
+
+  @@index([customerId, promotionFamily, status])
+  @@index([bookingId])
+}
+
+/* ------------------------------------------------------------------ */
+/* reviews                                                             */
+/* ------------------------------------------------------------------ */
+
+/// A real review from a provenanced source.
+///
+/// `source` is not a free label. GOOGLE requires an externalId from the
+/// provider sync; R2NETTE_VERIFIED requires a completed booking. Those rules
+/// live in ReviewService and are enforced by tests — the public API has no
+/// path to create either.
+model Review {
+  id                  String   @id @default(uuid())
+  source              String
+  externalId          String?
+  customerDisplayName String
+  rating              Int
+  reviewText          String?
+  reviewDate          DateTime
+  sourceUrl           String?
+  avatarUrl           String?
+  bookingId           String?  @unique
+  customerId          String?
+  language            String   @default("en")
+  status              String   @default("PENDING")
+  featured            Boolean  @default(false)
+  /// Preserved verbatim if an admin ever edits the displayed text.
+  originalText        String?
+  moderatedBy         String?
+  moderatedAt         DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([status, source])
+  @@index([featured, status])
+}
+
+/// Tokenised invitation to review a completed booking. Only the hash is
+/// stored, so a database read does not let someone else review your job.
+model ReviewInvitation {
+  id         String    @id @default(uuid())
+  bookingId  String    @unique
+  customerId String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([customerId])
+}
+
+model ReviewSyncState {
+  id                    String    @id @default("google")
+  provider              String
+  lastSyncAt            DateTime?
+  lastSuccessfulSyncAt  DateTime?
+  lastError             String?
+  reviewsImported       Int       @default(0)
+  updatedAt             DateTime  @updatedAt
+}
+
+/* ------------------------------------------------------------------ */
+/* callbacks & phones                                                  */
+/* ------------------------------------------------------------------ */
+
+model BusinessPhone {
+  id              String   @id @default(uuid())
+  label           String
+  phoneE164       String   @unique
+  displayNumber   String
+  purpose         String   @default("BOOKING")
+  isPublic        Boolean  @default(true)
+  enabled         Boolean  @default(true)
+  priority        Int      @default(0)
+  supportsInbound Boolean  @default(true)
+  supportsOutbound Boolean @default(false)
+  twilioNumberSid String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  callbacks CallbackRequest[]
+
+  @@index([isPublic, enabled, priority])
+}
+
+model CallbackRequest {
+  id                    String    @id @default(uuid())
+  customerId            String?
+  phoneE164             String
+  requestedAt           DateTime  @default(now())
+  /// When the customer asked to be called. Null means as soon as possible.
+  requestedFor          DateTime?
+  timezone              String    @default("America/Toronto")
+  reason                String?
+  source                String    @default("CONCIERGE")
+  status                String    @default("REQUESTED")
+  assignedBusinessPhoneId String?
+  assignedStaffId       String?
+  attemptCount          Int       @default(0)
+  lastAttemptAt         DateTime?
+  /// Worker lease. Two workers cannot claim the same request.
+  claimedBy             String?
+  claimedUntil          DateTime?
+  staffCallSid          String?
+  customerCallSid       String?
+  connectedAt           DateTime?
+  completedAt           DateTime?
+  failureReason         String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  businessPhone BusinessPhone? @relation(fields: [assignedBusinessPhoneId], references: [id])
+
+  @@index([status, requestedFor])
+  @@index([customerId, status])
+  @@index([phoneE164, status])
+}
+
+/* ------------------------------------------------------------------ */
+/* concierge                                                           */
+/* ------------------------------------------------------------------ */
+
+model Conversation {
+  id         String   @id @default(uuid())
+  customerId String?
+  locale     String   @default("en")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  expiresAt  DateTime
+
+  messages ConversationMessage[]
+
+  @@index([customerId])
+  @@index([expiresAt])
+}
+
+model ConversationMessage {
+  id             String   @id @default(uuid())
+  conversationId String
+  role           String
+  content        String
+  /// Which backend tools ran, for audit. Never model internals.
+  toolCalls      Json?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+/* ------------------------------------------------------------------ */
+/* staff authentication                                                */
+/* ------------------------------------------------------------------ */
+
+/// A person who can sign in to operations. Separate from `Staff`, which is a
+/// schedulable resource — an owner may have a login but never be dispatched,
+/// and a cleaner may exist on the schedule before they have an account.
+model StaffUser {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  /// scrypt: salt:hash. Never a plaintext or unsalted digest.
+  passwordHash      String
+  displayName       String
+  /// OWNER | DISPATCHER | CLEANER
+  role              String    @default("CLEANER")
+  /// Links a CLEANER login to the schedulable Staff row they may see.
+  staffId           String?   @unique
+  active            Boolean   @default(true)
+  mustChangePassword Boolean  @default(true)
+  failedAttempts    Int       @default(0)
+  lockedUntil       DateTime?
+  lastLoginAt       DateTime?
+  passwordChangedAt DateTime  @default(now())
+
+  /// TOTP secret, base32. Present once enrolment starts; `totpEnabledAt` is
+  /// what actually gates sign-in, so a half-finished enrolment cannot lock
+  /// anyone out.
+  totpSecret        String?
+  totpEnabledAt     DateTime?
+  /// Hashed single-use recovery codes. The plaintext is shown once.
+  recoveryCodeHashes String[]  @default([])
+  /// Last accepted TOTP step, so a stolen code cannot be replayed.
+  lastTotpStep      BigInt?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sessions StaffSession[]
+
+  @@index([role, active])
+}
+
+/// Server-side staff session. Only the SHA-256 of the cookie token is stored,
+/// so a database leak does not hand out live operator access.
+model StaffSession {
+  id               String    @id @default(uuid())
+  staffUserId      String
+  sessionTokenHash String    @unique
+  createdAt        DateTime  @default(now())
+  lastSeenAt       DateTime  @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  ipHash           String?
+  userAgentHash    String?
+
+  user StaffUser @relation(fields: [staffUserId], references: [id], onDelete: Cascade)
+
+  @@index([staffUserId])
+  @@index([expiresAt])
+}
+
+/* ------------------------------------------------------------------ */
+/* billing attempts & notifications                                    */
+/* ------------------------------------------------------------------ */
+
+/// One row per charge attempt for a scheduled visit.
+///
+/// Separate from Payment because a visit can be attempted several times
+/// (soft decline, expired card) and operations need the history, not just the
+/// final state.
+/// A dunning case: a customer whose payment needs human attention.
+///
+/// Separate from BillingAttempt because one customer may have several failed
+/// visits and operations works the customer, not the attempt.
+model DunningCase {
+  id            String    @id @default(uuid())
+  customerId    String    @unique
+  /// OPEN | CONTACTED | RESOLVED | WRITTEN_OFF
+  status        String    @default("OPEN")
+  reason        String
+  failedCount   Int       @default(1)
+  totalOwedCents Int      @default(0)
+  firstFailedAt DateTime  @default(now())
+  lastFailedAt  DateTime  @default(now())
+  contactedAt   DateTime?
+  resolvedAt    DateTime?
+  assignedTo    String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, lastFailedAt])
+}
+
+model BillingAttempt {
+  id            String    @id @default(uuid())
+  bookingId     String
+  customerId    String
+  attemptNumber Int       @default(1)
+  amountCents   Int
+  /// SCHEDULED | RUNNING | SUCCEEDED | SOFT_FAILED | HARD_FAILED | ABANDONED
+  status        String    @default("SCHEDULED")
+  scheduledFor  DateTime
+  startedAt     DateTime?
+  completedAt   DateTime?
+  nextRetryAt   DateTime?
+  failureCode   String?
+  failureMessage String?
+  paymentId     String?
+  /// Worker lease, so two workers never charge the same visit.
+  claimedBy     String?
+  claimedUntil  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([bookingId, attemptNumber])
+  @@index([status, scheduledFor])
+  @@index([customerId])
+}
+
+/// Outbound message record. Written before sending, so a crash cannot lose
+/// the fact that a customer was told something.
+model Notification {
+  id          String    @id @default(uuid())
+  customerId  String?
+  bookingId   String?
+  channel     String
+  template    String
+  /// QUEUED | SENT | FAILED | SUPPRESSED
+  status      String    @default("QUEUED")
+  /// Hashed: proof of delivery without a second copy of contact details.
+  recipientHash String
+  /// EMAIL | SMS — which field on the customer to re-read at retry time.
+  /// The address itself is never stored, so a retry re-derives it from the
+  /// customer record. If they changed it, the retry goes to the new one,
+  /// which is what they would want.
+  recipientField String?
+  /// Template variables, so a retry renders the same message. Contains no
+  /// contact details — those come from the customer record.
+  renderVars    Json?
+  locale      String    @default("en")
+  subject     String?
+  providerId  String?
+  failureCode String?
+  attempts    Int       @default(0)
+  /// One notification per booking per template, enforced by the database.
+  dedupeKey   String    @unique
+  createdAt   DateTime  @default(now())
+  sentAt      DateTime?
+
+  @@index([status, createdAt])
+  @@index([bookingId])
+}
+
+/// Evidence that a scheduled job actually ran.
+///
+/// Without this, "the billing worker is fine" is an assumption. Overdue
+/// detection reads successes from here.
+model WorkerRun {
+  id         String   @id @default(uuid())
+  worker     String
+  startedAt  DateTime
+  finishedAt DateTime
+  status     String
+  durationMs Int
+  detail     Json?
+  error      String?
+  createdAt  DateTime @default(now())
+
+  @@index([worker, status, finishedAt])
+  @@index([createdAt])
+}
+
+/// An operational problem that needs a person.
+///
+/// Deduplicated by `key`: a worker overdue for 45 minutes with a one-minute
+/// check loop produces ONE row, not 45.
+model OperationalAlert {
+  id             String    @id @default(uuid())
+  /// Stable identity for the condition, e.g. "worker:billing".
+  key            String    @unique
+  severity       String
+  category       String
+  title          String
+  message        String
+  resource       String?
+  /// OPEN | RESOLVED
+  status         String    @default("OPEN")
+  observations   Int       @default(1)
+  openedAt       DateTime  @default(now())
+  lastObservedAt DateTime  @default(now())
+  resolvedAt     DateTime?
+  /// PENDING | DELIVERED | FAILED | NOT_CONFIGURED
+  deliveryStatus String    @default("PENDING")
+  deliveredAt    DateTime?
+  deliveryError  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, severity])
+  @@index([category, status])
+}
