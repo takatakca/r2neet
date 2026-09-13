@@ -36,12 +36,33 @@ export const minutesToTime = (m: number) =>
   `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
 export function timeToMinutes(value: string): number {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
-  if (!m) throw new RosterError(`"${value}" is not a time like 08:00.`, 'INVALID_TIME');
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  if (h > 24 || min > 59) throw new RosterError(`"${value}" is not a valid time.`, 'INVALID_TIME');
-  return h * 60 + min;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+
+  if (!match) {
+    throw new RosterError(
+      `"${value}" is not a time like 08:00.`,
+      'INVALID_TIME',
+    );
+  }
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+
+  const valid =
+    hour >= 0 &&
+    hour <= 24 &&
+    minute >= 0 &&
+    minute <= 59 &&
+    !(hour === 24 && minute !== 0);
+
+  if (!valid) {
+    throw new RosterError(
+      `"${value}" is not a valid time.`,
+      'INVALID_TIME',
+    );
+  }
+
+  return hour * 60 + minute;
 }
 
 /**
@@ -51,28 +72,55 @@ export function timeToMinutes(value: string): number {
  * mean a typo, and silently merging them hides the mistake until someone is
  * booked at a time they never offered.
  */
-export function validateAvailability(windows: AvailabilityWindow[]): void {
-  for (const w of windows) {
-    if (!Number.isInteger(w.weekday) || w.weekday < 0 || w.weekday > 6) {
-      throw new RosterError('Weekday must be 0 (Sunday) through 6.', 'INVALID_WEEKDAY');
-    }
-    if (w.startMinute >= w.endMinute) {
+export function validateAvailability(
+  windows: AvailabilityWindow[],
+): void {
+  for (const window of windows) {
+    if (
+      !Number.isInteger(window.weekday) ||
+      window.weekday < 0 ||
+      window.weekday > 6
+    ) {
       throw new RosterError(
-        `${WEEKDAY_NAMES[w.weekday]}: the end time must be after the start time.`,
+        'Weekday must be 0 (Sunday) through 6.',
+        'INVALID_WEEKDAY',
+      );
+    }
+
+    if (
+      !Number.isInteger(window.startMinute) ||
+      !Number.isInteger(window.endMinute) ||
+      window.startMinute < 0 ||
+      window.endMinute > 24 * 60
+    ) {
+      throw new RosterError(
+        `${WEEKDAY_NAMES[window.weekday]}: availability must stay inside the day.`,
         'INVALID_WINDOW',
       );
     }
-    if (w.endMinute > 24 * 60) {
-      throw new RosterError('A window cannot run past midnight.', 'INVALID_WINDOW');
+
+    if (window.startMinute >= window.endMinute) {
+      throw new RosterError(
+        `${WEEKDAY_NAMES[window.weekday]}: the end time must be after the start time.`,
+        'INVALID_WINDOW',
+      );
     }
   }
 
-  for (const day of new Set(windows.map((w) => w.weekday))) {
-    const sameDay = windows.filter((w) => w.weekday === day).sort((a, b) => a.startMinute - b.startMinute);
-    for (let i = 1; i < sameDay.length; i++) {
-      if (sameDay[i]!.startMinute < sameDay[i - 1]!.endMinute) {
+  const weekdays = new Set(windows.map((window) => window.weekday));
+
+  for (const weekday of weekdays) {
+    const sameDay = windows
+      .filter((window) => window.weekday === weekday)
+      .sort((a, b) => a.startMinute - b.startMinute);
+
+    for (let index = 1; index < sameDay.length; index++) {
+      const previous = sameDay[index - 1]!;
+      const current = sameDay[index]!;
+
+      if (current.startMinute < previous.endMinute) {
         throw new RosterError(
-          `${WEEKDAY_NAMES[day]}: two availability windows overlap.`,
+          `${WEEKDAY_NAMES[weekday]}: two availability windows overlap.`,
           'OVERLAPPING_WINDOWS',
         );
       }
@@ -245,14 +293,77 @@ export class RosterService {
     return out;
   }
 
-  async setSkills(staffId: string, skills: string[]) {
+  async setSkills(staffId: string, requestedSkills: string[]) {
+    const skills = [...new Set(requestedSkills)];
+
     this.assertKnownSkills(skills);
+
+    await this.prisma.staff.findUniqueOrThrow({
+      where: { id: staffId },
+    });
+
+    const conflicts = await this.jobsOutsideSkills(
+      staffId,
+      skills,
+    );
+
     await this.prisma.$transaction([
-      this.prisma.staffSkill.deleteMany({ where: { staffId } }),
+      this.prisma.staffSkill.deleteMany({
+        where: { staffId },
+      }),
+
       this.prisma.staffSkill.createMany({
-        data: skills.map((serviceOptionId) => ({ staffId, serviceOptionId })),
+        data: skills.map((serviceOptionId) => ({
+          staffId,
+          serviceOptionId,
+        })),
       }),
     ]);
+
+    return { conflicts };
+  }
+
+  async jobsOutsideSkills(
+    staffId: string,
+    skills: string[],
+  ): Promise<{ bookingNumber: string; startAt: string }[]> {
+    // Empty means the cleaner may perform every service.
+    if (skills.length === 0) {
+      return [];
+    }
+
+    const assignments =
+      await this.prisma.bookingStaff.findMany({
+        where: {
+          staffId,
+          booking: {
+            startAt: {
+              gte: this.now(),
+            },
+            status: {
+              notIn: ['CANCELLED'],
+            },
+          },
+        },
+        include: {
+          booking: true,
+        },
+      });
+
+    return assignments
+      .filter(
+        (assignment) =>
+          !skills.includes(
+            assignment.booking.serviceOptionId,
+          ),
+      )
+      .map((assignment) => ({
+        bookingNumber:
+          assignment.booking.bookingNumber,
+
+        startAt:
+          assignment.booking.startAt.toISOString(),
+      }));
   }
 
   /**
@@ -336,25 +447,118 @@ export class RosterService {
    */
   async coverage() {
     const staff = await this.prisma.staff.findMany({
-      where: { active: true },
-      include: { availability: true },
+      where: {
+        active: true,
+      },
+
+      include: {
+        availability: true,
+        skills: true,
+      },
     });
 
+    const twoCleanerServices = SERVICES.filter(
+      (service) =>
+        service.active &&
+        service.requiredStaffCount === 2 &&
+        service.appointmentDurationMinutes !== null,
+    );
+
     return WEEKDAY_NAMES.map((name, weekday) => {
-      const windows = staff.flatMap((s) =>
-        s.availability
-          .filter((a) => a.weekday === weekday)
-          .map((a) => ({ ownerStaffId: s.id, startMinute: a.startMinute, endMinute: a.endMinute })),
+      const workingStaff = staff
+        .map((member) => ({
+          id: member.id,
+
+          skills: member.skills.map(
+            (skill) => skill.serviceOptionId,
+          ),
+
+          windows: member.availability.filter(
+            (window) => window.weekday === weekday,
+          ),
+        }))
+        .filter((member) => member.windows.length > 0);
+
+      const allWindows = workingStaff.flatMap(
+        (member) => member.windows,
       );
-      const cleaners = new Set(windows.map((w) => w.ownerStaffId)).size;
+
+      const canStaffTwoPersonJobs =
+        twoCleanerServices.some((service) => {
+          const eligible = workingStaff.filter(
+            (member) =>
+              member.skills.length === 0 ||
+              member.skills.includes(service.id),
+          );
+
+          const requiredMinutes =
+            service.appointmentDurationMinutes!;
+
+          for (
+            let firstIndex = 0;
+            firstIndex < eligible.length;
+            firstIndex++
+          ) {
+            for (
+              let secondIndex = firstIndex + 1;
+              secondIndex < eligible.length;
+              secondIndex++
+            ) {
+              const first = eligible[firstIndex]!;
+              const second = eligible[secondIndex]!;
+
+              for (const firstWindow of first.windows) {
+                for (const secondWindow of second.windows) {
+                  const overlapStart = Math.max(
+                    firstWindow.startMinute,
+                    secondWindow.startMinute,
+                  );
+
+                  const overlapEnd = Math.min(
+                    firstWindow.endMinute,
+                    secondWindow.endMinute,
+                  );
+
+                  if (
+                    overlapEnd - overlapStart >=
+                    requiredMinutes
+                  ) {
+                    return true;
+                  }
+                }
+              }
+            }
+          }
+
+          return false;
+        });
+
       return {
         weekday,
         name,
-        cleaners,
-        earliest: windows.length ? minutesToTime(Math.min(...windows.map((w) => w.startMinute))) : null,
-        latest: windows.length ? minutesToTime(Math.max(...windows.map((w) => w.endMinute))) : null,
-        // Two-cleaner services need two people free at once.
-        canStaffTwoPersonJobs: cleaners >= 2,
+        cleaners: workingStaff.length,
+
+        earliest: allWindows.length
+          ? minutesToTime(
+              Math.min(
+                ...allWindows.map(
+                  (window) => window.startMinute,
+                ),
+              ),
+            )
+          : null,
+
+        latest: allWindows.length
+          ? minutesToTime(
+              Math.max(
+                ...allWindows.map(
+                  (window) => window.endMinute,
+                ),
+              ),
+            )
+          : null,
+
+        canStaffTwoPersonJobs,
       };
     });
   }

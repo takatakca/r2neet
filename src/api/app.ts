@@ -4,6 +4,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 
+
 import { createQuote } from '../engine/quote.js';
 import { GUEST } from '../engine/discounts.js';
 import { SERVICES } from '../data/catalogue.js';
@@ -1541,6 +1542,7 @@ export function createApi(deps: ApiDeps) {
    */
   app.use(createOpsApi({ prisma, voice: deps.voice ?? null, now }));
 
+  
   /* ---------------- errors ---------------- */
 
   app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {

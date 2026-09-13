@@ -366,8 +366,20 @@ export function createOpsApi(deps: OpsDeps) {
     '/api/v1/admin/roster/:id/skills',
     wrap(async (req, res) => {
       requirePermission(req, 'staff.manage');
-      await roster.setSkills(String(req.params.id), (req.body as { skills?: string[] }).skills ?? []);
-      res.json({ ok: true });
+
+      const body = req.body as {
+        skills?: string[];
+      };
+
+      const result = await roster.setSkills(
+        String(req.params.id),
+        body.skills ?? [],
+      );
+
+      res.json({
+        ok: true,
+        conflicts: result.conflicts,
+      });
     }),
   );
 

@@ -3,22 +3,23 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 
 /**
  * Two build targets:
- *  - default: hashed assets served by the app at /book
- *  - SINGLE_FILE=1: one genuinely self-contained HTML with everything inlined,
- *    for the portable preview. The previous "standalone" file imported modules
- *    that never travelled with it; this one actually contains them.
+ * - Default: hashed assets served by the application.
+ * - SINGLE_FILE=1: one self-contained HTML booking preview.
  */
 const single = process.env.SINGLE_FILE === '1';
 
 export default defineConfig({
   root: 'web',
+
   plugins: single ? [viteSingleFile()] : [],
+
   build: {
     outDir: single ? '../dist-single' : '../dist',
     emptyOutDir: true,
     target: 'es2020',
-    // The single-file preview can only inline one entry, so it builds the
-    // booking page alone; the normal build ships every page.
+
+    // The single-file preview only builds the booking page.
+    // The normal build ships every application page.
     rollupOptions: single
       ? undefined
       : {
@@ -30,9 +31,13 @@ export default defineConfig({
           },
         },
   },
+
   server: {
     proxy: {
-      '/api': 'http://localhost:3000',
+      '/api': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      },
     },
   },
 });

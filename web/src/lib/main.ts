@@ -138,26 +138,10 @@ const TICK =
 
 function setBoot(state: BootState, detail?: string): void {
   document.body.dataset.boot = state;
-  const veil = $('boot');
-  if (!veil) return;
-  if (state === 'READY') {
-    veil.hidden = true;
-    return;
+
+  if (detail) {
+    console.error('[r2nette boot]', detail);
   }
-  veil.hidden = false;
-  if (state === 'BOOTING') {
-    veil.innerHTML = `<div class="boot-in"><div class="boot-mark">R2</div><div class="boot-txt">${t('boot.loading')}</div></div>`;
-    return;
-  }
-  // Never a stack trace, always a way out.
-  veil.innerHTML = `<div class="boot-in">
-      <div class="boot-mark">R2</div>
-      <h2>${t('boot.unavailableTitle')}</h2>
-      <p>${t('boot.unavailableBody')}</p>
-      <button class="btn btn-primary" data-action="retry-boot">${t('common.retry')}</button>
-      <a class="btn btn-ghost" href="tel:+15148252825">${t('boot.call')}</a>
-    </div>`;
-  if (detail) console.error('[r2nette boot]', detail);
 }
 
 /** A late failure must not leave a half-rendered interface. */
@@ -224,13 +208,46 @@ const FAMILIES = [
 function renderFamilies(): void {
   const box = $('families');
   if (!box) return;
-  box.innerHTML = FAMILIES.map(
-    (f) => `<button type="button" class="fam art-${f.art}" data-action="pick-family" data-family="${f.id}"
-        aria-pressed="${S.familyId === f.id}">
-        <span class="fam-body"><span class="fam-t">${esc(t(f.key))}</span>
-        <span class="fam-s">${esc(t(f.sub))}</span></span>
-        <span class="fam-go">→</span></button>`,
-  ).join('');
+
+  const imageByFamily: Record<string, string> = {
+    basic: '/assets/services/basic.jpg',
+    deep: '/assets/services/deep.jpg',
+    other: '/assets/services/specialty.jpg',
+  };
+
+  box.innerHTML = FAMILIES.map((family) => {
+    const image =
+      imageByFamily[family.art] ??
+      '/assets/services/specialty.jpg';
+
+    return `
+      <button
+        type="button"
+        class="landing-service-card"
+        data-action="pick-family"
+        data-family="${esc(family.id)}"
+        aria-pressed="${S.familyId === family.id}"
+      >
+        <span
+          class="landing-service-photo"
+          style="background-image:url('${image}')"
+          aria-hidden="true"
+        ></span>
+
+        <span class="landing-service-content">
+          <span class="landing-service-copy">
+            <strong>${esc(t(family.key))}</strong>
+            <span>${esc(t(family.sub))}</span>
+          </span>
+
+          <span class="landing-service-arrow" aria-hidden="true">
+            →
+          </span>
+        </span>
+      </button>
+    `;
+  }).join('');
+
   renderServiceOptions();
 }
 
@@ -1038,6 +1055,74 @@ async function goNext(): Promise<void> {
   goTo(order[Math.min(i + 1, order.length - 1)]!);
 }
 
+function goToPhase(requestedPhase: string): void {
+  const service = svc();
+
+  if (requestedPhase === 'CLEAN') {
+    goTo('service');
+    return;
+  }
+
+  if (!service) {
+    toast(t('guard.service'));
+    goTo('service');
+    return;
+  }
+
+  if (requestedPhase === 'HOME') {
+    goTo('property');
+    return;
+  }
+
+  if (!S.propertyType) {
+    toast(t('guard.property'));
+    goTo('property');
+    return;
+  }
+
+  if (
+    service.productSupplyMode === 'REQUIRED_SELECTION' &&
+    !S.productSupplyOption
+  ) {
+    toast(t('guard.products'));
+    goTo('products');
+    return;
+  }
+
+  if (!S.frequency) {
+    toast(t('guard.frequency'));
+    goTo('frequency');
+    return;
+  }
+
+  if (requestedPhase === 'TIME') {
+    if (!S.addressId) {
+      toast(t('guard.address'));
+      goTo('address');
+      return;
+    }
+
+    goTo('slots');
+    return;
+  }
+
+  if (requestedPhase === 'CONFIRM') {
+    if (!S.addressId) {
+      toast(t('guard.address'));
+      goTo('address');
+      return;
+    }
+
+    if (!hold) {
+      toast(t('guard.slots'));
+      goTo('slots');
+      return;
+    }
+
+    goTo('details');
+  }
+}
+
 function goBack(): void {
   const order = visibleSteps();
   const i = order.indexOf(S.step);
@@ -1095,142 +1180,368 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
     persistLocale(locale);
     applyLocale();
   },
-  'scroll-book': () => $('book')?.scrollIntoView({ behavior: 'smooth' }),
-  'pick-family': (el) => {
-    S.familyId = el.dataset.family;
-    if (svc() && svc()!.categoryId !== S.familyId) S.serviceOptionId = null;
-    renderFamilies();
+
+  'toggle-mobile-menu': () => {
+    const menu = $('mobileNavigation');
+    const button = $('mobileMenuButton');
+
+    if (!menu || !button) return;
+
+    const willOpen = menu.hidden;
+
+    menu.hidden = !willOpen;
+    button.setAttribute('aria-expanded', String(willOpen));
   },
-  'pick-service': (el) => {
-    S.serviceOptionId = el.dataset.service!;
-    renderServiceOptions();
-    saveDraft(S);
-    const s = svc()!;
-    if (s.pricingMode === 'QUOTE_REQUIRED') {
-      toast(t('service.quoteNote'));
+
+  'book-again': async () => {
+    const usual = ctx?.usualClean;
+
+    if (usual) {
+      S.familyId = services.find(
+        (service) => service.id === usual.serviceOptionId,
+      )?.categoryId;
+
+      S.serviceOptionId = usual.serviceOptionId;
+
+      renderFamilies();
+      renderWelcome();
+      goTo('welcome');
+
       return;
     }
-    if (!verified) openIdentitySheet();
-    else goTo('property');
+
+    goTo('service');
   },
-  'send-code': () => void sendCode(),
-  'change-number': () => openIdentitySheet(),
-  'close-sheet': () => closeSheet(),
-  goto: (el) => goTo(el.dataset.step!),
-  next: () => void goNext(),
-  back: () => goBack(),
+
+  'scroll-book': () => {
+    $('book')?.scrollIntoView({ behavior: 'smooth' });
+  },
+
+  'pick-family': (el) => {
+    S.familyId = el.dataset.family;
+
+    if (svc() && svc()!.categoryId !== S.familyId) {
+      S.serviceOptionId = null;
+    }
+
+    renderFamilies();
+  },
+
+  'pick-service': async (el) => {
+  const nextServiceId = el.dataset.service!;
+
+  if (S.serviceOptionId !== nextServiceId) {
+    quote = null;
+    S.serviceOptionId = nextServiceId;
+    S.productSupplyOption = null;
+    S.addressId = null;
+    S.addressSummary = null;
+    S.slotStartAt = null;
+    hold = null;
+    selectedDay = null;
+  }
+
+  const service = svc();
+  if (!service) return;
+
+  /*
+   * A newly selected service starts as a one-time cleaning when that
+   * frequency is supported. This allows an immediately priceable service
+   * to display its quote without forcing the customer to visit the
+   * frequency screen first.
+   */
+  if (
+    !S.frequency ||
+    !service.allowedFrequencies.includes(S.frequency)
+  ) {
+    S.frequency = service.allowedFrequencies.includes('ONE_TIME')
+      ? 'ONE_TIME'
+      : service.allowedFrequencies[0] ?? null;
+  }
+
+  renderServiceOptions();
+  renderLedger();
+  saveDraft(S);
+
+  if (service.pricingMode === 'QUOTE_REQUIRED') {
+    toast(t('service.quoteNote'));
+    return;
+  }
+
+  /*
+   * Specialty services that do not require a product choice can now be
+   * quoted immediately. Basic and Deep wait until the customer chooses
+   * who supplies the products.
+   */
+  await refreshQuote();
+
+  if (!verified) {
+    openIdentitySheet();
+    return;
+  }
+
+  goTo('property');
+},
+
+  'send-code': () => {
+    void sendCode();
+  },
+
+  'change-number': () => {
+    openIdentitySheet();
+  },
+
+  'close-sheet': () => {
+    closeSheet();
+  },
+
+  goto: (el) => {
+    goTo(el.dataset.step!);
+  },
+
+  'go-phase': (el) => {
+    goToPhase(el.dataset.phase!);
+  },
+
+  next: () => {
+    void goNext();
+  },
+
+  back: () => {
+    goBack();
+  },
+
   'use-usual': async () => {
-    const u = ctx!.usualClean!;
-    S.serviceOptionId = u.serviceOptionId;
-    S.frequency = u.frequency;
-    S.addressId = u.addressId;
-    S.addressSummary = u.addressSummary;
-    S.productSupplyOption = S.productSupplyOption ?? 'CLIENT_SUPPLIED';
+    const usual = ctx!.usualClean!;
+
+    S.serviceOptionId = usual.serviceOptionId;
+    S.frequency = usual.frequency;
+    S.addressId = usual.addressId;
+    S.addressSummary = usual.addressSummary;
+    S.productSupplyOption =
+      S.productSupplyOption ?? 'CLIENT_SUPPLIED';
+
     saveDraft(S);
+
     await refreshQuote();
+
     goTo('slots');
   },
+
   'pick-prop': (el) => {
     S.propertyType = el.dataset.prop!;
     S.isShortTermRental = el.dataset.prop === 'airbnb';
+
     renderProperty();
     saveDraft(S);
   },
+
   'pick-size': (el) => {
     S.propertySize = el.dataset.size!;
+
     renderProperty();
     saveDraft(S);
   },
+
   'pick-product': (el) => {
     S.productSupplyOption = el.dataset.product!;
+
     renderProducts();
     saveDraft(S);
+
     void refreshQuote();
   },
+
   'pick-freq': async (el) => {
     S.frequency = el.dataset.freq!;
+
     renderFrequency();
     saveDraft(S);
+
     await refreshQuote();
-    const d = quote?.firstVisit?.appliedDiscount;
-    if (d) toast(t('frequency.savings', { amount: formatMoney(d.amountCents, locale) }), 'save');
+
+    const discount = quote?.firstVisit?.appliedDiscount;
+
+    if (discount) {
+      toast(
+        t('frequency.savings', {
+          amount: formatMoney(discount.amountCents, locale),
+        }),
+        'save',
+      );
+    }
   },
+
   'use-saved': async (el) => {
-    const a = ctx!.addresses.find((x) => x.id === el.dataset.addr)!;
-    S.addressId = a.id;
-    S.addressSummary = a.formattedAddress;
+    const address = ctx!.addresses.find(
+      (item) => item.id === el.dataset.addr,
+    )!;
+
+    S.addressId = address.id;
+    S.addressSummary = address.formattedAddress;
+
     saveDraft(S);
     renderAddress();
+
     await refreshQuote();
   },
+
   'clear-address': () => {
     S.addressId = null;
     S.addressSummary = null;
+
     saveDraft(S);
     renderAddress();
   },
+
   'select-place': async (el) => {
-    const sug = $('suggestions');
-    if (sug) sug.hidden = true;
+    const suggestions = $('suggestions');
+
+    if (suggestions) {
+      suggestions.hidden = true;
+    }
+
     toast(t('address.confirming'));
+
     try {
-      const res = await api.selectAddress(el.dataset.place!, addrSession!);
+      const result = await api.selectAddress(
+        el.dataset.place!,
+        addrSession!,
+      );
+
       addrSession = null;
-      S.addressId = res.address.id;
-      S.addressSummary = res.address.formattedAddress;
+      S.addressId = result.address.id;
+      S.addressSummary = result.address.formattedAddress;
+
       saveDraft(S);
       renderAddress();
+
       await refreshQuote();
-    } catch (e) {
-      showError(e);
+    } catch (error) {
+      showError(error);
     }
   },
+
   'pick-day': (el) => {
     selectedDay = el.dataset.day!;
+
     renderDays();
+
     void loadSlots();
   },
+
   'pick-slot': async (el) => {
     S.slotStartAt = el.dataset.slot!;
+
     saveDraft(S);
-    if (!quote) await refreshQuote();
+
+    if (!quote) {
+      await refreshQuote();
+    }
+
     if (!quote) return;
+
     toast(t('hold.reserving'));
+
     try {
-      hold = (await api.createHold(quote.id, S.slotStartAt, `hold:${quote.id}:${S.slotStartAt}`)).hold;
+      const result = await api.createHold(
+        quote.id,
+        S.slotStartAt,
+        `hold:${quote.id}:${S.slotStartAt}`,
+      );
+
+      hold = result.hold;
+
       startHoldTimer();
       goTo('details');
-    } catch (e) {
-      showError(e);
-      if (e instanceof ApiError && e.code === 'SLOT_UNAVAILABLE') void loadSlots();
+    } catch (error) {
+      showError(error);
+
+      if (
+        error instanceof ApiError &&
+        error.code === 'SLOT_UNAVAILABLE'
+      ) {
+        void loadSlots();
+      }
     }
   },
-  'back-to-slots': () => backToSlots(),
-  confirm: () => void submitBooking(),
+
+  'back-to-slots': () => {
+    backToSlots();
+  },
+
+  confirm: () => {
+    void submitBooking();
+  },
+
   'download-ics': () => {
     if (!bookingResult) return;
-    const blob = new Blob([buildIcs(bookingResult, 'R2NETTE', S.addressSummary ?? '')], {
-      type: 'text/calendar',
-    });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${bookingResult.bookingNumber}.ics`;
-    a.click();
+
+    const blob = new Blob(
+      [
+        buildIcs(
+          bookingResult,
+          'R2NETTE',
+          S.addressSummary ?? '',
+        ),
+      ],
+      {
+        type: 'text/calendar',
+      },
+    );
+
+    const downloadLink = document.createElement('a');
+
+    downloadLink.href = URL.createObjectURL(blob);
+    downloadLink.download = `${bookingResult.bookingNumber}.ics`;
+
+    downloadLink.click();
+
+    URL.revokeObjectURL(downloadLink.href);
   },
-  'book-another': () => location.reload(),
-  'open-help': () => openHelp(),
+
+  'book-another': () => {
+    location.reload();
+  },
+
+  'open-help': () => {
+    openHelp();
+  },
+
   'help-action': (el) => {
-    const id = el.dataset.help;
-    if (id === 'callme' || id === 'human') openCallback();
-    else {
-      closeSheet();
-      $('book')?.scrollIntoView({ behavior: 'smooth' });
+    const helpAction = el.dataset.help;
+
+    if (
+      helpAction === 'callme' ||
+      helpAction === 'human'
+    ) {
+      openCallback();
+      return;
     }
+
+    closeSheet();
+
+    $('book')?.scrollIntoView({ behavior: 'smooth' });
   },
-  'callback-now': () => void requestCallback(),
-  'callback-5': () => void requestCallback(),
-  'retry-boot': () => location.reload(),
-  'show-ledger': () => document.querySelector('.ledger')?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+
+  'callback-now': () => {
+    void requestCallback();
+  },
+
+  'callback-5': () => {
+    void requestCallback();
+  },
+
+  'retry-boot': () => {
+    location.reload();
+  },
+
+  'show-ledger': () => {
+    document.querySelector('.ledger')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  },
 };
 
 function installDelegation(): void {

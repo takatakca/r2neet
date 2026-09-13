@@ -73,6 +73,38 @@ describe('availability validation', () => {
       expect((e as Error).message).toContain('Wednesday');
     }
   });
+
+  it('rejects availability before midnight', () => {
+    expect(() =>
+      validateAvailability([
+        {
+          weekday: 1,
+          startMinute: -30,
+          endMinute: 480,
+        },
+      ]),
+    ).toThrow(/inside the day/);
+  });
+
+  it('rejects non-integer minute values', () => {
+    expect(() =>
+      validateAvailability([
+        {
+          weekday: 1,
+          startMinute: 480.5,
+          endMinute: 1020,
+        },
+      ]),
+    ).toThrow(/inside the day/);
+  });
+
+  it('rejects 24:01 but permits 24:00', () => {
+    expect(timeToMinutes('24:00')).toBe(1440);
+    expect(() => timeToMinutes('24:01')).toThrow(
+      RosterError,
+    );
+  });
+  
 });
 
 d('roster', () => {
@@ -203,6 +235,50 @@ d('roster', () => {
     const alice = (await roster.list()).find((x) => x.id === s.id)!;
     expect(alice.skills).toEqual(expect.arrayContaining(['svc_deep_2x3', 'svc_carpet']));
     expect(alice.skills).not.toContain('svc_basic_2x3');
+  });
+
+  it('names future bookings affected by a skill change', async () => {
+    const staff = await roster.create({
+      displayName: 'Alice',
+
+      skills: [
+        'svc_basic_2x3',
+        'svc_deep_2x3',
+      ],
+    });
+
+    const booking = await bookFor(
+      staff.id,
+      5,
+      10,
+    );
+
+    const result = await roster.setSkills(
+      staff.id,
+      ['svc_deep_2x3'],
+    );
+
+    expect(
+      result.conflicts.map(
+        (conflict) => conflict.bookingNumber,
+      ),
+    ).toContain(booking.bookingNumber);
+  });
+
+  it('an empty skill list still means every service', async () => {
+    const staff = await roster.create({
+      displayName: 'Alice',
+      skills: ['svc_basic_2x3'],
+    });
+
+    await bookFor(staff.id, 5, 10);
+
+    const result = await roster.setSkills(
+      staff.id,
+      [],
+    );
+
+    expect(result.conflicts).toHaveLength(0);
   });
 
   it('replaces a week rather than accumulating windows', async () => {
@@ -369,6 +445,66 @@ d('roster', () => {
     await roster.create({ displayName: 'Bruno' });
     coverage = await roster.coverage();
     expect(coverage.find((c) => c.weekday === 1)!.canStaffTwoPersonJobs).toBe(true);
+  });
+
+  it('requires two cleaners to work simultaneously', async () => {
+    await roster.create({
+      displayName: 'Morning Cleaner',
+
+      availability: [
+        {
+          weekday: 1,
+          startMinute: 8 * 60,
+          endMinute: 12 * 60,
+        },
+      ],
+    });
+
+    await roster.create({
+      displayName: 'Afternoon Cleaner',
+
+      availability: [
+        {
+          weekday: 1,
+          startMinute: 13 * 60,
+          endMinute: 17 * 60,
+        },
+      ],
+    });
+
+    const monday = (
+      await roster.coverage()
+    ).find((day) => day.weekday === 1)!;
+
+    expect(monday.cleaners).toBe(2);
+
+    expect(
+      monday.canStaffTwoPersonJobs,
+    ).toBe(false);
+  });
+
+  it('requires a skilled pair for two-cleaner coverage', async () => {
+    await roster.create({
+      displayName: 'Basic Cleaner',
+
+      skills: ['svc_basic_1x3'],
+    });
+
+    await roster.create({
+      displayName: 'Window Cleaner',
+
+      skills: ['svc_window'],
+    });
+
+    const monday = (
+      await roster.coverage()
+    ).find((day) => day.weekday === 1)!;
+
+    expect(monday.cleaners).toBe(2);
+
+    expect(
+      monday.canStaffTwoPersonJobs,
+    ).toBe(false);
   });
 
   it('excludes deactivated cleaners from coverage', async () => {
