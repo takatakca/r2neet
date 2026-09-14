@@ -1214,7 +1214,17 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
   },
 
   'scroll-book': () => {
-    $('book')?.scrollIntoView({ behavior: 'smooth' });
+    if (!verified) {
+      window.location.assign(
+        `/login?returnTo=${encodeURIComponent('/#book')}`,
+      );
+      return;
+    }
+
+    $('book')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
   },
 
   'pick-family': (el) => {
@@ -1276,7 +1286,9 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
   await refreshQuote();
 
   if (!verified) {
-    openIdentitySheet();
+    window.location.assign(
+      `/login?returnTo=${encodeURIComponent('/#book')}`,
+    );
     return;
   }
 
@@ -1288,8 +1300,10 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
   },
 
   'change-number': () => {
-    openIdentitySheet();
-  },
+  window.location.assign(
+    `/login?returnTo=${encodeURIComponent('/#book')}`,
+  );
+},
 
   'close-sheet': () => {
     closeSheet();

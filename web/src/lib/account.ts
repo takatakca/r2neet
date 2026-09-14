@@ -167,7 +167,10 @@ function render(): void {
       : `<div class="empty"><div class="ic">🧼</div>
           <div class="t">${esc(t('account.emptyTitle'))}</div>
           <div class="s">${esc(t('account.emptyBody'))}</div>
-          <a class="btn btn-primary" href="/book">${esc(t('account.bookNew'))}</a></div>`;
+          <a class="btn btn-primary" href="/login?returnTo=%2Faccount">
+            Sign in
+          </a>
+        </div>`;
   }
 
   const past = $('past');
@@ -268,7 +271,10 @@ async function load(): Promise<void> {
       up.innerHTML = `<div class="empty"><div class="ic">${unauth ? '🔐' : '⚠'}</div>
         <div class="t">${esc(unauth ? t('account.signInTitle') : t('error.GENERIC'))}</div>
         <div class="s">${esc(unauth ? t('account.signInBody') : '')}</div>
-        <a class="btn btn-primary" href="/book">${esc(t('account.bookNew'))}</a></div>`;
+        <a class="btn btn-primary" href="/login?returnTo=%2Faccount">
+          Sign in
+        </a>
+        </div>`;
     }
   }
 }

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
+
+  <meta name="theme-color" content="#082f5a">
+
+  <title>Sign in — R2NETTE</title>
+
+  <link
+    rel="icon"
+    href="/assets/brand/icon.svg"
+    type="image/svg+xml"
+  >
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Instrument+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <link rel="stylesheet" href="/auth.css">
+</head>
+
+<body data-auth-page="login">
+  <main class="auth-layout">
+    <aside class="auth-scene auth-scene-left">
+      <div class="auth-scene-copy">
+        <p class="auth-scene-title">
+          A cleaner Montréal<br>
+          for brighter<br>
+          tomorrows.
+        </p>
+
+        <span class="gold-line"></span>
+
+        <p>
+          Residential &amp; commercial<br>
+          cleaning services.
+        </p>
+      </div>
+    </aside>
+
+    <section class="auth-card">
+      <div class="language">
+        <button type="button" aria-pressed="true">EN</button>
+        <span>|</span>
+        <button type="button" aria-pressed="false">FR</button>
+      </div>
+
+      <a class="brand" href="/" aria-label="R2NETTE home">
+        <img
+          src="/assets/brand/r2nette-logo.svg"
+          alt="R2NETTE"
+        >
+      </a>
+
+      <div class="auth-content">
+        <h1>Welcome back</h1>
+
+        <p class="lead">
+          Enter your mobile number to access your bookings.
+        </p>
+
+        <form id="phoneForm" novalidate>
+          <div class="field">
+            <label for="phone">Mobile number</label>
+
+            <input
+              class="input"
+              id="phone"
+              name="phone"
+              type="tel"
+              inputmode="tel"
+              autocomplete="tel"
+              placeholder="(514) 825-2825"
+              required
+            >
+          </div>
+
+          <div
+            class="error"
+            id="error"
+            role="alert"
+            aria-live="polite"
+            hidden
+          ></div>
+
+          <button
+            class="primary-button"
+            id="submitButton"
+            type="submit"
+          >
+            <span id="submitLabel">Send verification code</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </form>
+
+        <div class="security-divider">
+          <span></span>
+          <strong aria-hidden="true">♙</strong>
+          <span></span>
+        </div>
+
+        <p class="security-text">
+          Secure password-free sign in
+        </p>
+      </div>
+
+      <div class="footer-links">
+        <a href="/privacy">Privacy</a>
+        <a href="tel:+15148252825">Need help?</a>
+      </div>
+
+      <div class="skyline" aria-hidden="true"></div>
+
+      <p class="tagline">
+        A CLEANER MONTRÉAL<br>
+        BRIGHTER DAYS
+      </p>
+    </section>
+
+    <aside class="auth-scene auth-scene-right">
+      <div class="auth-scene-copy">
+        <p class="auth-scene-title">
+          Cleaner spaces.<br>
+          Brighter days.
+        </p>
+
+        <span class="gold-line"></span>
+
+        <p>
+          Trusted professional cleaning<br>
+          across Montréal.
+        </p>
+      </div>
+    </aside>
+
+    <section class="trust-bar">
+      <article>
+        <strong>Verified mobile identity</strong>
+        <span>Safe. Simple. Secure.</span>
+      </article>
+
+      <article>
+        <strong>Trusted professional cleaners</strong>
+        <span>For a healthier home.</span>
+      </article>
+
+      <article>
+        <strong>Proudly local</strong>
+        <span>Montréal.</span>
+      </article>
+
+      <article>
+        <strong>More time for what matters</strong>
+        <span>A cleaner, brighter you.</span>
+      </article>
+    </section>
+  </main>
+
+  <script type="module" src="/src/lib/auth.ts"></script>
+</body>
+</html>

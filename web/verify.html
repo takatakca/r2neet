@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
+
+  <meta name="theme-color" content="#082f5a">
+
+  <title>Verify your number — R2NETTE</title>
+
+  <link
+    rel="icon"
+    href="/assets/brand/icon.svg"
+    type="image/svg+xml"
+  >
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Instrument+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <link rel="stylesheet" href="/auth.css">
+</head>
+
+<body data-auth-page="verify">
+  <main class="auth-layout">
+    <aside class="auth-scene auth-scene-left">
+      <div class="auth-scene-copy">
+        <p class="auth-scene-title">
+          A cleaner Montréal<br>
+          for brighter<br>
+          tomorrows.
+        </p>
+
+        <span class="gold-line"></span>
+
+        <p>
+          Residential &amp; commercial<br>
+          cleaning services.
+        </p>
+      </div>
+    </aside>
+
+    <section class="auth-card">
+      <a class="back-link" href="/login">
+        ← Back
+      </a>
+
+      <a class="brand brand-small" href="/" aria-label="R2NETTE home">
+        <img
+          src="/assets/brand/r2nette-logo.svg"
+          alt="R2NETTE"
+        >
+      </a>
+
+      <div class="steps">
+        <div class="step active">
+          <span>1</span>
+          <strong>Verify number</strong>
+        </div>
+
+        <div class="step-line"></div>
+
+        <div class="step">
+          <span>2</span>
+          <strong>Your details</strong>
+        </div>
+      </div>
+
+      <div class="auth-content">
+        <h1>Enter your verification code</h1>
+
+        <p class="lead">
+          We sent a 6-digit code by SMS to
+          <strong id="maskedPhone"></strong>.
+        </p>
+
+        <div class="otp" id="otp" aria-label="Verification code">
+          <input
+            data-otp
+            aria-label="Digit 1"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="1"
+            autofocus
+          >
+
+          <input
+            data-otp
+            aria-label="Digit 2"
+            inputmode="numeric"
+            maxlength="1"
+          >
+
+          <input
+            data-otp
+            aria-label="Digit 3"
+            inputmode="numeric"
+            maxlength="1"
+          >
+
+          <input
+            data-otp
+            aria-label="Digit 4"
+            inputmode="numeric"
+            maxlength="1"
+          >
+
+          <input
+            data-otp
+            aria-label="Digit 5"
+            inputmode="numeric"
+            maxlength="1"
+          >
+
+          <input
+            data-otp
+            aria-label="Digit 6"
+            inputmode="numeric"
+            maxlength="1"
+          >
+        </div>
+
+        <div
+          class="error"
+          id="error"
+          role="alert"
+          aria-live="polite"
+          hidden
+        ></div>
+
+        <button
+          class="primary-button"
+          id="verifyButton"
+          type="button"
+        >
+          Verify code
+        </button>
+
+        <div class="verification-links">
+          <a href="/login">Change number</a>
+
+          <button id="resendButton" type="button">
+            Resend code
+          </button>
+        </div>
+
+        <div class="security-notice">
+          <span aria-hidden="true">🔒</span>
+          Never share this code with anyone.
+        </div>
+
+        <p class="otp-tip">
+          You can paste the 6-digit code or allow your phone to fill it
+          automatically from your SMS.
+        </p>
+      </div>
+    </section>
+
+    <aside class="auth-scene auth-scene-right">
+      <div class="auth-scene-copy">
+        <p class="auth-scene-title">
+          More professional.<br>
+          Closer together.
+        </p>
+
+        <span class="gold-line"></span>
+
+        <p>Trusted in Montréal.</p>
+      </div>
+    </aside>
+  </main>
+
+  <script type="module" src="/src/lib/auth.ts"></script>
+</body>
+</html>
