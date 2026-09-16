@@ -10,6 +10,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
  */
 
 const SESSION_TTL_MS = 60 * 60 * 1000;
+const REGISTRATION_SESSION_TTL_MS = 60 * 60 * 1000;
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
 function sha256(value: string): string {
@@ -81,9 +82,142 @@ export class PrismaSessionStore {
 
   async purgeExpired(): Promise<number> {
     const res = await this.prisma.customerSession.deleteMany({
-      where: { expiresAt: { lt: new Date(this.now().getTime() - 7 * 24 * 3600 * 1000) } },
+      where: {
+        expiresAt: {
+          lt: new Date(this.now().getTime() - 7 * 24 * 3600 * 1000),
+        },
+      },
     });
     return res.count;
+  }
+}
+
+/**
+ * Temporary proof that a phone number passed OTP verification for sign-up.
+ *
+ * This store does not create a Customer. The browser receives an opaque
+ * random token and PostgreSQL stores only its SHA-256 hash.
+ */
+export class PrismaRegistrationSessionStore {
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly now: () => Date = () => new Date(),
+  ) {}
+
+  async create(
+    phoneE164: string,
+    meta: { userAgent?: string; ip?: string } = {},
+  ): Promise<{ token: string; expiresAt: Date }> {
+    const token = randomBytes(32).toString('base64url');
+    const at = this.now();
+    const expiresAt = new Date(at.getTime() + REGISTRATION_SESSION_TTL_MS);
+
+    // Retire any previous unconsumed registration proof for this number.
+    // This ensures that requesting a new registration code invalidates the
+    // previous browser registration flow.
+    await this.prisma.registrationSession.updateMany({
+      where: {
+        phoneE164,
+        consumedAt: null,
+      },
+      data: {
+        consumedAt: at,
+      },
+    });
+
+    await this.prisma.registrationSession.create({
+      data: {
+        registrationTokenHash: sha256(token),
+        phoneE164,
+        phoneVerifiedAt: at,
+        createdAt: at,
+        expiresAt,
+        userAgentHash: meta.userAgent ? sha256(meta.userAgent) : null,
+        ipHash: meta.ip ? sha256(meta.ip) : null,
+      },
+    });
+
+    return { token, expiresAt };
+  }
+
+  async get(token: string | undefined): Promise<{
+    id: string;
+    phoneE164: string;
+    phoneVerifiedAt: Date;
+    expiresAt: Date;
+  } | null> {
+    if (!token) return null;
+
+    const row = await this.prisma.registrationSession.findUnique({
+      where: {
+        registrationTokenHash: sha256(token),
+      },
+    });
+
+    if (!row) return null;
+    if (row.consumedAt !== null) return null;
+    if (row.expiresAt <= this.now()) return null;
+
+    return {
+      id: row.id,
+      phoneE164: row.phoneE164,
+      phoneVerifiedAt: row.phoneVerifiedAt,
+      expiresAt: row.expiresAt,
+    };
+  }
+
+  async consume(token: string | undefined): Promise<boolean> {
+    if (!token) return false;
+
+    const result = await this.prisma.registrationSession.updateMany({
+      where: {
+        registrationTokenHash: sha256(token),
+        consumedAt: null,
+        expiresAt: {
+          gt: this.now(),
+        },
+      },
+      data: {
+        consumedAt: this.now(),
+      },
+    });
+
+    return result.count === 1;
+  }
+
+  async destroy(token: string | undefined): Promise<void> {
+    if (!token) return;
+
+    await this.prisma.registrationSession.updateMany({
+      where: {
+        registrationTokenHash: sha256(token),
+        consumedAt: null,
+      },
+      data: {
+        consumedAt: this.now(),
+      },
+    });
+  }
+
+  async purgeExpired(): Promise<number> {
+    const result = await this.prisma.registrationSession.deleteMany({
+      where: {
+        OR: [
+          {
+            expiresAt: {
+              lt: new Date(this.now().getTime() - 7 * 24 * 60 * 60 * 1000),
+            },
+          },
+          {
+            consumedAt: {
+              lt: new Date(this.now().getTime() - 7 * 24 * 60 * 60 * 1000),
+            },
+          },
+        ],
+      },
+    });
+
+    return result.count;
   }
 }
 
@@ -144,7 +278,11 @@ export class PrismaIdempotencyStore {
       });
       return { kind: 'PROCEED', recordId: created.id };
     } catch (e) {
-      if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== 'P2002') throw e;
+      if (
+        !(e instanceof Prisma.PrismaClientKnownRequestError) ||
+        e.code !== 'P2002'
+      )
+        throw e;
     }
 
     const existing = await this.prisma.idempotencyRecord.findUnique({
@@ -161,13 +299,20 @@ export class PrismaIdempotencyStore {
     if (existing.status === 'COMPLETED' && existing.responseStatus !== null) {
       return {
         kind: 'REPLAY',
-        result: { status: existing.responseStatus, body: existing.responseBody },
+        result: {
+          status: existing.responseStatus,
+          body: existing.responseBody,
+        },
       };
     }
     return { kind: 'IN_PROGRESS' };
   }
 
-  async complete(recordId: string, status: number, body: unknown): Promise<void> {
+  async complete(
+    recordId: string,
+    status: number,
+    body: unknown,
+  ): Promise<void> {
     await this.prisma.idempotencyRecord.update({
       where: { id: recordId },
       data: {

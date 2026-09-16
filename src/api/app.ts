@@ -1,15 +1,22 @@
-import express, { type Request, type Response, type NextFunction } from 'express';
+import express, {
+  type Request,
+  type Response,
+  type NextFunction,
+} from 'express';
 import cookieParser from 'cookie-parser';
 import { randomUUID, createHash } from 'node:crypto';
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import { z } from 'zod';
-
 
 import { createQuote } from '../engine/quote.js';
 import { GUEST } from '../engine/discounts.js';
 import { SERVICES } from '../data/catalogue.js';
 import { CleaningFrequency, ProductSupplyType } from '../domain/types.js';
-import { findAvailableSlots, localToUtc, verifySlotStillOpen } from '../scheduling/availability.js';
+import {
+  findAvailableSlots,
+  localToUtc,
+  verifySlotStillOpen,
+} from '../scheduling/availability.js';
 import { BookingService, BookingError } from '../booking/booking.js';
 import {
   PrismaSchedulingRepo,
@@ -25,10 +32,15 @@ import {
 import { integrationStatus } from '../data/repositories.js';
 import {
   PrismaSessionStore,
+  PrismaRegistrationSessionStore,
   PrismaIdempotencyStore,
   IdempotencyConflict,
 } from '../db/durable-stores.js';
-import { PaymentService, PaymentError, amountDueNowCents } from '../payments/payment-service.js';
+import {
+  PaymentService,
+  PaymentError,
+  amountDueNowCents,
+} from '../payments/payment-service.js';
 import { QuoteRevalidator, REPRICE_COPY } from '../payments/reprice.js';
 import {
   securityHeaders,
@@ -42,7 +54,10 @@ import {
 } from './hardening.js';
 import { ReviewService } from '../reviews/review-service.js';
 import { RecurrenceService } from '../booking/recurrence-service.js';
-import { CallbackService, type VoiceProvider } from '../callbacks/callback-service.js';
+import {
+  CallbackService,
+  type VoiceProvider,
+} from '../callbacks/callback-service.js';
 import { createOpsApi } from './ops.js';
 import { AuthError } from '../auth/staff-auth.js';
 import { RosterError } from '../staff/roster-service.js';
@@ -52,7 +67,10 @@ import {
   PlacesError,
   type PlacesProvider,
 } from '../integrations/places.js';
-import { StripeError, type StripeProvider } from '../payments/stripe-provider.js';
+import {
+  StripeError,
+  type StripeProvider,
+} from '../payments/stripe-provider.js';
 
 /**
  * R2NETTE HTTP API (v1).
@@ -67,6 +85,9 @@ import { StripeError, type StripeProvider } from '../payments/stripe-provider.js
  */
 
 export const SESSION_COOKIE = 'r2n_session';
+export const REGISTRATION_COOKIE = 'r2n_registration';
+const TERMS_VERSION = '2026-09-16';
+const PRIVACY_VERSION = '2026-09-16';
 const SESSION_TTL_MS = 60 * 60 * 1000;
 
 export class ApiError extends Error {
@@ -127,7 +148,9 @@ export class SessionStore {
 /* ------------------------------------------------------------------ */
 
 function fingerprint(body: unknown): string {
-  return createHash('sha256').update(JSON.stringify(body ?? {})).digest('hex');
+  return createHash('sha256')
+    .update(JSON.stringify(body ?? {}))
+    .digest('hex');
 }
 
 /**
@@ -185,32 +208,78 @@ export class IdempotencyStore {
 /* validation                                                          */
 /* ------------------------------------------------------------------ */
 
-const phoneSchema = z.object({ phone: z.string().min(1) });
-const verifySchema = z.object({ phone: z.string().min(1), code: z.string().min(4).max(10) });
+const authIntentSchema = z.enum(['login', 'signup']);
 
-const quoteSchema = z.object({
-  serviceOptionId: z.string(),
-  frequency: z.string(),
-  productSupplyOption: z.string().optional(),
-  addOns: z.array(z.object({ id: z.string(), quantity: z.number().int().min(0) })).optional(),
-  /** Server resolves distance from this. A distanceKm in the body is ignored. */
-  addressId: z.string().optional(),
-  distanceKm: z.number().min(0).max(500).optional(),
-  // Deliberately permissive: clients may send these, and we ignore them.
-  // Rejecting outright would break naive clients for no security benefit,
-  // since the server never reads them.
-}).passthrough();
+const phoneSchema = z.object({
+  phone: z.string().min(1),
+  intent: authIntentSchema,
+});
 
-const holdSchema = z.object({
-  quoteId: z.string(),
-  startAt: z.string(),
-}).passthrough();
+const verifySchema = z.object({
+  phone: z.string().min(1),
+  code: z.string().min(4).max(10),
+  intent: authIntentSchema,
+});
 
-const bookingSchema = z.object({
-  holdId: z.string(),
-  quoteId: z.string(),
-  addressId: z.string(),
-}).passthrough();
+const completeRegistrationSchema = z.object({
+  firstName: z.string().trim().min(1).max(80),
+  lastName: z.string().trim().min(1).max(80),
+
+  email: z
+    .string()
+    .trim()
+    .email()
+    .max(254)
+    .transform((value) => value.toLowerCase()),
+
+  locale: z.enum(['en', 'fr']),
+
+  termsAccepted: z.literal(true),
+  privacyAccepted: z.literal(true),
+
+  marketingConsent: z.boolean().default(false),
+
+  address: z
+    .object({
+      placeId: z.string().min(1),
+      sessionId: z.string().optional(),
+      unit: z.string().trim().max(30).optional(),
+      label: z.string().trim().max(50).optional(),
+    })
+    .optional(),
+});
+
+const quoteSchema = z
+  .object({
+    serviceOptionId: z.string(),
+    frequency: z.string(),
+    productSupplyOption: z.string().optional(),
+    addOns: z
+      .array(z.object({ id: z.string(), quantity: z.number().int().min(0) }))
+      .optional(),
+    /** Server resolves distance from this. A distanceKm in the body is ignored. */
+    addressId: z.string().optional(),
+    distanceKm: z.number().min(0).max(500).optional(),
+    // Deliberately permissive: clients may send these, and we ignore them.
+    // Rejecting outright would break naive clients for no security benefit,
+    // since the server never reads them.
+  })
+  .passthrough();
+
+const holdSchema = z
+  .object({
+    quoteId: z.string(),
+    startAt: z.string(),
+  })
+  .passthrough();
+
+const bookingSchema = z
+  .object({
+    holdId: z.string(),
+    quoteId: z.string(),
+    addressId: z.string(),
+  })
+  .passthrough();
 
 /* ------------------------------------------------------------------ */
 /* app                                                                 */
@@ -255,18 +324,27 @@ export function createApi(deps: ApiDeps) {
   // Both stores are Postgres-backed: sessions and payment idempotency must
   // survive a restart and be shared across instances.
   const sessions = new PrismaSessionStore(prisma, now);
+  const registrationSessions = new PrismaRegistrationSessionStore(prisma, now);
   const idempotency = new PrismaIdempotencyStore(prisma, now);
 
   const customers = new PrismaCustomerRepo(prisma);
-  const identity = new IdentityService(verification, customers, new RateLimiter(), now);
+  const identity = new IdentityService(
+    verification,
+    customers,
+    new RateLimiter(),
+    now,
+  );
   const scheduling = new PrismaSchedulingRepo(prisma);
   const quotes = new PrismaQuoteRepo(prisma);
-  const bookings = new BookingService(scheduling, quotes, now, () => randomUUID());
+  const bookings = new BookingService(scheduling, quotes, now, () =>
+    randomUUID(),
+  );
 
   const paymentService = deps.stripe
     ? new PaymentService(prisma, deps.stripe, now)
     : null;
-  const webhookSecret = deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET;
+  const webhookSecret =
+    deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET;
 
   const app = express();
   const hard = deps.hardening ?? {};
@@ -317,7 +395,11 @@ export function createApi(deps: ApiDeps) {
   /** Identity is server-derived. Any customerId in the body is ignored. */
   function requireCustomer(req: Request): string {
     if (!req.customerId) {
-      throw new ApiError(401, 'UNAUTHORIZED', 'Verify your phone number to continue.');
+      throw new ApiError(
+        401,
+        'UNAUTHORIZED',
+        'Verify your phone number to continue.',
+      );
     }
     return req.customerId;
   }
@@ -333,37 +415,370 @@ export function createApi(deps: ApiDeps) {
   app.post(
     '/api/v1/auth/phone/send',
     wrap(async (req, res) => {
-      const { phone } = phoneSchema.parse(req.body);
+      const { phone, intent } = phoneSchema.parse(req.body);
+      const phoneE164 = normalizePhone(phone);
+
+      const existingPhone = await prisma.customerPhone.findUnique({
+        where: {
+          phoneE164,
+        },
+        include: {
+          customer: true,
+        },
+      });
+
+      const hasCompleteAccount = Boolean(
+        existingPhone?.verifiedAt &&
+        existingPhone.customer.firstName?.trim() &&
+        existingPhone.customer.lastName?.trim(),
+      );
+
+      if (intent === 'login' && !hasCompleteAccount) {
+        throw new ApiError(
+          404,
+          'ACCOUNT_NOT_FOUND',
+          'No completed R2NETTE account was found for this number. Please sign up first.',
+        );
+      }
+
+      if (intent === 'signup' && hasCompleteAccount) {
+        throw new ApiError(
+          409,
+          'ACCOUNT_ALREADY_EXISTS',
+          'An R2NETTE account already exists for this number. Please log in instead.',
+        );
+      }
+
       const ip = req.ip ?? 'unknown';
-      const out = await identity.startVerification(phone, ip);
-      // Identical shape whether or not this number is known to us.
-      res.json({ sent: true, message: out.message, maskedPhone: out.masked });
+
+      const out = await identity.startVerification(phoneE164, ip);
+
+      res.json({
+        sent: true,
+        message: out.message,
+        maskedPhone: out.masked,
+        intent,
+      });
     }),
   );
 
   app.post(
     '/api/v1/auth/phone/verify',
     wrap(async (req, res) => {
-      const { phone, code } = verifySchema.parse(req.body);
-      const session = await identity.completeVerification(phone, code);
-      const created = await sessions.create(session.customerId, {
-        userAgent: req.header('user-agent') ?? undefined,
-        ip: req.ip ?? undefined,
+      const { phone, code, intent } = verifySchema.parse(req.body);
+
+      const verified = await identity.verifyPhone(phone, code);
+
+      const existingPhone = await prisma.customerPhone.findUnique({
+        where: {
+          phoneE164: verified.phoneE164,
+        },
+        include: {
+          customer: true,
+        },
       });
-      res.cookie(SESSION_COOKIE, created.token, {
+
+      const hasCompleteAccount = Boolean(
+        existingPhone?.verifiedAt &&
+        existingPhone.customer.firstName?.trim() &&
+        existingPhone.customer.lastName?.trim(),
+      );
+
+      if (intent === 'login') {
+        if (!existingPhone || !hasCompleteAccount) {
+          throw new ApiError(
+            404,
+            'ACCOUNT_NOT_FOUND',
+            'No completed R2NETTE account was found for this number. Please sign up first.',
+          );
+        }
+
+        const created = await sessions.create(existingPhone.customerId, {
+          userAgent: req.header('user-agent') ?? undefined,
+          ip: req.ip ?? undefined,
+        });
+
+        res.cookie(SESSION_COOKIE, created.token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          expires: created.expiresAt,
+        });
+
+        res.clearCookie(REGISTRATION_COOKIE, {
+          path: '/',
+        });
+
+        res.json({
+          outcome: 'AUTHENTICATED',
+          intent,
+          customer: {
+            id: existingPhone.customer.id,
+            firstName: existingPhone.customer.firstName,
+            lastName: existingPhone.customer.lastName,
+            email: existingPhone.customer.email,
+            verifiedPhone: verified.phoneE164,
+          },
+        });
+
+        return;
+      }
+
+      if (hasCompleteAccount) {
+        throw new ApiError(
+          409,
+          'ACCOUNT_ALREADY_EXISTS',
+          'An R2NETTE account already exists for this number. Please log in instead.',
+        );
+      }
+
+      const registration = await registrationSessions.create(
+        verified.phoneE164,
+        {
+          userAgent: req.header('user-agent') ?? undefined,
+          ip: req.ip ?? undefined,
+        },
+      );
+
+      res.cookie(REGISTRATION_COOKIE, registration.token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
-        expires: created.expiresAt,
+        expires: registration.expiresAt,
       });
-      const profile = await customers.findByPhone(session.phoneE164);
+
       res.json({
+        outcome: 'PROFILE_REQUIRED',
+        intent,
+        registration: {
+          verifiedPhone: verified.phoneE164,
+          expiresAt: registration.expiresAt.toISOString(),
+        },
+      });
+    }),
+  );
+
+  app.post(
+    '/api/v1/auth/registration/complete',
+    wrap(async (req, res) => {
+      const input = completeRegistrationSchema.parse(req.body);
+
+      const registrationToken = req.cookies?.[REGISTRATION_COOKIE] as
+        string | undefined;
+
+      const registration = await registrationSessions.get(registrationToken);
+
+      if (!registration) {
+        throw new ApiError(
+          401,
+          'REGISTRATION_SESSION_EXPIRED',
+          'Your verified registration session expired. Please verify your number again.',
+        );
+      }
+
+      let resolvedAddress: Awaited<
+        ReturnType<PlacesProvider['details']>
+      > | null = null;
+
+      if (input.address) {
+        const provider = requirePlaces();
+
+        const addressSessionId = input.address.sessionId ?? req.requestId;
+
+        const addressToken = tokens.acquire(addressSessionId);
+
+        try {
+          resolvedAddress = await provider.details(
+            input.address.placeId,
+            addressToken,
+          );
+        } finally {
+          tokens.retire(addressSessionId);
+        }
+      }
+
+      const completedAt = now();
+
+      let customer: {
+        id: string;
+        firstName: string | null;
+        lastName: string | null;
+        email: string | null;
+        preferredLocale: string;
+      };
+
+      try {
+        customer = await prisma.$transaction(async (transaction) => {
+          // Claim the temporary proof inside the same transaction as
+          // customer creation. Only one concurrent submission can win.
+          const claimed = await transaction.registrationSession.updateMany({
+            where: {
+              id: registration.id,
+              consumedAt: null,
+              expiresAt: {
+                gt: completedAt,
+              },
+            },
+            data: {
+              consumedAt: completedAt,
+            },
+          });
+
+          if (claimed.count !== 1) {
+            throw new ApiError(
+              409,
+              'REGISTRATION_ALREADY_COMPLETED',
+              'This registration has already been completed.',
+            );
+          }
+
+          const existingPhone = await transaction.customerPhone.findUnique({
+            where: {
+              phoneE164: registration.phoneE164,
+            },
+            include: {
+              customer: true,
+            },
+          });
+
+          const existingIsComplete = Boolean(
+            existingPhone?.customer.registrationCompletedAt ||
+            (existingPhone?.verifiedAt &&
+              existingPhone.customer.firstName?.trim() &&
+              existingPhone.customer.lastName?.trim()),
+          );
+
+          if (existingPhone && existingIsComplete) {
+            throw new ApiError(
+              409,
+              'ACCOUNT_ALREADY_EXISTS',
+              'An R2NETTE account already exists for this number. Please log in instead.',
+            );
+          }
+
+          const customerData = {
+            firstName: input.firstName,
+            lastName: input.lastName,
+            email: input.email,
+            preferredLocale: input.locale,
+            registrationCompletedAt: completedAt,
+            termsAcceptedAt: completedAt,
+            termsVersion: TERMS_VERSION,
+            privacyAcceptedAt: completedAt,
+            privacyVersion: PRIVACY_VERSION,
+            marketingConsent: input.marketingConsent,
+            marketingConsentUpdatedAt: completedAt,
+          };
+
+          const savedCustomer = existingPhone
+            ? await transaction.customer.update({
+                where: {
+                  id: existingPhone.customerId,
+                },
+                data: customerData,
+              })
+            : await transaction.customer.create({
+                data: {
+                  ...customerData,
+                  phones: {
+                    create: {
+                      phoneE164: registration.phoneE164,
+                      verifiedAt: registration.phoneVerifiedAt,
+                      isPrimary: true,
+                    },
+                  },
+                },
+              });
+
+          if (existingPhone) {
+            await transaction.customerPhone.update({
+              where: {
+                id: existingPhone.id,
+              },
+              data: {
+                verifiedAt: registration.phoneVerifiedAt,
+                isPrimary: true,
+              },
+            });
+          }
+
+          if (resolvedAddress && input.address) {
+            await transaction.customerAddress.updateMany({
+              where: {
+                customerId: savedCustomer.id,
+                isDefault: true,
+              },
+              data: {
+                isDefault: false,
+              },
+            });
+
+            await transaction.customerAddress.create({
+              data: {
+                customerId: savedCustomer.id,
+                label: input.address.label?.trim() || 'Home',
+                formattedAddress: resolvedAddress.formattedAddress,
+                streetNumber: resolvedAddress.streetNumber,
+                route: resolvedAddress.route,
+                unit: input.address.unit?.trim() || null,
+                city: resolvedAddress.city,
+                province: resolvedAddress.province,
+                postalCode: resolvedAddress.postalCode,
+                country: resolvedAddress.country,
+                placeId: resolvedAddress.placeId,
+                latitude: resolvedAddress.latitude,
+                longitude: resolvedAddress.longitude,
+                isDefault: true,
+              },
+            });
+          }
+
+          return {
+            id: savedCustomer.id,
+            firstName: savedCustomer.firstName,
+            lastName: savedCustomer.lastName,
+            email: savedCustomer.email,
+            preferredLocale: savedCustomer.preferredLocale,
+          };
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        ) {
+          throw new ApiError(
+            409,
+            'EMAIL_ALREADY_IN_USE',
+            'This email address is already connected to another account.',
+          );
+        }
+
+        throw error;
+      }
+
+      const session = await sessions.create(customer.id, {
+        userAgent: req.header('user-agent') ?? undefined,
+        ip: req.ip ?? undefined,
+      });
+
+      res.cookie(SESSION_COOKIE, session.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        expires: session.expiresAt,
+      });
+
+      res.clearCookie(REGISTRATION_COOKIE, {
+        path: '/',
+      });
+
+      res.status(201).json({
         customer: {
-          id: session.customerId,
-          firstName: profile?.firstName ?? null,
-          email: profile?.email ?? null,
-          isReturningCustomer: !session.isNewCustomer,
+          ...customer,
+          verifiedPhone: registration.phoneE164,
         },
       });
     }),
@@ -406,7 +821,9 @@ export function createApi(deps: ApiDeps) {
     wrap(async (req, res) => {
       const customerId = requireCustomer(req);
       // Scoped by session customer — there is no path to another customer's rows.
-      const rows = await prisma.customerAddress.findMany({ where: { customerId } });
+      const rows = await prisma.customerAddress.findMany({
+        where: { customerId },
+      });
       res.json({ addresses: rows });
     }),
   );
@@ -432,7 +849,10 @@ export function createApi(deps: ApiDeps) {
 
       const c = await prisma.customer.findUniqueOrThrow({
         where: { id: customerId },
-        include: { phones: true, addresses: { orderBy: { isDefault: 'desc' } } },
+        include: {
+          phones: true,
+          addresses: { orderBy: { isDefault: 'desc' } },
+        },
       });
 
       const lastBooking = await prisma.booking.findFirst({
@@ -446,18 +866,23 @@ export function createApi(deps: ApiDeps) {
         lastBooking && c.addresses.some((a) => a.id === lastBooking.addressId);
 
       const bookingTemplate =
-        lastBooking && lastBooking.service.active && lastBooking.service.publiclyBookable
+        lastBooking &&
+        lastBooking.service.active &&
+        lastBooking.service.publiclyBookable
           ? {
               serviceOptionId: lastBooking.serviceOptionId,
               serviceName: lastBooking.service.nameEn,
               serviceNameFr: lastBooking.service.nameFr,
               requiredStaffCount: lastBooking.service.requiredStaffCount,
-              appointmentDurationMinutes: lastBooking.service.appointmentDurationMinutes,
+              appointmentDurationMinutes:
+                lastBooking.service.appointmentDurationMinutes,
               productSupplyMode: lastBooking.service.productSupplyMode,
               allowedFrequencies: lastBooking.service.allowedFrequencies,
               frequency: lastBooking.quote.frequency,
               addressId: addressStillSaved ? lastBooking.addressId : null,
-              addressSummary: addressStillSaved ? lastBooking.address.formattedAddress : null,
+              addressSummary: addressStillSaved
+                ? lastBooking.address.formattedAddress
+                : null,
               lastBookedAt: lastBooking.createdAt,
             }
           : null;
@@ -511,27 +936,33 @@ export function createApi(deps: ApiDeps) {
       const customerId = requireCustomer(req);
       const at = now();
 
-      const [customer, bookings, addresses, series, methods] = await Promise.all([
-        prisma.customer.findUniqueOrThrow({
-          where: { id: customerId },
-          include: { phones: true },
-        }),
-        prisma.booking.findMany({
-          where: { customerId },
-          orderBy: { startAt: 'desc' },
-          take: 40,
-          include: { service: true, address: true, payments: true, staff: true },
-        }),
-        prisma.customerAddress.findMany({
-          where: { customerId },
-          orderBy: { isDefault: 'desc' },
-        }),
-        prisma.recurrenceSeries.findMany({
-          where: { customerId, status: { in: ['ACTIVE', 'PAUSED'] } },
-          include: { service: true, address: true },
-        }),
-        prisma.paymentMethodReference.findMany({ where: { customerId } }),
-      ]);
+      const [customer, bookings, addresses, series, methods] =
+        await Promise.all([
+          prisma.customer.findUniqueOrThrow({
+            where: { id: customerId },
+            include: { phones: true },
+          }),
+          prisma.booking.findMany({
+            where: { customerId },
+            orderBy: { startAt: 'desc' },
+            take: 40,
+            include: {
+              service: true,
+              address: true,
+              payments: true,
+              staff: true,
+            },
+          }),
+          prisma.customerAddress.findMany({
+            where: { customerId },
+            orderBy: { isDefault: 'desc' },
+          }),
+          prisma.recurrenceSeries.findMany({
+            where: { customerId, status: { in: ['ACTIVE', 'PAUSED'] } },
+            include: { service: true, address: true },
+          }),
+          prisma.paymentMethodReference.findMany({ where: { customerId } }),
+        ]);
 
       const CANCELLABLE = ['CONFIRMED', 'ASSIGNED', 'PENDING_PAYMENT'];
       const shape = (b: (typeof bookings)[number]) => {
@@ -567,8 +998,13 @@ export function createApi(deps: ApiDeps) {
           email: customer.email,
           verifiedPhone: customer.phones[0]?.phoneE164 ?? null,
         },
-        upcoming: bookings.filter((b) => b.startAt >= at && b.status !== 'CANCELLED').reverse().map(shape),
-        past: bookings.filter((b) => b.startAt < at || b.status === 'CANCELLED').map(shape),
+        upcoming: bookings
+          .filter((b) => b.startAt >= at && b.status !== 'CANCELLED')
+          .reverse()
+          .map(shape),
+        past: bookings
+          .filter((b) => b.startAt < at || b.status === 'CANCELLED')
+          .map(shape),
         addresses: addresses.map((a) => ({
           id: a.id,
           label: a.label,
@@ -604,9 +1040,15 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/account/bookings/:id/cancel',
     wrap(async (req, res) => {
       const customerId = requireCustomer(req);
-      const booking = await prisma.booking.findUnique({ where: { id: String(req.params.id) } });
+      const booking = await prisma.booking.findUnique({
+        where: { id: String(req.params.id) },
+      });
       if (!booking || booking.customerId !== customerId) {
-        throw new ApiError(404, 'BOOKING_NOT_FOUND', 'We could not find that booking.');
+        throw new ApiError(
+          404,
+          'BOOKING_NOT_FOUND',
+          'We could not find that booking.',
+        );
       }
       if (booking.status === 'CANCELLED') {
         res.json({ status: 'CANCELLED', alreadyCancelled: true });
@@ -635,12 +1077,19 @@ export function createApi(deps: ApiDeps) {
         });
         // A cancelled booking must give the welcome offer back.
         const claim = await tx.promotionClaim.findFirst({
-          where: { bookingId: booking.id, status: { in: ['RESERVED', 'REDEEMED'] } },
+          where: {
+            bookingId: booking.id,
+            status: { in: ['RESERVED', 'REDEEMED'] },
+          },
         });
         if (claim) {
           await tx.promotionClaim.update({
             where: { id: claim.id },
-            data: { status: 'RELEASED', releasedAt: now(), releaseReason: 'BOOKING_CANCELLED' },
+            data: {
+              status: 'RELEASED',
+              releasedAt: now(),
+              releaseReason: 'BOOKING_CANCELLED',
+            },
           });
         }
       });
@@ -657,14 +1106,19 @@ export function createApi(deps: ApiDeps) {
     wrap(async (req, res) => {
       const customerId = requireCustomer(req);
       const { startAt } = req.body as { startAt?: string };
-      if (!startAt) throw new ApiError(400, 'VALIDATION_ERROR', 'A new time is required.');
+      if (!startAt)
+        throw new ApiError(400, 'VALIDATION_ERROR', 'A new time is required.');
 
       const booking = await prisma.booking.findUnique({
         where: { id: String(req.params.id) },
         include: { staff: true },
       });
       if (!booking || booking.customerId !== customerId) {
-        throw new ApiError(404, 'BOOKING_NOT_FOUND', 'We could not find that booking.');
+        throw new ApiError(
+          404,
+          'BOOKING_NOT_FOUND',
+          'We could not find that booking.',
+        );
       }
       const hoursAway = (booking.startAt.getTime() - now().getTime()) / 3600000;
       if (hoursAway < 24) {
@@ -676,45 +1130,81 @@ export function createApi(deps: ApiDeps) {
       }
       const service = SERVICES.find((s) => s.id === booking.serviceOptionId);
       if (!service || service.appointmentDurationMinutes === null) {
-        throw new ApiError(400, 'VALIDATION_ERROR', 'That service cannot be rescheduled online.');
+        throw new ApiError(
+          400,
+          'VALIDATION_ERROR',
+          'That service cannot be rescheduled online.',
+        );
       }
 
       const newStart = new Date(startAt);
-      const newEnd = new Date(newStart.getTime() + service.appointmentDurationMinutes * 60000);
+      const newEnd = new Date(
+        newStart.getTime() + service.appointmentDurationMinutes * 60000,
+      );
 
-      await scheduling.withCapacityLock({ startUtc: newStart, endUtc: newEnd }, async () => {
-        const staff = await scheduling.listStaff();
-        const busy = (await scheduling.listBusy({ startUtc: newStart, endUtc: newEnd }))
-          // The booking's own current assignment must not block its move.
-          .filter((b) => !(b.kind === 'BOOKING' && booking.staff.some((a) => a.staffId === b.staffId)
-            && b.startUtc.getTime() === booking.startAt.getTime()));
+      await scheduling.withCapacityLock(
+        { startUtc: newStart, endUtc: newEnd },
+        async () => {
+          const staff = await scheduling.listStaff();
+          const busy = (
+            await scheduling.listBusy({ startUtc: newStart, endUtc: newEnd })
+          )
+            // The booking's own current assignment must not block its move.
+            .filter(
+              (b) =>
+                !(
+                  b.kind === 'BOOKING' &&
+                  booking.staff.some((a) => a.staffId === b.staffId) &&
+                  b.startUtc.getTime() === booking.startAt.getTime()
+                ),
+            );
 
-        const check = verifySlotStillOpen(service, newStart, staff, busy, now());
-        if (!check.ok) {
-          throw new ApiError(409, 'SLOT_UNAVAILABLE', 'That time is no longer free.');
-        }
+          const check = verifySlotStillOpen(
+            service,
+            newStart,
+            staff,
+            busy,
+            now(),
+          );
+          if (!check.ok) {
+            throw new ApiError(
+              409,
+              'SLOT_UNAVAILABLE',
+              'That time is no longer free.',
+            );
+          }
 
-        await prisma.$transaction(async (tx) => {
-          await tx.booking.update({
-            where: { id: booking.id },
-            data: { startAt: newStart, endAt: newEnd, status: 'CONFIRMED' },
+          await prisma.$transaction(async (tx) => {
+            await tx.booking.update({
+              where: { id: booking.id },
+              data: { startAt: newStart, endAt: newEnd, status: 'CONFIRMED' },
+            });
+            await tx.bookingStaff.deleteMany({
+              where: { bookingId: booking.id },
+            });
+            await tx.bookingStaff.createMany({
+              data: check.staffIds.map((staffId) => ({
+                bookingId: booking.id,
+                staffId,
+              })),
+            });
+            await tx.bookingStatusHistory.create({
+              data: {
+                bookingId: booking.id,
+                status: 'RESCHEDULED',
+                actor: `CUSTOMER:${customerId}`,
+                reason: `Moved to ${newStart.toISOString()}`,
+              },
+            });
           });
-          await tx.bookingStaff.deleteMany({ where: { bookingId: booking.id } });
-          await tx.bookingStaff.createMany({
-            data: check.staffIds.map((staffId) => ({ bookingId: booking.id, staffId })),
-          });
-          await tx.bookingStatusHistory.create({
-            data: {
-              bookingId: booking.id,
-              status: 'RESCHEDULED',
-              actor: `CUSTOMER:${customerId}`,
-              reason: `Moved to ${newStart.toISOString()}`,
-            },
-          });
-        });
+        },
+      );
+
+      res.json({
+        rescheduled: true,
+        startAt: newStart.toISOString(),
+        endAt: newEnd.toISOString(),
       });
-
-      res.json({ rescheduled: true, startAt: newStart.toISOString(), endAt: newEnd.toISOString() });
     }),
   );
 
@@ -723,11 +1213,16 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/account/plans/:id/upcoming',
     wrap(async (req, res) => {
       const customerId = requireCustomer(req);
-      const series = await prisma.recurrenceSeries.findUnique({ where: { id: String(req.params.id) } });
+      const series = await prisma.recurrenceSeries.findUnique({
+        where: { id: String(req.params.id) },
+      });
       if (!series || series.customerId !== customerId) {
         throw new ApiError(404, 'NOT_FOUND', 'We could not find that plan.');
       }
-      const dates = await new RecurrenceService(prisma, now).upcomingDates(String(req.params.id), 6);
+      const dates = await new RecurrenceService(prisma, now).upcomingDates(
+        String(req.params.id),
+        6,
+      );
       res.json({ upcoming: dates.map((x) => x.toISOString()) });
     }),
   );
@@ -781,13 +1276,21 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/account/addresses/:id/default',
     wrap(async (req, res) => {
       const customerId = requireCustomer(req);
-      const addr = await prisma.customerAddress.findUnique({ where: { id: String(req.params.id) } });
+      const addr = await prisma.customerAddress.findUnique({
+        where: { id: String(req.params.id) },
+      });
       if (!addr || addr.customerId !== customerId) {
         throw new ApiError(404, 'NOT_FOUND', 'We could not find that address.');
       }
       await prisma.$transaction([
-        prisma.customerAddress.updateMany({ where: { customerId }, data: { isDefault: false } }),
-        prisma.customerAddress.update({ where: { id: addr.id }, data: { isDefault: true } }),
+        prisma.customerAddress.updateMany({
+          where: { customerId },
+          data: { isDefault: false },
+        }),
+        prisma.customerAddress.update({
+          where: { id: addr.id },
+          data: { isDefault: true },
+        }),
       ]);
       res.json({ ok: true });
     }),
@@ -797,13 +1300,19 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/account/addresses/:id',
     wrap(async (req, res) => {
       const customerId = requireCustomer(req);
-      const addr = await prisma.customerAddress.findUnique({ where: { id: String(req.params.id) } });
+      const addr = await prisma.customerAddress.findUnique({
+        where: { id: String(req.params.id) },
+      });
       if (!addr || addr.customerId !== customerId) {
         res.json({ ok: true }); // idempotent
         return;
       }
       const inUse = await prisma.booking.count({
-        where: { addressId: addr.id, startAt: { gte: now() }, status: { notIn: ['CANCELLED'] } },
+        where: {
+          addressId: addr.id,
+          startAt: { gte: now() },
+          status: { notIn: ['CANCELLED'] },
+        },
       });
       if (inUse > 0) {
         throw new ApiError(
@@ -821,9 +1330,17 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/account/profile',
     wrap(async (req, res) => {
       const customerId = requireCustomer(req);
-      const body = req.body as { firstName?: string; lastName?: string; email?: string };
+      const body = req.body as {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+      };
       if (body.email !== undefined && !/^\S+@\S+\.\S{2,}$/.test(body.email)) {
-        throw new ApiError(400, 'VALIDATION_ERROR', 'Enter a valid email address.');
+        throw new ApiError(
+          400,
+          'VALIDATION_ERROR',
+          'Enter a valid email address.',
+        );
       }
       const updated = await prisma.customer.update({
         where: { id: customerId },
@@ -833,7 +1350,11 @@ export function createApi(deps: ApiDeps) {
           email: body.email?.trim() || undefined,
         },
       });
-      res.json({ firstName: updated.firstName, lastName: updated.lastName, email: updated.email });
+      res.json({
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        email: updated.email,
+      });
     }),
   );
 
@@ -844,20 +1365,22 @@ export function createApi(deps: ApiDeps) {
     wrap(async (_req, res) => {
       // Internal migration-review notes are never exposed publicly.
       res.json({
-        services: SERVICES.filter((s) => s.active && s.publiclyBookable).map((s) => ({
-          id: s.id,
-          slug: s.slug,
-          categoryId: s.categoryId,
-          name: s.name,
-          pricingMode: s.pricingMode,
-          durationMode: s.durationMode,
-          basePriceCents: s.basePriceCents,
-          appointmentDurationMinutes: s.appointmentDurationMinutes,
-          requiredStaffCount: s.requiredStaffCount,
-          labourMinutes: s.labourMinutes,
-          allowedFrequencies: s.allowedFrequencies,
-          productSupplyMode: s.productSupplyMode,
-        })),
+        services: SERVICES.filter((s) => s.active && s.publiclyBookable).map(
+          (s) => ({
+            id: s.id,
+            slug: s.slug,
+            categoryId: s.categoryId,
+            name: s.name,
+            pricingMode: s.pricingMode,
+            durationMode: s.durationMode,
+            basePriceCents: s.basePriceCents,
+            appointmentDurationMinutes: s.appointmentDurationMinutes,
+            requiredStaffCount: s.requiredStaffCount,
+            labourMinutes: s.labourMinutes,
+            allowedFrequencies: s.allowedFrequencies,
+            productSupplyMode: s.productSupplyMode,
+          }),
+        ),
       });
     }),
   );
@@ -869,7 +1392,8 @@ export function createApi(deps: ApiDeps) {
     wrap(async (req, res) => {
       const input = quoteSchema.parse(req.body);
       const service = SERVICES.find((s) => s.id === input.serviceOptionId);
-      if (!service) throw new ApiError(404, 'VALIDATION_ERROR', 'Unknown service.');
+      if (!service)
+        throw new ApiError(404, 'VALIDATION_ERROR', 'Unknown service.');
 
       // Authoritative distance: derived server-side from the saved address,
       // never from anything the browser sends. distanceKm in the payload is
@@ -883,7 +1407,9 @@ export function createApi(deps: ApiDeps) {
           throw new ApiError(404, 'VALIDATION_ERROR', 'Unknown address.');
         }
         if (deps.places && addr.placeId) {
-          const route = await deps.places.computeRoute(origin, { placeId: addr.placeId });
+          const route = await deps.places.computeRoute(origin, {
+            placeId: addr.placeId,
+          });
           distanceKm = route.distanceKm;
         }
       }
@@ -893,7 +1419,8 @@ export function createApi(deps: ApiDeps) {
         quote = createQuote({
           serviceOptionId: input.serviceOptionId,
           frequency: input.frequency as CleaningFrequency,
-          productSupplyOption: input.productSupplyOption as ProductSupplyType | undefined,
+          productSupplyOption: input.productSupplyOption as
+            ProductSupplyType | undefined,
           transport: { distanceKm },
           addOns: input.addOns,
           eligibility: GUEST,
@@ -919,7 +1446,8 @@ export function createApi(deps: ApiDeps) {
           qstRateMicroPercent: 9_975_000,
           pricingVersion: quote.pricingVersion ?? '1',
           warningCodes: quote.warningCodes ?? [],
-          winningDiscountSource: quote.firstVisit?.appliedDiscount?.source ?? null,
+          winningDiscountSource:
+            quote.firstVisit?.appliedDiscount?.source ?? null,
           // Everything needed to rebuild this quote faithfully at
           // revalidation time — selections only, never money.
           requestSnapshot: {
@@ -929,7 +1457,8 @@ export function createApi(deps: ApiDeps) {
             addOns: input.addOns ?? [],
           } as never,
           firstVisit: (quote.firstVisit ?? null) as never,
-          subsequentVisitPreview: (quote.subsequentVisitPricingPreview ?? null) as never,
+          subsequentVisitPreview: (quote.subsequentVisitPricingPreview ??
+            null) as never,
           priceSnapshot: JSON.parse(JSON.stringify(quote)),
           expiresAt: quote.expiresAt,
           lines: {
@@ -957,9 +1486,18 @@ export function createApi(deps: ApiDeps) {
         where: { id: String(req.params.id) },
         include: { lines: true },
       });
-      if (!q) throw new ApiError(404, 'QUOTE_NOT_FOUND', 'We could not find that price.');
+      if (!q)
+        throw new ApiError(
+          404,
+          'QUOTE_NOT_FOUND',
+          'We could not find that price.',
+        );
       if (q.customerId && q.customerId !== req.customerId) {
-        throw new ApiError(404, 'QUOTE_NOT_FOUND', 'We could not find that price.');
+        throw new ApiError(
+          404,
+          'QUOTE_NOT_FOUND',
+          'We could not find that price.',
+        );
       }
       res.json({ quote: q });
     }),
@@ -973,7 +1511,8 @@ export function createApi(deps: ApiDeps) {
       const serviceOptionId = String(req.query.serviceOptionId ?? '');
       const date = String(req.query.date ?? '');
       const service = SERVICES.find((s) => s.id === serviceOptionId);
-      if (!service) throw new ApiError(404, 'VALIDATION_ERROR', 'Unknown service.');
+      if (!service)
+        throw new ApiError(404, 'VALIDATION_ERROR', 'Unknown service.');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         throw new ApiError(400, 'VALIDATION_ERROR', 'Use date=YYYY-MM-DD.');
       }
@@ -982,7 +1521,10 @@ export function createApi(deps: ApiDeps) {
       const dayStart = localToUtc(y!, m!, d!, 0);
       const dayEnd = localToUtc(y!, m!, d!, 24 * 60);
       const staff = await scheduling.listStaff();
-      const busy = await scheduling.listBusy({ startUtc: dayStart, endUtc: dayEnd });
+      const busy = await scheduling.listBusy({
+        startUtc: dayStart,
+        endUtc: dayEnd,
+      });
 
       let slots;
       try {
@@ -1021,24 +1563,45 @@ export function createApi(deps: ApiDeps) {
 
       let recordId: string | null = null;
       if (key) {
-        const begun = await idempotency.begin('booking-holds', customerId, key, req.body);
+        const begun = await idempotency.begin(
+          'booking-holds',
+          customerId,
+          key,
+          req.body,
+        );
         if (begun.kind === 'REPLAY') {
           res.status(begun.result.status).json(begun.result.body);
           return;
         }
         if (begun.kind === 'IN_PROGRESS') {
-          throw new ApiError(409, 'IDEMPOTENCY_IN_PROGRESS', 'That request is still running.');
+          throw new ApiError(
+            409,
+            'IDEMPOTENCY_IN_PROGRESS',
+            'That request is still running.',
+          );
         }
         recordId = begun.recordId;
       }
 
-      const quote = await prisma.quote.findUnique({ where: { id: input.quoteId } });
-      if (!quote) throw new ApiError(404, 'QUOTE_NOT_FOUND', 'We could not find that price.');
+      const quote = await prisma.quote.findUnique({
+        where: { id: input.quoteId },
+      });
+      if (!quote)
+        throw new ApiError(
+          404,
+          'QUOTE_NOT_FOUND',
+          'We could not find that price.',
+        );
       if (quote.customerId && quote.customerId !== customerId) {
-        throw new ApiError(404, 'QUOTE_NOT_FOUND', 'We could not find that price.');
+        throw new ApiError(
+          404,
+          'QUOTE_NOT_FOUND',
+          'We could not find that price.',
+        );
       }
       const service = SERVICES.find((s) => s.id === quote.serviceOptionId);
-      if (!service) throw new ApiError(404, 'VALIDATION_ERROR', 'Unknown service.');
+      if (!service)
+        throw new ApiError(404, 'VALIDATION_ERROR', 'Unknown service.');
 
       const hold = await bookings.holdSlot({
         service,
@@ -1067,7 +1630,9 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/booking-holds/:id',
     wrap(async (req, res) => {
       const customerId = requireCustomer(req);
-      const h = await prisma.bookingHold.findUnique({ where: { id: String(req.params.id) } });
+      const h = await prisma.bookingHold.findUnique({
+        where: { id: String(req.params.id) },
+      });
       if (!h || h.customerId !== customerId) {
         throw new ApiError(404, 'HOLD_NOT_FOUND', 'That reservation has gone.');
       }
@@ -1079,7 +1644,9 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/booking-holds/:id',
     wrap(async (req, res) => {
       const customerId = requireCustomer(req);
-      const h = await prisma.bookingHold.findUnique({ where: { id: String(req.params.id) } });
+      const h = await prisma.bookingHold.findUnique({
+        where: { id: String(req.params.id) },
+      });
       if (!h || h.customerId !== customerId) {
         // Idempotent: releasing an already-released hold is a success.
         res.json({ ok: true });
@@ -1104,21 +1671,34 @@ export function createApi(deps: ApiDeps) {
 
       let recordId: string | null = null;
       if (key) {
-        const begun = await idempotency.begin('bookings', customerId, key, req.body);
+        const begun = await idempotency.begin(
+          'bookings',
+          customerId,
+          key,
+          req.body,
+        );
         if (begun.kind === 'REPLAY') {
           res.status(begun.result.status).json(begun.result.body);
           return;
         }
         if (begun.kind === 'IN_PROGRESS') {
-          throw new ApiError(409, 'IDEMPOTENCY_IN_PROGRESS', 'That request is still running.');
+          throw new ApiError(
+            409,
+            'IDEMPOTENCY_IN_PROGRESS',
+            'That request is still running.',
+          );
         }
         recordId = begun.recordId;
       }
 
-      const hold = await prisma.bookingHold.findUnique({ where: { id: input.holdId } });
-      if (!hold) throw new ApiError(404, 'HOLD_NOT_FOUND', 'That reservation has gone.');
+      const hold = await prisma.bookingHold.findUnique({
+        where: { id: input.holdId },
+      });
+      if (!hold)
+        throw new ApiError(404, 'HOLD_NOT_FOUND', 'That reservation has gone.');
       const service = SERVICES.find((s) => s.id === hold.serviceOptionId);
-      if (!service) throw new ApiError(404, 'VALIDATION_ERROR', 'Unknown service.');
+      if (!service)
+        throw new ApiError(404, 'VALIDATION_ERROR', 'Unknown service.');
 
       const address = await prisma.customerAddress.findUnique({
         where: { id: input.addressId },
@@ -1157,7 +1737,11 @@ export function createApi(deps: ApiDeps) {
         include: { staff: true },
       });
       if (!b || b.customerId !== customerId) {
-        throw new ApiError(404, 'BOOKING_NOT_FOUND', 'We could not find that booking.');
+        throw new ApiError(
+          404,
+          'BOOKING_NOT_FOUND',
+          'We could not find that booking.',
+        );
       }
       res.json({ booking: publicBooking(b) });
     }),
@@ -1208,7 +1792,8 @@ export function createApi(deps: ApiDeps) {
         unit?: string;
         label?: string;
       };
-      if (!placeId) throw new ApiError(400, 'VALIDATION_ERROR', 'placeId is required.');
+      if (!placeId)
+        throw new ApiError(400, 'VALIDATION_ERROR', 'placeId is required.');
 
       const sid = sessionId ?? req.requestId;
       const token = tokens.acquire(sid);
@@ -1279,17 +1864,22 @@ export function createApi(deps: ApiDeps) {
   app.get(
     '/api/v1/payment-config',
     wrap(async (req, res) => {
-      const cfg = await prisma.businessConfiguration.findUnique({ where: { id: 'default' } });
+      const cfg = await prisma.businessConfiguration.findUnique({
+        where: { id: 'default' },
+      });
       const body: Record<string, unknown> = {
         publishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? null,
         currency: 'CAD',
         country: 'CA',
         configured: Boolean(paymentService),
-        recurringPaymentTiming: cfg?.recurringPaymentTiming ?? '24_HOURS_BEFORE',
+        recurringPaymentTiming:
+          cfg?.recurringPaymentTiming ?? '24_HOURS_BEFORE',
         defaultPaymentPolicy: cfg?.defaultPaymentPolicy ?? 'PAY_LATER',
       };
 
-      const bookingId = req.query.bookingId ? String(req.query.bookingId) : null;
+      const bookingId = req.query.bookingId
+        ? String(req.query.bookingId)
+        : null;
       if (bookingId && req.customerId) {
         const b = await prisma.booking.findUnique({
           where: { id: bookingId },
@@ -1320,14 +1910,27 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/quotes/:id/revalidate',
     wrap(async (req, res) => {
       const customerId = requireCustomer(req);
-      const quote = await prisma.quote.findUnique({ where: { id: String(req.params.id) } });
+      const quote = await prisma.quote.findUnique({
+        where: { id: String(req.params.id) },
+      });
       if (!quote || (quote.customerId && quote.customerId !== customerId)) {
-        throw new ApiError(404, 'QUOTE_NOT_FOUND', 'We could not find that price.');
+        throw new ApiError(
+          404,
+          'QUOTE_NOT_FOUND',
+          'We could not find that price.',
+        );
       }
 
-      const result = await revalidator.revalidate(String(req.params.id), customerId);
+      const result = await revalidator.revalidate(
+        String(req.params.id),
+        customerId,
+      );
       if (result.status === 'VALID') {
-        res.json({ status: 'VALID', quoteId: result.quoteId, grandTotalCents: result.grandTotalCents });
+        res.json({
+          status: 'VALID',
+          quoteId: result.quoteId,
+          grandTotalCents: result.grandTotalCents,
+        });
         return;
       }
 
@@ -1364,13 +1967,18 @@ export function createApi(deps: ApiDeps) {
     wrap(async (req, res) => {
       const customerId = requireCustomer(req);
       const svc = requirePayments();
-      const bookingId = String((req.body as { bookingId?: string }).bookingId ?? '');
-      if (!bookingId) throw new ApiError(400, 'VALIDATION_ERROR', 'bookingId is required.');
+      const bookingId = String(
+        (req.body as { bookingId?: string }).bookingId ?? '',
+      );
+      if (!bookingId)
+        throw new ApiError(400, 'VALIDATION_ERROR', 'bookingId is required.');
 
       // Eligibility is settled BEFORE Stripe is touched. If the price moved,
       // no PaymentIntent is created and the customer must accept the new
       // total first.
-      const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+      });
       if (booking && booking.customerId === customerId) {
         const check = await revalidator.revalidate(booking.quoteId, customerId);
         if (check.status === 'REPRICE_REQUIRED') {
@@ -1419,9 +2027,15 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/payments/:id',
     wrap(async (req, res) => {
       const customerId = requireCustomer(req);
-      const p = await prisma.payment.findUnique({ where: { id: String(req.params.id) } });
+      const p = await prisma.payment.findUnique({
+        where: { id: String(req.params.id) },
+      });
       if (!p || p.customerId !== customerId) {
-        throw new ApiError(404, 'PAYMENT_NOT_FOUND', 'We could not find that payment.');
+        throw new ApiError(
+          404,
+          'PAYMENT_NOT_FOUND',
+          'We could not find that payment.',
+        );
       }
       res.json({
         payment: {
@@ -1443,18 +2057,29 @@ export function createApi(deps: ApiDeps) {
     wrap(async (req, res) => {
       const svc = requirePayments();
       if (!webhookSecret) {
-        throw new ApiError(503, 'INTEGRATION_NOT_CONFIGURED', 'Webhook secret is not set.');
+        throw new ApiError(
+          503,
+          'INTEGRATION_NOT_CONFIGURED',
+          'Webhook secret is not set.',
+        );
       }
       const signature = req.header('stripe-signature');
-      if (!signature) throw new ApiError(400, 'WEBHOOK_BAD_SIGNATURE', 'Missing signature.');
+      if (!signature)
+        throw new ApiError(400, 'WEBHOOK_BAD_SIGNATURE', 'Missing signature.');
 
-      const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body);
+      const raw = Buffer.isBuffer(req.body)
+        ? req.body.toString('utf8')
+        : String(req.body);
       let event;
       try {
         event = deps.stripe!.verifyWebhook(raw, signature, webhookSecret);
       } catch {
         // Never reveal why verification failed.
-        throw new ApiError(400, 'WEBHOOK_BAD_SIGNATURE', 'Signature verification failed.');
+        throw new ApiError(
+          400,
+          'WEBHOOK_BAD_SIGNATURE',
+          'Signature verification failed.',
+        );
       }
 
       const result = await svc.handleWebhookEvent(event);
@@ -1481,7 +2106,11 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/promotions/public',
     wrap(async (_req, res) => {
       const promos = await prisma.promotion.findMany({
-        where: { active: true, family: 'NEW_CUSTOMER', ownerReviewRequired: false },
+        where: {
+          active: true,
+          family: 'NEW_CUSTOMER',
+          ownerReviewRequired: false,
+        },
         orderBy: { amountCents: 'desc' },
       });
       res.json({
@@ -1507,7 +2136,9 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/reviews',
     wrap(async (req, res) => {
       const limit = Math.min(Number(req.query.limit ?? 10), 50);
-      res.json({ reviews: await new ReviewService(prisma, now).listPublished({ limit }) });
+      res.json({
+        reviews: await new ReviewService(prisma, now).listPublished({ limit }),
+      });
     }),
   );
 
@@ -1515,7 +2146,12 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/callbacks',
     wrap(async (req, res) => {
       const body = req.body as { phoneE164?: string; reason?: string };
-      if (!body.phoneE164) throw new ApiError(400, 'VALIDATION_ERROR', 'A phone number is required.');
+      if (!body.phoneE164)
+        throw new ApiError(
+          400,
+          'VALIDATION_ERROR',
+          'A phone number is required.',
+        );
       const svc = new CallbackService(prisma, null, now);
       const out = await svc.request({
         phoneE164: normalizePhone(body.phoneE164),
@@ -1523,7 +2159,9 @@ export function createApi(deps: ApiDeps) {
         reason: body.reason,
         source: 'BOOKING_FLOW',
       });
-      res.status(201).json({ callbackId: out.callback.id, status: out.callback.status });
+      res
+        .status(201)
+        .json({ callbackId: out.callback.id, status: out.callback.status });
     }),
   );
 
@@ -1542,70 +2180,108 @@ export function createApi(deps: ApiDeps) {
    */
   app.use(createOpsApi({ prisma, voice: deps.voice ?? null, now }));
 
-  
   /* ---------------- errors ---------------- */
 
   app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
     const requestId = req.requestId;
     if (err instanceof RosterError) {
-      res.status(err.status).json({ error: { code: err.code, message: err.message, requestId } });
+      res
+        .status(err.status)
+        .json({ error: { code: err.code, message: err.message, requestId } });
       return;
     }
     if (err instanceof AuthError) {
-      res.status(err.status).json({ error: { code: err.code, message: err.message, requestId } });
+      res
+        .status(err.status)
+        .json({ error: { code: err.code, message: err.message, requestId } });
       return;
     }
     if (err instanceof PlacesError) {
       const status = err.code === 'INTEGRATION_NOT_CONFIGURED' ? 503 : 502;
-      res.status(status).json({ error: { code: err.code, message: err.message, requestId } });
+      res
+        .status(status)
+        .json({ error: { code: err.code, message: err.message, requestId } });
       return;
     }
     if (err instanceof PaymentError) {
       const status =
-        err.code === 'IDEMPOTENCY_CONFLICT' ? 409 : err.code.includes('NOT_FOUND') ? 404 : 400;
-      res.status(status).json({ error: { code: err.code, message: err.message, requestId } });
+        err.code === 'IDEMPOTENCY_CONFLICT'
+          ? 409
+          : err.code.includes('NOT_FOUND')
+            ? 404
+            : 400;
+      res
+        .status(status)
+        .json({ error: { code: err.code, message: err.message, requestId } });
       return;
     }
     if (err instanceof StripeError) {
       res.status(502).json({
-        error: { code: 'PAYMENT_PROVIDER_ERROR', message: 'Payment could not be processed.', requestId },
+        error: {
+          code: 'PAYMENT_PROVIDER_ERROR',
+          message: 'Payment could not be processed.',
+          requestId,
+        },
       });
       return;
     }
     if (err instanceof IdempotencyConflict) {
-      res
-        .status(409)
-        .json({ error: { code: 'IDEMPOTENCY_CONFLICT', message: err.message, requestId } });
+      res.status(409).json({
+        error: {
+          code: 'IDEMPOTENCY_CONFLICT',
+          message: err.message,
+          requestId,
+        },
+      });
       return;
     }
     if (err instanceof ApiError) {
-      res.status(err.status).json({ error: { code: err.code, message: err.message, requestId } });
+      res
+        .status(err.status)
+        .json({ error: { code: err.code, message: err.message, requestId } });
       return;
     }
     if (err instanceof z.ZodError) {
       res.status(400).json({
-        error: { code: 'VALIDATION_ERROR', message: 'Check the highlighted fields.', requestId },
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Check the highlighted fields.',
+          requestId,
+        },
       });
       return;
     }
     if (err instanceof IdentityError) {
-      const status = err.code.includes('LIMIT') || err.code === 'OTP_COOLDOWN' ? 429 : 400;
-      res.status(status).json({ error: { code: err.code, message: err.message, requestId } });
+      const status =
+        err.code.includes('LIMIT') || err.code === 'OTP_COOLDOWN' ? 429 : 400;
+      res
+        .status(status)
+        .json({ error: { code: err.code, message: err.message, requestId } });
       return;
     }
     if (err instanceof BookingError) {
       const status =
-        err.code === 'SLOT_UNAVAILABLE' ? 409 : err.code.includes('NOT_FOUND') ? 404 : 400;
-      res.status(status).json({ error: { code: err.code, message: err.message, requestId } });
+        err.code === 'SLOT_UNAVAILABLE'
+          ? 409
+          : err.code.includes('NOT_FOUND')
+            ? 404
+            : 400;
+      res
+        .status(status)
+        .json({ error: { code: err.code, message: err.message, requestId } });
       return;
     }
     if (process.env.NODE_ENV !== 'production') {
       console.error('[api 500]', req.method, req.path, err);
     }
     // Never leak a stack trace to a customer.
-    res
-      .status(500)
-      .json({ error: { code: 'INTERNAL_ERROR', message: 'Something went wrong.', requestId } });
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Something went wrong.',
+        requestId,
+      },
+    });
   });
 
   return app;

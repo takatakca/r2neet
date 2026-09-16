@@ -5,7 +5,8 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 const single = process.env.SINGLE_FILE === '1';
 
 const cleanPageRoutes: Record<string, string> = {
-  '/login': '/login.html',
+  '/auth': '/auth.html',
+  '/login': '/auth.html',
   '/verify': '/verify.html',
   '/signup': '/signup.html',
   '/account': '/account.html',
@@ -17,9 +18,7 @@ function cleanPageUrls() {
   return {
     name: 'r2nette-clean-page-urls',
 
-    configureServer(server: {
-      middlewares: Connect.Server;
-    }) {
+    configureServer(server: { middlewares: Connect.Server }) {
       server.middlewares.use((request, _response, next) => {
         if (!request.url) {
           next();
@@ -42,9 +41,7 @@ function cleanPageUrls() {
 export default defineConfig({
   root: 'web',
 
-  plugins: single
-    ? [viteSingleFile()]
-    : [cleanPageUrls()],
+  plugins: single ? [viteSingleFile()] : [cleanPageUrls()],
 
   build: {
     outDir: single ? '../dist-single' : '../dist',
@@ -56,7 +53,7 @@ export default defineConfig({
       : {
           input: {
             index: 'web/index.html',
-            login: 'web/login.html',
+            auth: 'web/auth.html',
             verify: 'web/verify.html',
             signup: 'web/signup.html',
             account: 'web/account.html',

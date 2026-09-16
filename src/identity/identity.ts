@@ -22,7 +22,10 @@ export class IdentityError extends Error {
 /* E.164 normalization (Canada / NANP)                                 */
 /* ------------------------------------------------------------------ */
 
-export function normalizePhone(input: string, defaultCountry: '+1' = '+1'): string {
+export function normalizePhone(
+  input: string,
+  defaultCountry: '+1' = '+1',
+): string {
   const raw = (input ?? '').trim();
   if (!raw) throw new IdentityError('Enter a phone number.', 'PHONE_EMPTY');
 
@@ -31,7 +34,10 @@ export function normalizePhone(input: string, defaultCountry: '+1' = '+1'): stri
   let national: string;
   if (raw.startsWith('+')) {
     if (!digits.startsWith('1')) {
-      throw new IdentityError('We currently serve Canadian numbers only.', 'PHONE_UNSUPPORTED_COUNTRY');
+      throw new IdentityError(
+        'We currently serve Canadian numbers only.',
+        'PHONE_UNSUPPORTED_COUNTRY',
+      );
     }
     national = digits.slice(1);
   } else if (digits.length === 11 && digits.startsWith('1')) {
@@ -41,11 +47,17 @@ export function normalizePhone(input: string, defaultCountry: '+1' = '+1'): stri
   }
 
   if (national.length !== 10) {
-    throw new IdentityError('That phone number needs 10 digits.', 'PHONE_INVALID_LENGTH');
+    throw new IdentityError(
+      'That phone number needs 10 digits.',
+      'PHONE_INVALID_LENGTH',
+    );
   }
   // NANP: area code and exchange both start 2-9
   if (!/^[2-9]\d{2}[2-9]\d{6}$/.test(national)) {
-    throw new IdentityError('That does not look like a valid number.', 'PHONE_INVALID_FORMAT');
+    throw new IdentityError(
+      'That does not look like a valid number.',
+      'PHONE_INVALID_FORMAT',
+    );
   }
   return `${defaultCountry}${national}`;
 }
@@ -67,7 +79,10 @@ export interface VerificationProvider {
   readonly name: string;
   readonly configured: boolean;
   start(phoneE164: string): Promise<{ status: VerificationStatus }>;
-  check(phoneE164: string, code: string): Promise<{ status: VerificationStatus }>;
+  check(
+    phoneE164: string,
+    code: string,
+  ): Promise<{ status: VerificationStatus }>;
 }
 
 /**
@@ -92,7 +107,9 @@ export class TwilioVerifyProvider implements VerificationProvider {
   }
 
   private auth(): string {
-    return 'Basic ' + Buffer.from(`${this.sid}:${this.token}`).toString('base64');
+    return (
+      'Basic ' + Buffer.from(`${this.sid}:${this.token}`).toString('base64')
+    );
   }
 
   private assertConfigured(): void {
@@ -117,12 +134,16 @@ export class TwilioVerifyProvider implements VerificationProvider {
         body: new URLSearchParams({ To: phoneE164, Channel: 'sms' }),
       },
     );
-    if (!res.ok) throw new IdentityError('Could not send the code.', 'VERIFY_SEND_FAILED');
+    if (!res.ok)
+      throw new IdentityError('Could not send the code.', 'VERIFY_SEND_FAILED');
     const json = (await res.json()) as { status: string };
     return { status: json.status.toUpperCase() as VerificationStatus };
   }
 
-  async check(phoneE164: string, code: string): Promise<{ status: VerificationStatus }> {
+  async check(
+    phoneE164: string,
+    code: string,
+  ): Promise<{ status: VerificationStatus }> {
     this.assertConfigured();
     const res = await fetch(
       `https://verify.twilio.com/v2/Services/${this.service}/VerificationCheck`,
@@ -136,7 +157,11 @@ export class TwilioVerifyProvider implements VerificationProvider {
       },
     );
     if (res.status === 404) return { status: 'EXPIRED' };
-    if (!res.ok) throw new IdentityError('Could not check that code.', 'VERIFY_CHECK_FAILED');
+    if (!res.ok)
+      throw new IdentityError(
+        'Could not check that code.',
+        'VERIFY_CHECK_FAILED',
+      );
     const json = (await res.json()) as { status: string };
     return { status: json.status.toUpperCase() as VerificationStatus };
   }
@@ -155,7 +180,10 @@ export class FakeVerificationProvider implements VerificationProvider {
     return { status: 'PENDING' };
   }
 
-  async check(phoneE164: string, code: string): Promise<{ status: VerificationStatus }> {
+  async check(
+    phoneE164: string,
+    code: string,
+  ): Promise<{ status: VerificationStatus }> {
     const expected = this.sent.get(phoneE164);
     if (!expected) return { status: 'EXPIRED' };
     if (expected !== code) return { status: 'DENIED' };
@@ -216,17 +244,29 @@ export class RateLimiter {
     const i = this.bucket(this.ips, ip);
 
     const last = p.timestamps[p.timestamps.length - 1];
-    if (last !== undefined && this.now() - last < this.policy.resendCooldownSeconds * 1000) {
+    if (
+      last !== undefined &&
+      this.now() - last < this.policy.resendCooldownSeconds * 1000
+    ) {
       const wait = Math.ceil(
         (this.policy.resendCooldownSeconds * 1000 - (this.now() - last)) / 1000,
       );
-      throw new IdentityError(`Wait ${wait}s before requesting another code.`, 'OTP_COOLDOWN');
+      throw new IdentityError(
+        `Wait ${wait}s before requesting another code.`,
+        'OTP_COOLDOWN',
+      );
     }
     if (p.timestamps.length >= this.policy.sendsPerPhonePerHour) {
-      throw new IdentityError('Too many codes requested. Try again later.', 'OTP_PHONE_LIMIT');
+      throw new IdentityError(
+        'Too many codes requested. Try again later.',
+        'OTP_PHONE_LIMIT',
+      );
     }
     if (i.timestamps.length >= this.policy.sendsPerIpPerHour) {
-      throw new IdentityError('Too many codes requested. Try again later.', 'OTP_IP_LIMIT');
+      throw new IdentityError(
+        'Too many codes requested. Try again later.',
+        'OTP_IP_LIMIT',
+      );
     }
   }
 
@@ -290,6 +330,12 @@ export interface CustomerRepository {
   create(phoneE164: string): Promise<CustomerProfile>;
 }
 
+export interface VerifiedPhone {
+  phoneE164: string;
+  verifiedAt: Date;
+  expiresAt: Date;
+}
+
 export interface VerifiedSession {
   phoneE164: string;
   customerId: string;
@@ -330,17 +376,26 @@ export class IdentityService {
     };
   }
 
-  /** Check a code. Only on success is any customer information revealed. */
-  async completeVerification(rawPhone: string, code: string): Promise<VerifiedSession> {
+  /**
+   * Verify an OTP without reading or creating a Customer.
+   *
+   * Sign-up uses this method so an abandoned registration never creates an
+   * incomplete customer account.
+   */
+  async verifyPhone(rawPhone: string, code: string): Promise<VerifiedPhone> {
     const phone = normalizePhone(rawPhone);
+
     if (!/^\d{4,10}$/.test(code)) {
       throw new IdentityError('Enter the code we sent you.', 'OTP_MALFORMED');
     }
+
     this.limiter.assertCanCheck(phone);
 
     const result = await this.provider.check(phone, code);
+
     if (result.status !== 'APPROVED') {
       this.limiter.recordFailedCheck(phone);
+
       throw new IdentityError(
         result.status === 'EXPIRED'
           ? 'That code expired. Request a new one.'
@@ -351,16 +406,38 @@ export class IdentityService {
 
     this.limiter.clear(phone);
 
-    const existing = await this.customers.findByPhone(phone);
-    const customer = existing ?? (await this.customers.create(phone));
     const at = this.now();
 
     return {
       phoneE164: phone,
+      verifiedAt: at,
+      expiresAt: new Date(at.getTime() + SESSION_TTL_MINUTES * 60_000),
+    };
+  }
+
+  /**
+   * Legacy customer-session helper.
+   *
+   * Existing callers keep their current behaviour while login and sign-up are
+   * migrated to explicit flows. New sign-up code must use verifyPhone().
+   */
+  async completeVerification(
+    rawPhone: string,
+    code: string,
+  ): Promise<VerifiedSession> {
+    const verified = await this.verifyPhone(rawPhone, code);
+
+    const existing = await this.customers.findByPhone(verified.phoneE164);
+
+    const customer =
+      existing ?? (await this.customers.create(verified.phoneE164));
+
+    return {
+      phoneE164: verified.phoneE164,
       customerId: customer.id,
       isNewCustomer: existing === null,
-      verifiedAt: at,
-      expiresAt: new Date(at.getTime() + SESSION_TTL_MINUTES * 60000),
+      verifiedAt: verified.verifiedAt,
+      expiresAt: verified.expiresAt,
     };
   }
 
@@ -372,18 +449,27 @@ export class IdentityService {
    */
   async profileForSession(session: VerifiedSession): Promise<CustomerProfile> {
     if (session.expiresAt <= this.now()) {
-      throw new IdentityError('Your session expired. Verify again.', 'SESSION_EXPIRED');
+      throw new IdentityError(
+        'Your session expired. Verify again.',
+        'SESSION_EXPIRED',
+      );
     }
     const profile = await this.customers.findByPhone(session.phoneE164);
     if (!profile || profile.id !== session.customerId) {
-      throw new IdentityError('Session does not match a customer.', 'SESSION_INVALID');
+      throw new IdentityError(
+        'Session does not match a customer.',
+        'SESSION_INVALID',
+      );
     }
     return profile;
   }
 }
 
 /** Enforce that a customer only ever reads their own addresses. */
-export function assertOwnsAddress(session: VerifiedSession, address: CustomerAddress): void {
+export function assertOwnsAddress(
+  session: VerifiedSession,
+  address: CustomerAddress,
+): void {
   if (address.customerId !== session.customerId) {
     throw new IdentityError('Not found.', 'NOT_FOUND');
   }
