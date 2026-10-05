@@ -187,11 +187,14 @@ jobs:
           # leaves no usable audit trail. It was removed deliberately.
           #
           # hardening.ts READS env.ADMIN_TOKEN in order to refuse it at
-          # startup, so that file is excluded; comments are excluded too.
-          # What must never return is code that authenticates with one.
+          # startup, and the deploy gate (validate-production-env.ts) reads it
+          # to refuse a deploy, so those files are excluded; comments are
+          # excluded too. What must never return is code that authenticates
+          # with one.
           HITS=$(grep -rIn --exclude-dir=node_modules \
                    'ADMIN_TOKEN' src/ web/ scripts/ 2>/dev/null \
                  | grep -v 'src/api/hardening.ts' \
+                 | grep -v 'scripts/deploy/validate-production-env.ts' \
                  | grep -vE '//|[*]' || true)
           if [ -n "$HITS" ]; then
             echo "$HITS"
