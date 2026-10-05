@@ -3,8 +3,9 @@
  *
  *   npm run staff:create -- --email you@r2nette.ca --name "Your Name" --role OWNER
  *
- * The password comes from STAFF_PASSWORD or is generated. It is printed ONCE
- * and never stored in plaintext — there is no recovery, only a reset.
+ * The password comes from STAFF_PASSWORD or is generated. A generated one is
+ * printed ONCE; a supplied one is never printed (CI logs can be public).
+ * Neither is stored in plaintext — there is no recovery, only a reset.
  */
 import { randomBytes } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
@@ -41,7 +42,8 @@ if (role === 'CLEANER' && !staffId) {
   process.exit(1);
 }
 
-const password = process.env.STAFF_PASSWORD ?? suggestPassword();
+const supplied = process.env.STAFF_PASSWORD;
+const password = supplied ?? suggestPassword();
 const problems = passwordProblems(password);
 if (problems.length) {
   console.error('Password rejected:', problems.join(' '));
@@ -75,8 +77,14 @@ try {
     mustChangePassword: true,
   });
   console.log(`\nCreated ${user.role} account for ${user.email}`);
-  console.log(`Password: ${password}`);
-  console.log('\nShown once. Sign in at /admin and change it immediately.\n');
+  if (supplied === undefined) {
+    // Generated here, so the operator has no other way to learn it.
+    console.log(`Password: ${password}`);
+    console.log('\nShown once. Sign in at /admin and change it immediately.\n');
+  } else {
+    // Supplied by the operator: never echo it (CI logs can be public).
+    console.log('Password: the one you supplied. Sign in at /admin and change it immediately.\n');
+  }
 } catch (e) {
   const msg = String((e as Error).message ?? e);
   const line = msg.split('\n').find((l) => /Unique|Invalid|constraint|reach/i.test(l)) ?? msg.slice(0, 200);

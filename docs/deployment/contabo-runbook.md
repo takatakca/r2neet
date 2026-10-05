@@ -28,6 +28,54 @@ Optional features**. Replace `SERVER_IP`, `MOCHAHOST_IP` and `yourdomain.com`
 with your own values every time. A block that says **on the server** runs inside
 an `ssh` session; everything else runs on your own computer.
 
+## Fastest path: let GitHub Actions do it
+
+You never need to SSH in. Add a few **secrets** in GitHub, then run three
+workflows from **Actions** (or ask Claude to run them). The workflows do steps
+3–8 below for you.
+
+**1. Add secrets.** In the repository, go to **Settings → Secrets and
+variables → Actions → New repository secret**. Add one per name:
+
+| Secret | Value | Needed for |
+|---|---|---|
+| `CONTABO_SSH_HOST` | The VPS IPv4 address, from the Contabo panel | everything |
+| `CONTABO_ROOT_PASSWORD` | The VPS root password, from Contabo's welcome email (or set `CONTABO_ROOT_SSH_KEY` to a root private key instead) | everything |
+| `OWNER_INITIAL_PASSWORD` | The password for your first `/admin` login (12+ characters). You change it at first sign-in | creating the owner |
+| `MOCHAHOST_CPANEL_HOST` | Your cPanel address without `https://` or `:2083`, e.g. `server123.mochahost.com` (it appears in cPanel's address bar) | DNS |
+| `MOCHAHOST_CPANEL_USER` | Your cPanel username | DNS |
+| `MOCHAHOST_CPANEL_TOKEN` | cPanel → **Security → Manage API Tokens → Create**. Name it `r2nette-dns` and copy the token it shows once | DNS |
+| `CONTABO_SSH_PORT` | Only if SSH is not on port 22 | optional |
+
+Provider keys can be added the same way whenever you have them. **Server setup**
+copies each one it finds into the server's `.env`: `TWILIO_ACCOUNT_SID`,
+`TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID`, `STRIPE_SECRET_KEY`,
+`STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `GOOGLE_MAPS_API_KEY`,
+`EMAIL_API_URL`, `EMAIL_API_KEY`, `EMAIL_FROM`, `BACKUP_S3_*`, `ALERT_WEBHOOK_*`.
+Run **Server setup** again after adding one, then **Deploy**.
+
+**2. Run the workflows**, each from **Actions → (workflow) → Run workflow**, in this order:
+
+1. **Server setup**, with your domain and an email address for certificate
+   notices. It installs Docker, turns on the firewall, writes `/opt/r2nette/.env`
+   with generated secrets, and prints the server's public host key. That key
+   gets committed to `deploy/known_hosts`, so later runs refuse any other machine.
+2. **Deploy**. It builds, starts and health-checks the app.
+3. **DNS (MochaHost)**: first `plan`, which is read-only and shows every change.
+   Then `email`, which gives mail its own records so it stays at MochaHost.
+   Then, ideally after the TTL shown in the plan, `web`, which points the
+   domain and `www` at the VPS. HTTPS starts working minutes after `web`.
+4. **Server admin** → `create-owner`, with your email and name. Then sign in at
+   `https://yourdomain.com/admin` with `OWNER_INITIAL_PASSWORD`, change it, and
+   turn on two-step verification. **Server admin** → `status` shows health at any time.
+
+The repository is public, so these logs are public. The workflows print names,
+public DNS records and host keys, never a secret value. The server's
+`FIELD_ENCRYPTION_KEY` is generated on the server and never leaves it. To keep
+a copy for disaster recovery, see step 4.
+
+The manual steps below do the same things by hand, and explain each one.
+
 ## What is in the repo
 
 | Piece | Where |
@@ -41,6 +89,8 @@ an `ssh` session; everything else runs on your own computer.
 | Compose wrapper for manual commands | `scripts/deploy/compose.sh` |
 | Health check / rollback | `scripts/deploy/healthcheck.sh`, `scripts/deploy/rollback.sh` |
 | Deploy workflow | `.github/workflows/deploy.yml` |
+| Setup / admin / DNS workflows | `.github/workflows/server-setup.yml`, `server-admin.yml`, `dns-mochahost.yml` |
+| DNS automation (cPanel API) | `scripts/deploy/mochahost-dns.py` |
 
 The services are `postgres`, `migrate`, `web`, `billing`, `scheduler`, `backup` and `caddy`.
 `migrate` runs `prisma migrate deploy` and must finish before `web` or any

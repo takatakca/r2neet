@@ -64,6 +64,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/deploy/publish-image.sh
 
+      - name: Install sshpass
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null
+
       - name: Roll the VPS to that image
         env:
           GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -72,6 +75,8 @@ jobs:
           CONTABO_SSH_USER: ${{ secrets.CONTABO_SSH_USER }}
           CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
           CONTABO_SSH_KNOWN_HOSTS: ${{ secrets.CONTABO_SSH_KNOWN_HOSTS }}
+          CONTABO_ROOT_PASSWORD: ${{ secrets.CONTABO_ROOT_PASSWORD }}
+          CONTABO_ROOT_SSH_KEY: ${{ secrets.CONTABO_ROOT_SSH_KEY }}
           GHCR_PULL_USER: ${{ github.actor }}
           GHCR_PULL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/deploy/ci-deploy.sh
