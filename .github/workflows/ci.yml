@@ -72,10 +72,10 @@ jobs:
     env:
       NODE_ENV: test
       # Only the test database is ever named here. The safety guard refuses
-      # destructive operations against anything else.
+      # destructive operations against anything else, and refuses outright
+      # when DATABASE_URL equals TEST_DATABASE_URL, so DATABASE_URL is unset.
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/r2nette_test
       PRISMA_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/r2nette_test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/r2nette_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
