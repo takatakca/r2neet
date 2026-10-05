@@ -82,11 +82,18 @@ function safeReturnPath(): string {
     sessionStorage.getItem('r2nette.returnTo') ??
     '/account';
 
-  if (!requested.startsWith('/') || requested.startsWith('//')) {
-    return '/account';
+  // Resolve it the way the browser will, then require our own origin. A
+  // prefix check is not enough: browsers read '/\evil.example' and
+  // '/<tab>/evil.example' as '//evil.example', another site.
+  try {
+    const url = new URL(requested, window.location.origin);
+    if (url.origin === window.location.origin) {
+      return url.pathname + url.search + url.hash;
+    }
+  } catch {
+    // Unparseable: fall through to the default.
   }
-
-  return requested;
+  return '/account';
 }
 
 async function apiRequest<T>(
@@ -472,7 +479,13 @@ function initializeVerifyPage(): void {
           : 'That code was not accepted. Try again.';
 
       if (error instanceof ApiRequestError && error.code === 'ACCOUNT_NOT_FOUND') {
-        showErrorWithLink(message, '/login?mode=signup', 'Go to Sign up');
+        // The server already accepted the code and issued the registration
+        // proof, so the profile form is the next step; no second code.
+        showErrorWithLink(
+          message,
+          `/signup?returnTo=${encodeURIComponent(safeReturnPath())}`,
+          'Continue to sign up',
+        );
       } else if (
         error instanceof ApiRequestError &&
         error.code === 'ACCOUNT_ALREADY_EXISTS'

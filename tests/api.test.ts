@@ -219,6 +219,45 @@ d('HTTP API', () => {
     expect(proven.body.error.code).toBe('ACCOUNT_NOT_FOUND');
     expect(setCookie(proven, SESSION_COOKIE)).toBeUndefined();
     expect(await prisma.customer.count()).toBe(0);
+
+    // The phone is proven, so the profile form can finish the sign-up
+    // without a second code.
+    const registration = setCookie(proven, REGISTRATION_COOKIE);
+    expect(registration).toBeTruthy();
+    const completed = await request(app)
+      .post('/api/v1/auth/registration/complete')
+      .set('Cookie', registration!)
+      .send(registrationProfile('514 825 2827'));
+    expect(completed.status).toBe(201);
+    expect(await prisma.customer.count()).toBe(1);
+  });
+
+  it('a customer imported from Setmore keeps their record on first sign-in', async () => {
+    // Imported phones are unverified and may lack a full name.
+    const imported = await prisma.customer.create({
+      data: {
+        firstName: 'Marie',
+        phones: { create: { phoneE164: '+15148252829', verifiedAt: null, isPrimary: true } },
+      },
+    });
+
+    await request(app).post('/api/v1/auth/phone/send').send({ phone: '514 825 2829', intent: 'login' });
+    const proven = await request(app)
+      .post('/api/v1/auth/phone/verify')
+      .send({ phone: '514 825 2829', code: TEST_OTP, intent: 'login' });
+    expect(proven.status).toBe(404);
+    const registration = setCookie(proven, REGISTRATION_COOKIE)!;
+
+    const completed = await request(app)
+      .post('/api/v1/auth/registration/complete')
+      .set('Cookie', registration)
+      .send(registrationProfile('514 825 2829', { firstName: 'Marie', lastName: 'Gagnon' }));
+    expect(completed.status).toBe(201);
+    expect(completed.body.customer.id).toBe(imported.id);
+    expect(await prisma.customer.count()).toBe(1);
+
+    const again = await logIn(app, '514 825 2829');
+    expect(again.customerId).toBe(imported.id);
   });
 
   it('sign-up for a number that already has an account is refused only after the code is proven', async () => {

@@ -470,12 +470,32 @@ export function createApi(deps: ApiDeps) {
         existingPhone.customer.lastName?.trim(),
       );
 
+      /** Carry the proven phone to the profile form in a single-use cookie. */
+      const issueRegistration = async () => {
+        const registration = await registrationSessions.create(verified.phoneE164, {
+          userAgent: req.header('user-agent') ?? undefined,
+          ip: req.ip ?? undefined,
+        });
+        res.cookie(REGISTRATION_COOKIE, registration.token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          expires: registration.expiresAt,
+        });
+        return registration;
+      };
+
       if (intent === 'login') {
         if (!existingPhone || !hasCompleteAccount) {
+          // The phone is proven, so go straight to the profile form instead
+          // of spending a second code on a sign-up. Customers imported from
+          // Setmore land here on their first sign-in.
+          await issueRegistration();
           throw new ApiError(
             404,
             'ACCOUNT_NOT_FOUND',
-            'No completed R2NETTE account was found for this number. Please sign up first.',
+            'No completed R2NETTE account was found for this number. Add your details to finish signing up.',
           );
         }
 
@@ -519,21 +539,7 @@ export function createApi(deps: ApiDeps) {
         );
       }
 
-      const registration = await registrationSessions.create(
-        verified.phoneE164,
-        {
-          userAgent: req.header('user-agent') ?? undefined,
-          ip: req.ip ?? undefined,
-        },
-      );
-
-      res.cookie(REGISTRATION_COOKIE, registration.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        expires: registration.expiresAt,
-      });
+      const registration = await issueRegistration();
 
       res.json({
         outcome: 'PROFILE_REQUIRED',
