@@ -47,11 +47,6 @@ exec > >(bash scripts/deploy/redact-stream.sh | tee -a "$log") 2>&1
 
 echo "Deploying commit ${SHA}"
 
-if [[ -f state/current-image-ref ]]; then
-  cp state/current-image-ref state/previous-image-ref
-  chmod 600 state/previous-image-ref
-fi
-
 export R2NETTE_IMAGE="$image"
 deploy_started=0
 rolled_back=0
@@ -75,8 +70,34 @@ docker compose -f docker-compose.production.yml run --rm --no-deps \
   --entrypoint ./node_modules/vite-node/vite-node.mjs \
   web scripts/deploy/check-production-env.ts /compose.yml
 
+# Caddy bind-mounts the single file deploy/Caddyfile. Unpacking a new one
+# replaces the file, but a running container keeps reading the old one, and
+# `up -d` leaves caddy alone because its compose config did not change. So
+# recreate caddy whenever the file differs from the one last deployed, after
+# checking that the new file is valid.
+caddyfile_hash="$(sha256sum deploy/Caddyfile | cut -d ' ' -f 1)"
+caddyfile_applied="$(cat state/caddyfile.sha256 2>/dev/null || true)"
+caddy_changed=0
+if [[ "$caddyfile_hash" != "$caddyfile_applied" ]]; then
+  caddy_changed=1
+  docker compose -f docker-compose.production.yml run --rm --no-deps caddy \
+    caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+fi
+
+# Rotate the rollback target only when the image changes. Redeploying the
+# same commit (for example after editing .env) keeps the real previous release.
+current="$(cat state/current-image-ref 2>/dev/null || true)"
+if [[ -n "$current" && "$current" != "$image" ]]; then
+  printf '%s\n' "$current" > state/previous-image-ref
+  chmod 600 state/previous-image-ref
+fi
+
 deploy_started=1
 docker compose -f docker-compose.production.yml up -d
+if [[ "$caddy_changed" -eq 1 ]]; then
+  echo "deploy/Caddyfile changed. Recreating caddy so it reads the new file."
+  docker compose -f docker-compose.production.yml up -d --force-recreate --no-deps caddy
+fi
 bash scripts/deploy/healthcheck.sh
 
 cid="$(docker compose -f docker-compose.production.yml ps -q web)"
@@ -88,6 +109,8 @@ fi
 
 printf '%s\n' "$image" > state/current-image-ref
 chmod 600 state/current-image-ref
+printf '%s\n' "$caddyfile_hash" > state/caddyfile.sha256
+chmod 600 state/caddyfile.sha256
 echo "Deploy verified for commit ${SHA}."
 
 # Every deploy pulls a new SHA-tagged image. Keep the running one and the
