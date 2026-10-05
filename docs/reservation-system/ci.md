@@ -14,9 +14,9 @@ exactly when a release is rushed.
 Fast signal first: a broken commit says so in seconds rather than waiting on a
 five-minute test run.
 
-It also enforces a **bundle budget of 400KB** (currently 152KB). A silent size
+It also enforces a **bundle budget of 400KB** (currently 396KB). A silent size
 jump almost always means a server dependency was pulled into the browser by
-accident.
+accident. Page photos are copied into `dist/assets` as well, so they count.
 
 **`test`** — Postgres 16 service container, then:
 
@@ -124,8 +124,9 @@ Both were correct in intent and wrong in practice:
   than no check. Now it requires realistic key lengths, skips `tests/`, and
   excludes AWS's own documentation example key.
 - The `ADMIN_TOKEN` check flagged `hardening.ts`, which reads that variable
-  **in order to refuse it** at startup. Excluded that file and comments; the
-  ban is on code that authenticates with one.
+  **in order to refuse it** at startup. The production deploy gate does the
+  same. Both files are excluded, along with comments; the ban is on code that
+  authenticates with one.
 
 Finding these locally is the point. A CI check that fails on correct code
 teaches people to ignore CI.

@@ -64,10 +64,22 @@ describe('database safety guard', () => {
     ).toThrow(/Refusing to fall back/i);
   });
 
-  it('refuses when the test URL equals the production URL', () => {
-    const same = 'postgresql://u@localhost:5432/r2nette_test';
+  it('allows a test run when both URLs name the same disposable database', () => {
+    const same = 'postgresql://postgres@localhost:5432/r2nette_test';
+    const db = assertDestructiveAllowed({
+      NODE_ENV: 'test',
+      DATABASE_URL: same,
+      TEST_DATABASE_URL: same,
+    });
+    expect(db.url).toBe(same);
+    expect(db.environment).toBe('test');
+    expect(db.destructiveAllowed).toBe(true);
+  });
+
+  it('refuses when production DATABASE_URL equals TEST_DATABASE_URL', () => {
+    const same = 'postgresql://u@db.r2nette.ca/r2nette';
     expect(() =>
-      resolveDatabase({ NODE_ENV: 'test', DATABASE_URL: same, TEST_DATABASE_URL: same }),
+      resolveDatabase({ NODE_ENV: 'production', DATABASE_URL: same, TEST_DATABASE_URL: same }),
     ).toThrow(/identical/i);
   });
 

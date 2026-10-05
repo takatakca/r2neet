@@ -8,6 +8,10 @@
  * So we never fall back. Resolution is explicit per environment, and
  * destructive operations additionally require the resolved URL to look like a
  * throwaway database — checked against the URL itself, not a variable name.
+ *
+ * CI may set DATABASE_URL and TEST_DATABASE_URL to the same scratch database.
+ * That pair is allowed while NODE_ENV=test. It is refused in production,
+ * where the URL would be live customer data.
  */
 
 export class DatabaseSafetyError extends Error {
@@ -66,7 +70,8 @@ function looksDisposable(host: string, database: string): boolean {
  * Resolve the database for the current NODE_ENV.
  *
  * There is no fallback chain. In test, only TEST_DATABASE_URL is consulted;
- * if it is missing we throw rather than reaching for DATABASE_URL.
+ * if it is missing we throw rather than reaching for DATABASE_URL. Matching
+ * the two URLs is refused only in production.
  */
 export function resolveDatabase(
   env: Record<string, string | undefined> = process.env,
@@ -84,15 +89,19 @@ export function resolveDatabase(
           'that fallback is how test runs destroy production data. Set TEST_DATABASE_URL explicitly.',
       );
     }
-    if (env.DATABASE_URL && env.DATABASE_URL.trim() === url.trim()) {
-      throw new DatabaseSafetyError(
-        'TEST_DATABASE_URL is identical to DATABASE_URL. Tests must target a separate database.',
-      );
-    }
   } else {
     url = env.DATABASE_URL;
     if (!url || url.trim() === '') {
       throw new DatabaseSafetyError('DATABASE_URL is not set.');
+    }
+    if (
+      environment === 'production' &&
+      env.TEST_DATABASE_URL &&
+      env.TEST_DATABASE_URL.trim() === url.trim()
+    ) {
+      throw new DatabaseSafetyError(
+        'TEST_DATABASE_URL is identical to DATABASE_URL. Tests must target a separate database.',
+      );
     }
   }
 
