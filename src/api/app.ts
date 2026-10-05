@@ -356,12 +356,16 @@ export function createApi(deps: ApiDeps) {
   if (hard.enabled) {
     if (hard.log !== null) app.use(requestLogger(hard.log ?? undefined));
     app.use(securityHeaders({ hsts: hard.hsts }));
-    app.use(requireHttps(hard.requireHttps ?? false));
-    if (hard.rateLimit !== false) app.use(rateLimit(new EdgeRateLimiter()));
   }
 
   // Liveness must never touch the database: restarting the app because
   // Postgres blipped turns a blip into an outage.
+  //
+  // Probes are registered BEFORE the HTTPS redirect and the rate limiter.
+  // Docker and the deploy script call them over plain http inside the
+  // container; a 308 to https://127.0.0.1:3000 can never succeed, so the
+  // container would never become healthy and every deploy would roll back.
+  // They return a status word only, so plain http exposes nothing.
   app.get('/healthz', livenessHandler());
   app.get(
     '/readyz',
@@ -370,6 +374,11 @@ export function createApi(deps: ApiDeps) {
       hard.isShuttingDown ?? (() => false),
     ),
   );
+
+  if (hard.enabled) {
+    app.use(requireHttps(hard.requireHttps ?? false));
+    if (hard.rateLimit !== false) app.use(rateLimit(new EdgeRateLimiter()));
+  }
 
   // The webhook needs the RAW body: signature verification is over exact
   // bytes, and JSON round-tripping would change them.

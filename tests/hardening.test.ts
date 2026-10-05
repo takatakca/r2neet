@@ -16,6 +16,9 @@ import {
   validateProductionConfig,
   type LogLine,
 } from '../src/api/hardening.js';
+import type { PrismaClient } from '@prisma/client';
+import { createApi } from '../src/api/app.js';
+import { FakeVerificationProvider } from '../src/identity/identity.js';
 
 describe('content security policy', () => {
   const csp = buildCsp();
@@ -378,5 +381,35 @@ describe('production config validation', () => {
       FIELD_ENCRYPTION_KEY: 'a'.repeat(43),
     });
     expect(problems).toEqual([]);
+  });
+});
+
+describe('health probes behind the HTTPS redirect', () => {
+  // Docker's HEALTHCHECK, the compose healthcheck and the deploy script all
+  // probe http://127.0.0.1:3000 from inside the container. If the redirect
+  // caught them, the container could never become healthy.
+  function hardenedApp() {
+    const prisma = { $queryRaw: async () => [{ ok: 1 }] } as unknown as PrismaClient;
+    return createApi({
+      prisma,
+      verification: new FakeVerificationProvider('123456'),
+      hardening: { enabled: true, requireHttps: true, rateLimit: true, log: null },
+    });
+  }
+
+  it('answers liveness and readiness over plain http', async () => {
+    const a = hardenedApp();
+    const live = await request(a).get('/healthz');
+    expect(live.status).toBe(200);
+    expect(live.body.status).toBe('alive');
+    const ready = await request(a).get('/readyz');
+    expect(ready.status).toBe(200);
+    expect(ready.body.status).toBe('ready');
+  });
+
+  it('still redirects every other insecure GET', async () => {
+    const res = await request(hardenedApp()).get('/api/v1/catalogue').set('x-forwarded-proto', 'http');
+    expect(res.status).toBe(308);
+    expect(res.headers.location).toMatch(/^https:\/\//);
   });
 });
