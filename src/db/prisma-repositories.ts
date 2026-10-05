@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaClient, Prisma } from '@prisma/client';
 import type {
   SchedulingRepository,
@@ -6,7 +7,7 @@ import type {
   BookingHold,
   Booking,
 } from '../booking/booking.js';
-import type { StaffBusy, StaffMember } from '../scheduling/availability.js';
+import { localDateKey, type StaffBusy, type StaffMember } from '../scheduling/availability.js';
 import type { CustomerProfile, CustomerRepository } from '../identity/identity.js';
 
 /**
@@ -16,147 +17,230 @@ import type { CustomerProfile, CustomerRepository } from '../identity/identity.j
  *
  * An in-process mutex is worthless the moment R2NETTE runs two Node
  * processes, two containers, or serverless invocations. So capacity
- * serialization uses a PostgreSQL *transaction-level advisory lock*
- * (`pg_advisory_xact_lock`), keyed by the appointment window.
+ * serialization uses PostgreSQL *transaction-level advisory locks*
+ * (`pg_advisory_xact_lock`), one per local service day.
  *
  * Properties that matter:
  *   - the lock lives in the database, so every process contends for the
  *     same lock regardless of where it runs;
  *   - it is transaction-scoped, so it is released automatically on COMMIT
  *     or ROLLBACK, including if the process crashes mid-transaction;
- *   - keying by time window rather than one global lock means bookings for
- *     different days never block each other.
+ *   - any two windows that could compete for the same cleaner — identical,
+ *     overlapping, or merely within travel-buffer distance — share a key,
+ *     because they share a service day. Keying by the exact window did not
+ *     do this: 10:00–13:00 and 11:00–14:00 took different locks and both
+ *     claimed the last crew;
+ *   - bookings on unrelated days still never block each other.
+ *
+ * Every writer that consumes capacity (holds, confirmations, reschedules,
+ * recurring generation) must take these locks via `withCapacityLock` or
+ * `acquireCapacityLocks`. A writer that derives its own key is not
+ * serialized against anyone.
  *
  * Booking numbers use `UPDATE ... RETURNING` on a per-year counter row,
  * which is atomic under Postgres. `SELECT MAX(n)+1` would race.
  */
 
-/** Stable 64-bit lock key from the appointment window. */
-export function capacityLockKey(startUtc: Date, endUtc: Date): bigint {
-  const s = `${Math.floor(startUtc.getTime() / 60000)}:${Math.floor(endUtc.getTime() / 60000)}`;
-  // FNV-1a 64-bit
+/**
+ * How far either side of a window another job can still compete for the
+ * same cleaner. Must be at least the largest travel buffer; `listBusy`
+ * widens its read by the same amount.
+ */
+const CAPACITY_PAD_MS = 4 * 60 * 60000;
+
+/** FNV-1a 64-bit, as the signed bigint advisory locks take. */
+function lockHash(s: string): bigint {
   let hash = 0xcbf29ce484222325n;
   const prime = 0x100000001b3n;
   const mask = (1n << 64n) - 1n;
   for (let i = 0; i < s.length; i++) {
     hash = ((hash ^ BigInt(s.charCodeAt(i))) * prime) & mask;
   }
-  // advisory locks take a signed bigint
   return BigInt.asIntN(64, hash);
+}
+
+/**
+ * Stable 64-bit advisory-lock key of the local service day a window starts
+ * on. Every window that starts that day shares it; other days do not.
+ * `withCapacityLock` also takes the neighbouring day's key when the
+ * window's buffers reach across midnight — see `capacityLockKeys`.
+ */
+export function capacityLockKey(startUtc: Date, _endUtc?: Date): bigint {
+  return lockHash(`capacity-day:${localDateKey(startUtc)}`);
+}
+
+/**
+ * Every advisory-lock key a capacity decision about this window must hold:
+ * one per local service day touched by the window widened by
+ * CAPACITY_PAD_MS. Sorted ascending so all callers acquire in the same
+ * order and two transactions cannot deadlock on them.
+ */
+export function capacityLockKeys(window: { startUtc: Date; endUtc: Date }): bigint[] {
+  const from = window.startUtc.getTime() - CAPACITY_PAD_MS;
+  const to = window.endUtc.getTime() + CAPACITY_PAD_MS;
+  const keys = new Set<bigint>();
+  // Hourly steps cannot skip a local day, even a 23-hour DST day.
+  for (let t = from; t < to; t += 3600000) keys.add(capacityLockKey(new Date(t)));
+  keys.add(capacityLockKey(new Date(to)));
+  return [...keys].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
 type Tx = Prisma.TransactionClient;
 
+/** Take every capacity lock for `window` inside an open transaction. */
+export async function acquireCapacityLocks(
+  tx: Tx,
+  window: { startUtc: Date; endUtc: Date },
+): Promise<void> {
+  for (const key of capacityLockKeys(window)) {
+    // pg_advisory_xact_lock() returns void, which Prisma cannot
+    // deserialize; cast to a concrete type so the driver is happy.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(${key}::bigint)::text AS locked`;
+  }
+}
+
+/**
+ * Everything consuming capacity in this window, read through `db` (the
+ * client or an open transaction).
+ *
+ * ACTIVE holds are returned with their `expiresAtUtc`; whether one is
+ * still alive is decided by the caller's clock (`busyIsLive` in
+ * availability), the same clock that stamped its expiry. Filtering here on
+ * this process's wall clock judged expiry against a second clock: with an
+ * injected clock behind the wall clock, every hold looked expired and
+ * nothing blocked capacity. A lapsed hold still stops blocking without the
+ * cleanup job, and its row is never deleted.
+ */
+export async function loadBusy(
+  db: PrismaClient | Tx,
+  window: { startUtc: Date; endUtc: Date },
+): Promise<StaffBusy[]> {
+  const pad = CAPACITY_PAD_MS; // widen for buffer arithmetic at the edges
+  const from = new Date(window.startUtc.getTime() - pad);
+  const to = new Date(window.endUtc.getTime() + pad);
+
+  const [bookings, holds, timeOff] = await Promise.all([
+    db.booking.findMany({
+      where: {
+        status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+        startAt: { lt: to },
+        endAt: { gt: from },
+      },
+      include: { staff: true },
+    }),
+    db.bookingHold.findMany({
+      where: {
+        status: 'ACTIVE',
+        startAt: { lt: to },
+        endAt: { gt: from },
+      },
+    }),
+    db.staffTimeOff.findMany({
+      where: { startAt: { lt: to }, endAt: { gt: from } },
+    }),
+  ]);
+
+  const busy: StaffBusy[] = [];
+  for (const b of bookings) {
+    for (const a of b.staff) {
+      busy.push({
+        staffId: a.staffId,
+        startUtc: b.startAt,
+        endUtc: b.endAt,
+        kind: 'BOOKING',
+        bookingId: b.id,
+      });
+    }
+  }
+  for (const h of holds) {
+    for (const staffId of h.staffIds) {
+      busy.push({
+        staffId,
+        startUtc: h.startAt,
+        endUtc: h.endAt,
+        kind: 'HOLD',
+        expiresAtUtc: h.expiresAt,
+        holdId: h.id,
+      });
+    }
+  }
+  for (const t of timeOff) {
+    busy.push({ staffId: t.staffId, startUtc: t.startAt, endUtc: t.endAt, kind: 'TIME_OFF' });
+  }
+  return busy;
+}
+
+/**
+ * Active staff with skills and weekly hours, read through `db` (the client or
+ * an open transaction). Code holding the capacity locks must read through
+ * its own transaction: a second pooled connection can be unavailable while
+ * same-day writers queue on the lock, and the lock holder then stalls.
+ */
+export async function loadStaff(db: PrismaClient | Tx): Promise<StaffMember[]> {
+  const rows = await db.staff.findMany({
+    where: { active: true },
+    include: { skills: true, availability: true },
+  });
+  return rows.map((s) => ({
+    id: s.id,
+    displayName: s.displayName,
+    active: s.active,
+    skills: s.skills.map((k) => k.serviceOptionId),
+    weeklyAvailability: s.availability.map((a) => ({
+      weekday: a.weekday,
+      startMinute: a.startMinute,
+      endMinute: a.endMinute,
+    })),
+  }));
+}
+
 export class PrismaSchedulingRepo implements SchedulingRepository {
-  /** Set while inside withCapacityLock so nested calls join the transaction. */
-  private tx: Tx | null = null;
+  /**
+   * The transaction of the withCapacityLock call this async context is
+   * inside, if any. One repo instance serves every concurrent request, so
+   * this must be per-call, not an instance field: a shared field let one
+   * request's queries run in another request's transaction and, once both
+   * finished, left the repo pointing at a closed transaction (P2028 on every
+   * later query until the process restarted).
+   */
+  private readonly scope = new AsyncLocalStorage<Tx>();
 
   constructor(private readonly prisma: PrismaClient) {}
 
   private get db(): PrismaClient | Tx {
-    return this.tx ?? this.prisma;
+    return this.scope.getStore() ?? this.prisma;
   }
 
   /**
    * Serialize everyone competing for this appointment window, across
-   * processes, for the life of the transaction.
+   * processes, for the life of the transaction. A nested call joins the
+   * enclosing transaction and takes any additional keys there.
    */
   async withCapacityLock<T>(
     window: { startUtc: Date; endUtc: Date },
     fn: () => Promise<T>,
   ): Promise<T> {
-    const key = capacityLockKey(window.startUtc, window.endUtc);
+    const outer = this.scope.getStore();
+    if (outer) {
+      await acquireCapacityLocks(outer, window);
+      return fn();
+    }
     return this.prisma.$transaction(
       async (tx) => {
-        // pg_advisory_xact_lock() returns void, which Prisma cannot
-        // deserialize; cast to a concrete type so the driver is happy.
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(${key}::bigint)::text AS locked`;
-        const previous = this.tx;
-        this.tx = tx;
-        try {
-          return await fn();
-        } finally {
-          this.tx = previous;
-        }
+        await acquireCapacityLocks(tx, window);
+        return this.scope.run(tx, fn);
       },
       { timeout: 20000 },
     );
   }
 
   async listStaff(): Promise<StaffMember[]> {
-    const rows = await this.db.staff.findMany({
-      where: { active: true },
-      include: { skills: true, availability: true },
-    });
-    return rows.map((s) => ({
-      id: s.id,
-      displayName: s.displayName,
-      active: s.active,
-      skills: s.skills.map((k) => k.serviceOptionId),
-      weeklyAvailability: s.availability.map((a) => ({
-        weekday: a.weekday,
-        startMinute: a.startMinute,
-        endMinute: a.endMinute,
-      })),
-    }));
+    return loadStaff(this.db);
   }
 
-  /**
-   * Everything consuming capacity in this window.
-   *
-   * A hold counts only while ACTIVE *and* unexpired — the `expiresAt > now`
-   * predicate is in the query, so a lapsed hold stops blocking immediately
-   * even if the cleanup job has not run.
-   */
+  /** Everything consuming capacity in this window. See `loadBusy`. */
   async listBusy(window: { startUtc: Date; endUtc: Date }): Promise<StaffBusy[]> {
-    const now = new Date();
-    const pad = 4 * 60 * 60000; // widen for buffer arithmetic at the edges
-    const from = new Date(window.startUtc.getTime() - pad);
-    const to = new Date(window.endUtc.getTime() + pad);
-
-    const [bookings, holds, timeOff] = await Promise.all([
-      this.db.booking.findMany({
-        where: {
-          status: { notIn: ['CANCELLED', 'NO_SHOW'] },
-          startAt: { lt: to },
-          endAt: { gt: from },
-        },
-        include: { staff: true },
-      }),
-      this.db.bookingHold.findMany({
-        where: {
-          status: 'ACTIVE',
-          expiresAt: { gt: now },
-          startAt: { lt: to },
-          endAt: { gt: from },
-        },
-      }),
-      this.db.staffTimeOff.findMany({
-        where: { startAt: { lt: to }, endAt: { gt: from } },
-      }),
-    ]);
-
-    const busy: StaffBusy[] = [];
-    for (const b of bookings) {
-      for (const a of b.staff) {
-        busy.push({ staffId: a.staffId, startUtc: b.startAt, endUtc: b.endAt, kind: 'BOOKING' });
-      }
-    }
-    for (const h of holds) {
-      for (const staffId of h.staffIds) {
-        busy.push({
-          staffId,
-          startUtc: h.startAt,
-          endUtc: h.endAt,
-          kind: 'HOLD',
-          expiresAtUtc: h.expiresAt,
-        });
-      }
-    }
-    for (const t of timeOff) {
-      busy.push({ staffId: t.staffId, startUtc: t.startAt, endUtc: t.endAt, kind: 'TIME_OFF' });
-    }
-    return busy;
+    return loadBusy(this.db, window);
   }
 
   async insertHold(hold: BookingHold): Promise<void> {
@@ -189,14 +273,17 @@ export class PrismaSchedulingRepo implements SchedulingRepository {
       createdAt: h.createdAt,
       expiresAt: h.expiresAt,
       consumedAt: h.consumedAt,
+      status: h.status,
     };
   }
 
-  async markHoldConsumed(id: string, at: Date): Promise<void> {
-    await this.db.bookingHold.update({
-      where: { id },
+  async markHoldConsumed(id: string, at: Date): Promise<boolean> {
+    // Conditional: only a live hold can become a booking, and only once.
+    const { count } = await this.db.bookingHold.updateMany({
+      where: { id, status: 'ACTIVE', consumedAt: null },
       data: { status: 'CONSUMED', consumedAt: at },
     });
+    return count === 1;
   }
 
   async insertBooking(booking: Booking): Promise<void> {

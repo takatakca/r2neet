@@ -44,6 +44,10 @@ export interface StaffBusy extends Interval {
   /** BOOKING blocks capacity permanently; HOLD blocks it until it expires. */
   kind: 'BOOKING' | 'HOLD' | 'TIME_OFF';
   expiresAtUtc?: Date;
+  /** Set on BOOKING entries, so a booking can be told apart from its neighbours. */
+  bookingId?: string;
+  /** Set on HOLD entries, so confirming a hold excludes that hold and no other. */
+  holdId?: string;
 }
 
 export interface BufferPolicy {
@@ -158,20 +162,26 @@ export function staffIsQualified(staff: StaffMember, service: ServiceOption): bo
  * Is this cleaner free for the whole window, including buffers, and does
  * the window fall inside their working hours for that weekday?
  */
-export function staffIsFree(
-  staff: StaffMember,
+/**
+ * The first live commitment that stops `staffId` taking `window`: a job
+ * (with travel time either side), an unexpired hold, or time off. Working
+ * hours are not considered here; `staffIsFree` adds them, and a dispatcher
+ * may knowingly assign outside them.
+ */
+export function findStaffConflict(
+  staffId: string,
   window: Interval,
   busy: StaffBusy[],
   now: Date,
   buffers: BufferPolicy,
-): boolean {
+): StaffBusy | null {
   const padded: Interval = {
     startUtc: new Date(window.startUtc.getTime() - buffers.preJobMinutes * 60000),
     endUtc: new Date(window.endUtc.getTime() + buffers.postJobMinutes * 60000),
   };
 
   for (const b of busy) {
-    if (b.staffId !== staff.id) continue;
+    if (b.staffId !== staffId) continue;
     if (!busyIsLive(b, now)) continue;
 
     // A job already on the books needs its own travel time either side.
@@ -185,8 +195,19 @@ export function staffIsFree(
             endUtc: new Date(b.endUtc.getTime() + buffers.postJobMinutes * 60000),
           };
 
-    if (overlaps(padded, paddedBusy)) return false;
+    if (overlaps(padded, paddedBusy)) return b;
   }
+  return null;
+}
+
+export function staffIsFree(
+  staff: StaffMember,
+  window: Interval,
+  busy: StaffBusy[],
+  now: Date,
+  buffers: BufferPolicy,
+): boolean {
+  if (findStaffConflict(staff.id, window, busy, now, buffers)) return false;
 
   // Working hours are evaluated on the local weekday of the slot start.
   const weekday = localWeekday(window.startUtc);

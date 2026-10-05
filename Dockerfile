@@ -6,9 +6,22 @@
 
 FROM node:22-slim AS base
 WORKDIR /app
-# openssl: Prisma needs it. postgresql-client: the backup job runs pg_dump.
-RUN apt-get update \
- && apt-get install -y --no-install-recommends openssl postgresql-client ca-certificates \
+# openssl: Prisma needs it. postgresql-client-16: the backup job runs pg_dump
+# against the postgres:16 server, and pg_dump refuses a server newer than
+# itself. Debian's own postgresql-client is 15 on bookworm (node:22-slim), so
+# the client comes from the PostgreSQL project's repository (PGDG) for
+# whichever Debian release the base image is on. curl only fetches the key.
+RUN set -eu \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl openssl \
+ && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+      -o /usr/share/keyrings/postgresql-pgdg.asc \
+ && . /etc/os-release \
+ && echo "deb [signed-by=/usr/share/keyrings/postgresql-pgdg.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+      > /etc/apt/sources.list.d/pgdg.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends postgresql-client-16 \
+ && apt-get purge -y --auto-remove curl \
  && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
@@ -21,7 +34,12 @@ COPY . .
 RUN npx prisma generate && npm run build
 
 FROM base AS runtime
+ARG GIT_SHA=unknown
 ENV NODE_ENV=production
+ENV R2NETTE_GIT_SHA=${GIT_SHA}
+LABEL org.opencontainers.image.revision="${GIT_SHA}" \
+      org.opencontainers.image.source="https://github.com/takatakca/r2neet" \
+      org.opencontainers.image.title="r2nette"
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma

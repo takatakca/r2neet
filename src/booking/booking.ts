@@ -37,6 +37,8 @@ export interface BookingHold {
   createdAt: Date;
   expiresAt: Date;
   consumedAt: Date | null;
+  /** ACTIVE until consumed or released (CANCELLED). Absent means ACTIVE. */
+  status?: string;
 }
 
 export type BookingStatus =
@@ -74,17 +76,19 @@ export interface Booking {
 
 export interface SchedulingRepository {
   /**
-   * Run `fn` with the staff rows for this window locked against concurrent
-   * writers. The Postgres implementation uses SELECT ... FOR UPDATE; the
-   * in-memory one serializes. Without this, two customers can buy the same
-   * last crew.
+   * Run `fn` with capacity for this window locked against concurrent
+   * writers, including writers of overlapping or buffer-adjacent windows.
+   * The Postgres implementation takes a transaction-level advisory lock per
+   * local service day; the in-memory one serializes. Without this, two
+   * customers can buy the same last crew.
    */
   withCapacityLock<T>(window: { startUtc: Date; endUtc: Date }, fn: () => Promise<T>): Promise<T>;
   listStaff(): Promise<StaffMember[]>;
   listBusy(window: { startUtc: Date; endUtc: Date }): Promise<StaffBusy[]>;
   insertHold(hold: BookingHold): Promise<void>;
   getHold(id: string): Promise<BookingHold | null>;
-  markHoldConsumed(id: string, at: Date): Promise<void>;
+  /** Consume a live hold. False when it was already consumed or released. */
+  markHoldConsumed(id: string, at: Date): Promise<boolean>;
   insertBooking(booking: Booking): Promise<void>;
   nextBookingSequence(year: number): Promise<number>;
 }
@@ -206,12 +210,7 @@ export class BookingService {
     if (hold.customerId !== customerId) {
       throw new BookingError('That reservation has gone.', 'HOLD_NOT_FOUND');
     }
-    if (hold.consumedAt !== null) {
-      throw new BookingError('That reservation was already used.', 'HOLD_CONSUMED');
-    }
-    if (hold.expiresAt <= now) {
-      throw new BookingError('Your held time expired. Pick a time again.', 'HOLD_EXPIRED');
-    }
+    this.assertHoldLive(hold, now);
 
     const quote = await this.quotes.get(quoteId);
     if (!quote) throw new BookingError('We could not find that price.', 'QUOTE_NOT_FOUND');
@@ -228,17 +227,25 @@ export class BookingService {
     return this.repo.withCapacityLock(
       { startUtc: hold.startUtc, endUtc: hold.endUtc },
       async () => {
+        // Read again under the lock: a concurrent confirm may have consumed
+        // it, or the customer released it, since the check above.
+        const current = await this.repo.getHold(hold.id);
+        if (!current) throw new BookingError('That reservation has gone.', 'HOLD_NOT_FOUND');
+        this.assertHoldLive(current, now);
+
         const staff = await this.repo.listStaff();
         const busy = await this.repo.listBusy({
           startUtc: hold.startUtc,
           endUtc: hold.endUtc,
         });
 
-        // The hold itself is in `busy`; exclude it so it does not block its own confirmation.
-        const others = busy.filter(
-          (b) => !(b.kind === 'HOLD' && hold.staffIds.includes(b.staffId) && b.startUtc.getTime() === hold.startUtc.getTime()),
-        );
-        const check = verifySlotStillOpen(service, hold.startUtc, staff, others, now, this.buffers);
+        // Exclude this hold only. Another customer's live hold on the same
+        // crew and time still blocks.
+        const others = busy.filter((b) => !(b.kind === 'HOLD' && b.holdId === hold.id));
+        // The booking goes to the held crew, so those cleaners must still be
+        // free; enough free cleaners elsewhere is not the same thing.
+        const crew = staff.filter((s) => hold.staffIds.includes(s.id));
+        const check = verifySlotStillOpen(service, hold.startUtc, crew, others, now, this.buffers);
         if (!check.ok) {
           throw new BookingError('That time is no longer free.', 'SLOT_UNAVAILABLE');
         }
@@ -254,7 +261,7 @@ export class BookingService {
           addressId,
           startUtc: hold.startUtc,
           endUtc: hold.endUtc,
-          staffIds: hold.staffIds,
+          staffIds: check.staffIds,
           status: 'CONFIRMED',
           quoteId: quote.id,
           priceSnapshot: quote.snapshot,
@@ -263,10 +270,25 @@ export class BookingService {
           createdAt: now,
         };
 
+        // Consume first: if this hold is no longer live, nothing is written.
+        if (!(await this.repo.markHoldConsumed(hold.id, now))) {
+          throw new BookingError('That reservation was already used.', 'HOLD_CONSUMED');
+        }
         await this.repo.insertBooking(booking);
-        await this.repo.markHoldConsumed(hold.id, now);
         return booking;
       },
     );
+  }
+
+  private assertHoldLive(hold: BookingHold, now: Date): void {
+    if (hold.consumedAt !== null || hold.status === 'CONSUMED') {
+      throw new BookingError('That reservation was already used.', 'HOLD_CONSUMED');
+    }
+    if ((hold.status ?? 'ACTIVE') !== 'ACTIVE') {
+      throw new BookingError('That reservation has gone.', 'HOLD_NOT_FOUND');
+    }
+    if (hold.expiresAt <= now) {
+      throw new BookingError('Your held time expired. Pick a time again.', 'HOLD_EXPIRED');
+    }
   }
 }

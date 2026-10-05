@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
-import { createApi, SESSION_COOKIE } from '../src/api/app.js';
+import { createApi } from '../src/api/app.js';
 import { FakeVerificationProvider } from '../src/identity/identity.js';
 import { FakeStripeProvider } from '../src/payments/stripe-provider.js';
 import { PromotionClaimService, NEW_CUSTOMER_FAMILY } from '../src/promotions/claims.js';
 import { REPRICE_COPY } from '../src/payments/reprice.js';
 import { assertDestructiveAllowed } from '../src/db/safety.js';
 import { seed } from '../prisma/seed.js';
+import { signUp } from './support/customer-auth.js';
 
 const URL = process.env.TEST_DATABASE_URL;
 const d = URL ? describe : describe.skip;
@@ -80,12 +81,9 @@ d('quote revalidation', () => {
     });
   });
 
+  /** Register a new customer through the real sign-up flow and return its session. */
   async function login(phone = '514 825 2825') {
-    await request(app).post('/api/v1/auth/phone/send').send({ phone });
-    const v = await request(app).post('/api/v1/auth/phone/verify').send({ phone, code: '123456' });
-    const cookie = (v.headers['set-cookie'] as unknown as string[]).find((c) =>
-      c.startsWith(SESSION_COOKIE),
-    )!;
+    const { cookie } = await signUp(app, phone);
     const me = await request(app).get('/api/v1/customer/me').set('Cookie', cookie);
     return { cookie, customerId: me.body.customer.id as string };
   }
@@ -283,13 +281,8 @@ d('payment config for checkout', () => {
   });
 
   async function bookingWithPolicy(policy: string) {
-    await request(app).post('/api/v1/auth/phone/send').send({ phone: '514 825 2825' });
-    const v = await request(app)
-      .post('/api/v1/auth/phone/verify')
-      .send({ phone: '514 825 2825', code: '123456' });
-    const cookie = (v.headers['set-cookie'] as unknown as string[]).find((c) =>
-      c.startsWith(SESSION_COOKIE),
-    )!;
+    // A new customer, registered through the real sign-up flow.
+    const { cookie } = await signUp(app, '514 825 2825');
     const me = await request(app).get('/api/v1/customer/me').set('Cookie', cookie);
     await prisma.serviceOption.update({
       where: { id: 'svc_basic_2x3' },
@@ -380,13 +373,7 @@ d('payment config for checkout', () => {
 
   it('does not reveal another customer booking amounts', async () => {
     const first = await bookingWithPolicy('FULL_PAYMENT');
-    await request(app).post('/api/v1/auth/phone/send').send({ phone: '514 825 2826' });
-    const v = await request(app)
-      .post('/api/v1/auth/phone/verify')
-      .send({ phone: '514 825 2826', code: '123456' });
-    const attacker = (v.headers['set-cookie'] as unknown as string[]).find((c) =>
-      c.startsWith(SESSION_COOKIE),
-    )!;
+    const { cookie: attacker } = await signUp(app, '514 825 2826');
     const res = await request(app)
       .get('/api/v1/payment-config')
       .query({ bookingId: first.bookingId })

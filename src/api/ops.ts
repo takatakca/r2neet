@@ -8,7 +8,8 @@ import { WorkerHealthService, AlertService } from '../workers/health.js';
 import { RosterService, RosterError } from '../staff/roster-service.js';
 import { CATEGORIES, SERVICES } from '../data/catalogue.js';
 import { workerExpectations, offHostConfigured } from '../workers/expectations.js';
-import { localToUtc } from '../scheduling/availability.js';
+import { localToUtc, findStaffConflict, DEFAULT_BUFFERS } from '../scheduling/availability.js';
+import { acquireCapacityLocks, loadBusy } from '../db/prisma-repositories.js';
 import cookieParser from 'cookie-parser';
 import {
   StaffAuthService,
@@ -248,54 +249,74 @@ export function createOpsApi(deps: OpsDeps) {
       const actor = requirePermission(req, 'dispatch.assign');
       const bookingId = String(req.params.id);
       const staffId = String((req.body as { staffId?: string }).staffId ?? '');
-      const booking = await prisma.booking.findUnique({
-        where: { id: bookingId },
-        include: { service: true, staff: true },
-      });
+      const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
       if (!booking) throw Object.assign(new Error('Booking not found.'), { status: 404 });
 
-      // Never let a dispatcher double-book someone.
-      const clash = await prisma.bookingStaff.findFirst({
-        where: {
-          staffId,
-          booking: {
-            id: { not: bookingId },
-            status: { notIn: ['CANCELLED'] },
-            startAt: { lt: booking.endAt },
-            endAt: { gt: booking.startAt },
-          },
-        },
-        include: { booking: true },
-      });
-      if (clash) {
-        res.status(409).json({
-          error: {
-            code: 'STAFF_CONFLICT',
-            message: `That cleaner is already on ${clash.booking.bookingNumber} at this time.`,
-          },
-        });
-        return;
-      }
+      // Never let a dispatcher double-book someone. Assigning consumes
+      // capacity like a hold or a confirmation, so it takes the same locks
+      // and judges the cleaner by the same busy view: other jobs with travel
+      // time, customers' live holds, and time off.
+      const window = { startUtc: booking.startAt, endUtc: booking.endAt };
+      const outcome = await prisma.$transaction(
+        async (tx) => {
+          await acquireCapacityLocks(tx, window);
+          const current = await tx.booking.findUniqueOrThrow({
+            where: { id: bookingId },
+            include: { service: true, staff: true },
+          });
+          if (current.staff.some((a) => a.staffId === staffId)) {
+            return { kind: 'ok' as const, crewSize: current.staff.length };
+          }
+          if (current.staff.length >= current.service.requiredStaffCount) {
+            return { kind: 'full' as const };
+          }
 
-      if (booking.staff.length >= booking.service.requiredStaffCount) {
+          const busy = (await loadBusy(tx, window)).filter(
+            (b) => !(b.kind === 'BOOKING' && b.bookingId === bookingId),
+          );
+          const conflict = findStaffConflict(staffId, window, busy, now(), DEFAULT_BUFFERS);
+          if (conflict) {
+            const other =
+              conflict.kind === 'BOOKING' && conflict.bookingId
+                ? await tx.booking.findUnique({
+                    where: { id: conflict.bookingId },
+                    select: { bookingNumber: true },
+                  })
+                : null;
+            return { kind: 'conflict' as const, conflict, otherNumber: other?.bookingNumber };
+          }
+
+          await tx.bookingStaff.create({ data: { bookingId, staffId } });
+          const crewSize = current.staff.length + 1;
+          if (crewSize >= current.service.requiredStaffCount) {
+            await tx.booking.update({ where: { id: bookingId }, data: { status: 'ASSIGNED' } });
+            await tx.bookingStatusHistory.create({
+              data: { bookingId, status: 'ASSIGNED', actor: 'DISPATCH', reason: 'Crew complete' },
+            });
+          }
+          return { kind: 'ok' as const, crewSize };
+        },
+        { timeout: 20000 },
+      );
+
+      if (outcome.kind === 'full') {
         res.status(409).json({
           error: { code: 'CREW_FULL', message: 'This job already has a full crew.' },
         });
         return;
       }
-
-      await prisma.bookingStaff.create({ data: { bookingId, staffId } });
-      const updated = await prisma.booking.findUniqueOrThrow({
-        where: { id: bookingId },
-        include: { staff: true },
-      });
-      if (updated.staff.length >= booking.service.requiredStaffCount) {
-        await prisma.booking.update({ where: { id: bookingId }, data: { status: 'ASSIGNED' } });
-        await prisma.bookingStatusHistory.create({
-          data: { bookingId, status: 'ASSIGNED', actor: 'DISPATCH', reason: 'Crew complete' },
-        });
+      if (outcome.kind === 'conflict') {
+        const { conflict, otherNumber } = outcome;
+        const message =
+          conflict.kind === 'TIME_OFF'
+            ? 'That cleaner is off at this time.'
+            : conflict.kind === 'HOLD'
+              ? 'That cleaner is held for a customer who is checking out at this time.'
+              : `That cleaner is already on ${otherNumber ?? 'another job'} at this time, or too close to it to travel.`;
+        res.status(409).json({ error: { code: 'STAFF_CONFLICT', message } });
+        return;
       }
-      res.json({ assigned: true, crewSize: updated.staff.length });
+      res.json({ assigned: true, crewSize: outcome.crewSize });
     }),
   );
 

@@ -1,5 +1,9 @@
 # Deployment and operations
 
+Production rollout (Contabo VPS, domain and email at MochaHost) is in
+[the Contabo runbook](../deployment/contabo-runbook.md).
+The notes below remain the application-level controls.
+
 ## Before the first public request
 
 ```bash

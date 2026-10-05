@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
-import { createApi, SESSION_COOKIE } from '../src/api/app.js';
+import { createApi } from '../src/api/app.js';
 import { FakeVerificationProvider } from '../src/identity/identity.js';
 import { localToUtc } from '../src/scheduling/availability.js';
 import { assertDestructiveAllowed } from '../src/db/safety.js';
 import { seed } from '../prisma/seed.js';
+import { signUp } from './support/customer-auth.js';
 
 const URL = process.env.TEST_DATABASE_URL;
 const d = URL ? describe : describe.skip;
@@ -57,12 +58,9 @@ d('customer account', () => {
     app = createApi({ prisma, verification: new FakeVerificationProvider('123456') });
   });
 
+  /** Register a new customer through the real sign-up flow and return its session. */
   async function login(phone: string) {
-    await request(app).post('/api/v1/auth/phone/send').send({ phone });
-    const v = await request(app).post('/api/v1/auth/phone/verify').send({ phone, code: '123456' });
-    const cookie = (v.headers['set-cookie'] as unknown as string[]).find((c) =>
-      c.startsWith(SESSION_COOKIE),
-    )!;
+    const { cookie } = await signUp(app, phone);
     const me = await request(app).get('/api/v1/customer/me').set('Cookie', cookie);
     return { cookie, customerId: me.body.customer.id as string };
   }
@@ -293,6 +291,22 @@ d('customer account', () => {
     expect(row.staff).toHaveLength(2); // crew re-verified, not assumed
     const history = await prisma.bookingStatusHistory.findMany({ where: { bookingId: booking.id } });
     expect(history.some((h) => h.status === 'RESCHEDULED')).toBe(true);
+  });
+
+  it('a cancelled booking cannot be rescheduled back to life', async () => {
+    const { cookie, customerId } = await login('514 825 2825');
+    const { booking } = await makeBooking(customerId, 72);
+    await request(app).post(`/api/v1/account/bookings/${booking.id}/cancel`).set('Cookie', cookie);
+
+    const res = await request(app)
+      .post(`/api/v1/account/bookings/${booking.id}/reschedule`)
+      .set('Cookie', cookie)
+      .send({ startAt: soon(13).toISOString() });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('BOOKING_NOT_RESCHEDULABLE');
+    const row = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
+    expect(row.status).toBe('CANCELLED');
   });
 
   it('[INV-CAP-02] refuses a slot the business cannot staff', async () => {

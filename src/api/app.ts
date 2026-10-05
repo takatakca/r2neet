@@ -22,6 +22,9 @@ import {
   PrismaSchedulingRepo,
   PrismaQuoteRepo,
   PrismaCustomerRepo,
+  acquireCapacityLocks,
+  loadBusy,
+  loadStaff,
 } from '../db/prisma-repositories.js';
 import {
   IdentityService,
@@ -356,12 +359,16 @@ export function createApi(deps: ApiDeps) {
   if (hard.enabled) {
     if (hard.log !== null) app.use(requestLogger(hard.log ?? undefined));
     app.use(securityHeaders({ hsts: hard.hsts }));
-    app.use(requireHttps(hard.requireHttps ?? false));
-    if (hard.rateLimit !== false) app.use(rateLimit(new EdgeRateLimiter()));
   }
 
   // Liveness must never touch the database: restarting the app because
   // Postgres blipped turns a blip into an outage.
+  //
+  // Probes are registered BEFORE the HTTPS redirect and the rate limiter.
+  // Docker and the deploy script call them over plain http inside the
+  // container; a 308 to https://127.0.0.1:3000 can never succeed, so the
+  // container would never become healthy and every deploy would roll back.
+  // They return a status word only, so plain http exposes nothing.
   app.get('/healthz', livenessHandler());
   app.get(
     '/readyz',
@@ -370,6 +377,11 @@ export function createApi(deps: ApiDeps) {
       hard.isShuttingDown ?? (() => false),
     ),
   );
+
+  if (hard.enabled) {
+    app.use(requireHttps(hard.requireHttps ?? false));
+    if (hard.rateLimit !== false) app.use(rateLimit(new EdgeRateLimiter()));
+  }
 
   // The webhook needs the RAW body: signature verification is over exact
   // bytes, and JSON round-tripping would change them.
@@ -418,37 +430,11 @@ export function createApi(deps: ApiDeps) {
       const { phone, intent } = phoneSchema.parse(req.body);
       const phoneE164 = normalizePhone(phone);
 
-      const existingPhone = await prisma.customerPhone.findUnique({
-        where: {
-          phoneE164,
-        },
-        include: {
-          customer: true,
-        },
-      });
-
-      const hasCompleteAccount = Boolean(
-        existingPhone?.verifiedAt &&
-        existingPhone.customer.firstName?.trim() &&
-        existingPhone.customer.lastName?.trim(),
-      );
-
-      if (intent === 'login' && !hasCompleteAccount) {
-        throw new ApiError(
-          404,
-          'ACCOUNT_NOT_FOUND',
-          'No completed R2NETTE account was found for this number. Please sign up first.',
-        );
-      }
-
-      if (intent === 'signup' && hasCompleteAccount) {
-        throw new ApiError(
-          409,
-          'ACCOUNT_ALREADY_EXISTS',
-          'An R2NETTE account already exists for this number. Please log in instead.',
-        );
-      }
-
+      // Deliberately no account lookup here. Answering "no account" or
+      // "already registered" before the caller proves they own the phone
+      // would let anyone enumerate customers by number. Those outcomes
+      // (ACCOUNT_NOT_FOUND / ACCOUNT_ALREADY_EXISTS) come from /verify, after
+      // the code is checked.
       const ip = req.ip ?? 'unknown';
 
       const out = await identity.startVerification(phoneE164, ip);
@@ -484,12 +470,32 @@ export function createApi(deps: ApiDeps) {
         existingPhone.customer.lastName?.trim(),
       );
 
+      /** Carry the proven phone to the profile form in a single-use cookie. */
+      const issueRegistration = async () => {
+        const registration = await registrationSessions.create(verified.phoneE164, {
+          userAgent: req.header('user-agent') ?? undefined,
+          ip: req.ip ?? undefined,
+        });
+        res.cookie(REGISTRATION_COOKIE, registration.token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          expires: registration.expiresAt,
+        });
+        return registration;
+      };
+
       if (intent === 'login') {
         if (!existingPhone || !hasCompleteAccount) {
+          // The phone is proven, so go straight to the profile form instead
+          // of spending a second code on a sign-up. Customers imported from
+          // Setmore land here on their first sign-in.
+          await issueRegistration();
           throw new ApiError(
             404,
             'ACCOUNT_NOT_FOUND',
-            'No completed R2NETTE account was found for this number. Please sign up first.',
+            'No completed R2NETTE account was found for this number. Add your details to finish signing up.',
           );
         }
 
@@ -533,21 +539,7 @@ export function createApi(deps: ApiDeps) {
         );
       }
 
-      const registration = await registrationSessions.create(
-        verified.phoneE164,
-        {
-          userAgent: req.header('user-agent') ?? undefined,
-          ip: req.ip ?? undefined,
-        },
-      );
-
-      res.cookie(REGISTRATION_COOKIE, registration.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        expires: registration.expiresAt,
-      });
+      const registration = await issueRegistration();
 
       res.json({
         outcome: 'PROFILE_REQUIRED',
@@ -1142,62 +1134,61 @@ export function createApi(deps: ApiDeps) {
         newStart.getTime() + service.appointmentDurationMinutes * 60000,
       );
 
-      await scheduling.withCapacityLock(
-        { startUtc: newStart, endUtc: newEnd },
-        async () => {
-          const staff = await scheduling.listStaff();
-          const busy = (
-            await scheduling.listBusy({ startUtc: newStart, endUtc: newEnd })
-          )
-            // The booking's own current assignment must not block its move.
-            .filter(
-              (b) =>
-                !(
-                  b.kind === 'BOOKING' &&
-                  booking.staff.some((a) => a.staffId === b.staffId) &&
-                  b.startUtc.getTime() === booking.startAt.getTime()
-                ),
-            );
+      // One transaction holds the capacity locks and does every read and
+      // write. A second pooled connection while holding the lock can wait
+      // behind same-day writers queued on that lock and time out.
+      const window = { startUtc: newStart, endUtc: newEnd };
+      await prisma.$transaction(
+        async (tx) => {
+          await acquireCapacityLocks(tx, window);
 
-          const check = verifySlotStillOpen(
-            service,
-            newStart,
-            staff,
-            busy,
-            now(),
-          );
-          if (!check.ok) {
+          // Re-read under the lock: it may have been cancelled or moved.
+          const current = await tx.booking.findUnique({ where: { id: booking.id } });
+          if (
+            !current ||
+            ['CANCELLED', 'NO_SHOW', 'COMPLETED', 'IN_PROGRESS'].includes(current.status)
+          ) {
             throw new ApiError(
               409,
-              'SLOT_UNAVAILABLE',
-              'That time is no longer free.',
+              'BOOKING_NOT_RESCHEDULABLE',
+              'This booking can no longer be changed online. Please call us.',
             );
           }
 
-          await prisma.$transaction(async (tx) => {
-            await tx.booking.update({
-              where: { id: booking.id },
-              data: { startAt: newStart, endAt: newEnd, status: 'CONFIRMED' },
-            });
-            await tx.bookingStaff.deleteMany({
-              where: { bookingId: booking.id },
-            });
-            await tx.bookingStaff.createMany({
-              data: check.staffIds.map((staffId) => ({
-                bookingId: booking.id,
-                staffId,
-              })),
-            });
-            await tx.bookingStatusHistory.create({
-              data: {
-                bookingId: booking.id,
-                status: 'RESCHEDULED',
-                actor: `CUSTOMER:${customerId}`,
-                reason: `Moved to ${newStart.toISOString()}`,
-              },
-            });
+          const staff = await loadStaff(tx);
+          // The booking's own current assignment must not block its move.
+          const busy = (await loadBusy(tx, window)).filter(
+            (b) => !(b.kind === 'BOOKING' && b.bookingId === booking.id),
+          );
+
+          const check = verifySlotStillOpen(service, newStart, staff, busy, now());
+          if (!check.ok) {
+            throw new ApiError(409, 'SLOT_UNAVAILABLE', 'That time is no longer free.');
+          }
+
+          await tx.booking.update({
+            where: { id: booking.id },
+            data: { startAt: newStart, endAt: newEnd, status: 'CONFIRMED' },
+          });
+          await tx.bookingStaff.deleteMany({
+            where: { bookingId: booking.id },
+          });
+          await tx.bookingStaff.createMany({
+            data: check.staffIds.map((staffId) => ({
+              bookingId: booking.id,
+              staffId,
+            })),
+          });
+          await tx.bookingStatusHistory.create({
+            data: {
+              bookingId: booking.id,
+              status: 'RESCHEDULED',
+              actor: `CUSTOMER:${customerId}`,
+              reason: `Moved to ${newStart.toISOString()}`,
+            },
           });
         },
+        { timeout: 20000 },
       );
 
       res.json({

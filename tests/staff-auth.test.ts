@@ -104,6 +104,7 @@ d('staff authentication', () => {
     await prisma.bookingStatusHistory.deleteMany();
     await prisma.bookingStaff.deleteMany();
     await prisma.booking.deleteMany();
+    await prisma.bookingHold.deleteMany();
     await prisma.quoteLine.deleteMany();
     await prisma.quote.deleteMany();
     await prisma.recurrenceSeries.deleteMany();
@@ -346,6 +347,108 @@ d('staff authentication', () => {
       .set('Cookie', cookie)
       .send({ staffId: otherStaffId });
     expect(res.status).toBe(403);
+  });
+
+  /* ---------------- dispatch capacity ---------------- */
+
+  // A week out, 10:00 local, so live holds and the real clock agree.
+  const DAY = new Date(Date.now() + 7 * 86400000);
+  const at = (hour: number) => {
+    const d = new Date(DAY);
+    d.setUTCHours(hour + 4, 0, 0, 0); // Toronto is UTC-4 in summer, UTC-5 in winter; either is fine here
+    return d;
+  };
+  let jobSeq = 0;
+
+  async function job(start: Date, hours = 3, staffIds: string[] = []) {
+    jobSeq += 1;
+    const customer = await prisma.customer.create({ data: { firstName: 'Job', lastName: `Owner ${jobSeq}` } });
+    const address = await prisma.customerAddress.create({
+      data: { customerId: customer.id, formattedAddress: '1 Rue Test', city: 'Montréal', postalCode: 'H2X1Y4' },
+    });
+    const quote = await prisma.quote.create({
+      data: {
+        customerId: customer.id,
+        serviceOptionId: 'svc_basic_2x3',
+        frequency: 'ONE_TIME',
+        baseServiceCents: 20000,
+        transportationCents: 0,
+        subtotalCents: 20000,
+        gstCents: 1000,
+        qstCents: 1995,
+        taxTotalCents: 2995,
+        grandTotalCents: 22995,
+        gstRateMicroPercent: 5_000_000,
+        qstRateMicroPercent: 9_975_000,
+        pricingVersion: '2026-08-01',
+        priceSnapshot: {},
+        expiresAt: new Date(Date.now() + 3600000),
+      },
+    });
+    return prisma.booking.create({
+      data: {
+        bookingNumber: `R2N-2026-9${String(jobSeq).padStart(5, '0')}`,
+        customerId: customer.id,
+        serviceOptionId: 'svc_basic_2x3',
+        addressId: address.id,
+        quoteId: quote.id,
+        startAt: start,
+        endAt: new Date(start.getTime() + hours * 3600000),
+        grandTotalCents: 22995,
+        priceSnapshot: {},
+        staff: { create: staffIds.map((staffId) => ({ staffId })) },
+      },
+    });
+  }
+
+  async function assign(bookingId: string, staffId: string) {
+    const cookie = await login(DISPATCH);
+    return request(app)
+      .post(`/api/v1/admin/bookings/${bookingId}/assign`)
+      .set('Cookie', cookie)
+      .send({ staffId });
+  }
+
+  it('a dispatcher cannot give away a cleaner a customer is holding at checkout', async () => {
+    const target = await job(at(11));
+    const holder = await prisma.customer.create({ data: {} });
+    await prisma.bookingHold.create({
+      data: {
+        customerId: holder.id,
+        serviceOptionId: 'svc_basic_2x3',
+        startAt: at(10),
+        endAt: at(13),
+        requiredStaffCount: 2,
+        staffIds: [otherStaffId, cleanerStaffId],
+        expiresAt: new Date(Date.now() + 10 * 60000),
+      },
+    });
+
+    const res = await assign(target.id, otherStaffId);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('STAFF_CONFLICT');
+    expect(await prisma.bookingStaff.count({ where: { bookingId: target.id } })).toBe(0);
+  });
+
+  it('a dispatcher cannot book a cleaner back to back with no time to travel', async () => {
+    const first = await job(at(10), 3, [otherStaffId]);
+    const tooClose = await job(at(13));
+    const res = await assign(tooClose.id, otherStaffId);
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toContain(first.bookingNumber);
+
+    const withTravel = await job(new Date(at(13).getTime() + 30 * 60000));
+    expect((await assign(withTravel.id, otherStaffId)).status).toBe(200);
+  });
+
+  it('a dispatcher cannot assign a cleaner during their time off', async () => {
+    await prisma.staffTimeOff.create({
+      data: { staffId: otherStaffId, startAt: at(8), endAt: at(18), reason: 'Appointment' },
+    });
+    const target = await job(at(10));
+    const res = await assign(target.id, otherStaffId);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('STAFF_CONFLICT');
   });
 
   /* ---------------- cleaner scoping ---------------- */

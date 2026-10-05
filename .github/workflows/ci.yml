@@ -43,14 +43,31 @@ jobs:
 
       # The bundle is what customers actually load. A silent size jump usually
       # means a dependency was pulled into the browser by accident.
+      # Code only: photos copied from web/public are budgeted separately below,
+      # so a new image can never hide a dependency leaking into the browser.
       - name: Check bundle size
         run: |
-          TOTAL=$(du -sk dist/assets | cut -f1)
+          TOTAL=$(find dist/assets -type f \( -name '*.js' -o -name '*.css' \) -exec du -ck {} + | tail -1 | cut -f1)
           echo "Bundle: ${TOTAL}KB"
           if [ "$TOTAL" -gt 400 ]; then
             echo "::error::Bundle grew to ${TOTAL}KB (limit 400KB)."
             exit 1
           fi
+
+      # Customers arrive on phones from social links. An unoptimised photo
+      # costs them seconds on a mobile connection.
+      - name: Check image sizes
+        run: |
+          FAIL=0
+          while IFS= read -r f; do
+            KB=$(du -k "$f" | cut -f1)
+            echo "${f}: ${KB}KB"
+            if [ "$KB" -gt 400 ]; then
+              echo "::error file=${f}::Image is ${KB}KB (limit 400KB per image). Resize or recompress it."
+              FAIL=1
+            fi
+          done < <(find web/public -type f \( -name '*.jpg' -o -name '*.jpeg' -o -name '*.png' -o -name '*.webp' \))
+          exit $FAIL
 
   test:
     name: Tests
@@ -72,10 +89,10 @@ jobs:
     env:
       NODE_ENV: test
       # Only the test database is ever named here. The safety guard refuses
-      # destructive operations against anything else.
+      # destructive operations against anything else, and refuses outright
+      # when DATABASE_URL equals TEST_DATABASE_URL, so DATABASE_URL is unset.
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/r2nette_test
       PRISMA_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/r2nette_test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/r2nette_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -187,11 +204,14 @@ jobs:
           # leaves no usable audit trail. It was removed deliberately.
           #
           # hardening.ts READS env.ADMIN_TOKEN in order to refuse it at
-          # startup, so that file is excluded; comments are excluded too.
-          # What must never return is code that authenticates with one.
+          # startup, and the deploy gate (validate-production-env.ts) reads it
+          # to refuse a deploy, so those files are excluded; comments are
+          # excluded too. What must never return is code that authenticates
+          # with one.
           HITS=$(grep -rIn --exclude-dir=node_modules \
                    'ADMIN_TOKEN' src/ web/ scripts/ 2>/dev/null \
                  | grep -v 'src/api/hardening.ts' \
+                 | grep -v 'scripts/deploy/validate-production-env.ts' \
                  | grep -vE '//|[*]' || true)
           if [ -n "$HITS" ]; then
             echo "$HITS"
@@ -237,6 +257,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build image
         run: docker build -t r2nette:ci .
+
+      - name: Backup client matches the PostgreSQL 16 server
+        run: |
+          # pg_dump refuses to dump a server newer than itself, so the nightly
+          # backup needs a version 16 client for the postgres:16 database.
+          VERSION=$(docker run --rm --entrypoint pg_dump r2nette:ci --version)
+          echo "$VERSION"
+          if ! echo "$VERSION" | grep -Eq ' 16\.'; then
+            echo "::error::The image's pg_dump is not version 16, so backups of the postgres:16 database would fail."
+            exit 1
+          fi
 
       - name: Refuses an unsafe production configuration
         run: |
