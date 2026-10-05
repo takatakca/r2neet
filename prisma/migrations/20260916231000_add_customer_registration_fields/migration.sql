@@ -8,8 +8,17 @@ ADD COLUMN "privacyAcceptedAt" TIMESTAMP(3),
 ADD COLUMN "privacyVersion" TEXT,
 ADD COLUMN "marketingConsent" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN "marketingConsentUpdatedAt" TIMESTAMP(3);
--- Protect temporary OTP registration proofs from the Supabase Data API.
+-- Protect temporary OTP registration proofs from the Supabase Data API when
+-- those roles exist. MochaHost and CI run vanilla PostgreSQL, which has
+-- neither role; an unconditional REVOKE fails the whole migration there.
 ALTER TABLE "RegistrationSession" ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL PRIVILEGES ON TABLE "RegistrationSession"
-FROM anon, authenticated;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    EXECUTE 'REVOKE ALL PRIVILEGES ON TABLE "RegistrationSession" FROM anon';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    EXECUTE 'REVOKE ALL PRIVILEGES ON TABLE "RegistrationSession" FROM authenticated';
+  END IF;
+END $$;

@@ -1,0 +1,176 @@
+# Production stack for the MochaHost VPS.
+#
+# PostgreSQL has no host port. The only published ports are 80 and 443.
+# Web and workers start only after `migrate` exits successfully.
+# Tag R2NETTE_IMAGE with the full git commit SHA. Do not deploy :latest.
+
+name: r2nette
+
+x-log: &log
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+x-app: &app
+  image: ${R2NETTE_IMAGE:?set R2NETTE_IMAGE to an immutable git SHA tag}
+  restart: unless-stopped
+  env_file:
+    - path: .env
+      required: true
+  environment:
+    NODE_ENV: production
+    HOST: 0.0.0.0
+    PORT: "3000"
+    TRUST_PROXY: "true"
+    REQUIRE_HTTPS: "true"
+    POSTGRES_HOST: postgres
+    R2NETTE_IMAGE: ${R2NETTE_IMAGE:?set R2NETTE_IMAGE to an immutable git SHA tag}
+  stop_grace_period: 40s
+  networks:
+    - private
+    - edge
+  depends_on:
+    postgres:
+      condition: service_healthy
+  <<: *log
+
+x-worker-health: &worker-health
+  test:
+    - CMD
+    - node
+    - --input-type=module
+    - -e
+    - "import net from 'node:net'; const socket = net.connect(5432, 'postgres'); const fail = () => process.exit(1); socket.setTimeout(3000); socket.on('connect', () => { socket.end(); process.exit(0); }); socket.on('timeout', fail); socket.on('error', fail);"
+  interval: 30s
+  timeout: 5s
+  retries: 5
+  start_period: 25s
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - private
+    <<: *log
+
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
+    networks:
+      - private
+
+  web:
+    <<: *app
+    command: ["npm", "start"]
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - --input-type=module
+        - -e
+        - "const port = process.env.PORT || '3000'; for (const path of ['/healthz', '/readyz']) { const res = await fetch('http://127.0.0.1:' + port + path); if (!res.ok) process.exit(1); } process.exit(0);"
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  billing:
+    <<: *app
+    command: ["npm", "run", "loop:billing"]
+    healthcheck: *worker-health
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  scheduler:
+    <<: *app
+    command: ["npm", "run", "loop:scheduler"]
+    healthcheck: *worker-health
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  backup-init:
+    <<: *app
+    user: "0:0"
+    restart: "no"
+    command: ["chown", "-R", "10001:10001", "/app/backups"]
+    volumes:
+      - backups:/app/backups
+    networks:
+      - private
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  backup:
+    <<: *app
+    command: ["npm", "run", "loop:backup"]
+    healthcheck: *worker-health
+    volumes:
+      - backups:/app/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      backup-init:
+        condition: service_completed_successfully
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      PRODUCTION_DOMAIN: ${PRODUCTION_DOMAIN:?set PRODUCTION_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - private
+      - edge
+    depends_on:
+      web:
+        condition: service_healthy
+    <<: *log
+
+networks:
+  private:
+    internal: true
+  edge:
+
+volumes:
+  pgdata:
+  backups:
+  caddy-data:
+  caddy-config:

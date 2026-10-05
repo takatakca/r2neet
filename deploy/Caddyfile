@@ -1,15 +1,24 @@
+# Automatic HTTPS for the production domain.
+# GET and HEAD on port 80 redirect to HTTPS.
+# Any other method is refused here so an insecure POST body is never redirected.
 {
 	email {$ACME_EMAIL}
+	auto_https disable_redirects
 }
 
-www.{$DOMAIN} {
-	redir https://{$DOMAIN}{uri} permanent
+{$PRODUCTION_DOMAIN} {
+	encode gzip
+	reverse_proxy web:3000
 }
 
-{$DOMAIN} {
-	encode zstd gzip
-	# Caddy sets X-Forwarded-Proto/For; the app trusts them via TRUST_PROXY.
-	reverse_proxy web:3000 {
-		health_uri /healthz
+http://{$PRODUCTION_DOMAIN} {
+	@unsafe {
+		not method GET
+		not method HEAD
 	}
+	handle @unsafe {
+		header Content-Type application/json
+		respond "{\"error\":{\"code\":\"HTTPS_REQUIRED\",\"message\":\"This endpoint requires a secure connection.\"}}" 403
+	}
+	redir https://{host}{uri} 308
 }

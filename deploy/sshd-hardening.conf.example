@@ -1,0 +1,9 @@
+# Apply only after a key login works from a second terminal.
+# Do not install this file until that second session is confirmed.
+# Installing it earlier can lock the owner out of the VPS.
+
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
+AuthenticationMethods publickey

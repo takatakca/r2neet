@@ -1,5 +1,9 @@
 # Deployment and operations
 
+Production rollout on a MochaHost VPS is in
+[the MochaHost runbook](../deployment/mochahost-runbook.md).
+The notes below remain the application-level controls.
+
 ## Before the first public request
 
 ```bash
