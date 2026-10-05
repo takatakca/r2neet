@@ -2,6 +2,7 @@ name: Server admin
 
 # Small, safe operations on the running server, without SSHing in by hand.
 #   status        containers, health checks, running revision
+#   restart-proxy Caddy retries HTTPS certificates now (run after DNS web)
 #   create-owner  the first OWNER login; its password is the
 #                 OWNER_INITIAL_PASSWORD secret and is never printed
 # The log is public (public repository): nothing here prints a secret,
@@ -13,7 +14,7 @@ on:
         description: What to do
         required: true
         type: choice
-        options: [status, create-owner]
+        options: [status, restart-proxy, create-owner]
       owner_email:
         description: create-owner only — the owner's email
         required: false
@@ -33,6 +34,8 @@ permissions:
 jobs:
   admin:
     name: ${{ inputs.task }}
+    # Only main's scripts may run with root and cPanel credentials.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production

@@ -13,10 +13,14 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 export DEBIAN_FRONTEND=noninteractive
+# Runs unattended over SSH too (the Server setup workflow): wait for a fresh
+# server's own apt run to release the lock instead of failing, and keep
+# existing config files instead of stopping at a dpkg prompt.
+apt_opts=(-o DPkg::Lock::Timeout=600 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
 
-apt-get update
-apt-get upgrade -y
-apt-get install -y ca-certificates curl gnupg unattended-upgrades ufw
+apt-get "${apt_opts[@]}" update
+apt-get "${apt_opts[@]}" upgrade -y
+apt-get "${apt_opts[@]}" install -y ca-certificates curl gnupg unattended-upgrades ufw
 
 if ! command -v docker >/dev/null 2>&1; then
   install -m 0755 -d /etc/apt/keyrings
@@ -26,8 +30,8 @@ if ! command -v docker >/dev/null 2>&1; then
   . /etc/os-release
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable" \
     > /etc/apt/sources.list.d/docker.list
-  apt-get update
-  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  apt-get "${apt_opts[@]}" update
+  apt-get "${apt_opts[@]}" install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 fi
 systemctl enable --now docker
 

@@ -55,7 +55,7 @@ elif [[ "${SSH_ALLOW_FIRST_CONTACT:-}" == "1" ]]; then
   echo "First contact with the server. Its public host keys, to pin in deploy/known_hosts:"
   sed 's/^/  /' "$_known_hosts"
 else
-  echo "No pinned host key. Run the 'Server setup' workflow first, or set CONTABO_SSH_KNOWN_HOSTS." >&2
+  echo "No pinned host key. Run the 'Server setup' workflow, then copy the host key line(s) it prints into a secret named CONTABO_SSH_KNOWN_HOSTS (or commit them to deploy/known_hosts)." >&2
   exit 1
 fi
 

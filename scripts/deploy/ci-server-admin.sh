@@ -2,6 +2,7 @@
 # GitHub Actions entrypoint for the 'Server admin' workflow.
 #
 #   TASK=status        containers, health, and the running revision
+#   TASK=restart-proxy restart Caddy so it requests certificates now (after DNS)
 #   TASK=create-owner  create the OWNER staff login. The password comes from
 #                      the OWNER_INITIAL_PASSWORD secret over stdin and is
 #                      never printed; change it at first sign-in.
@@ -23,6 +24,12 @@ else
 fi
 
 case "$TASK" in
+  restart-proxy)
+    # Caddy backs off after failed certificate attempts (e.g. before DNS
+    # pointed here). Restarting makes it try again at once.
+    ssh_remote "cd /opt/r2nette && ${as_app} bash scripts/deploy/compose.sh restart caddy"
+    echo "Caddy restarted; it will request the HTTPS certificates now."
+    ;;
   status)
     ssh_remote "cd /opt/r2nette && ${as_app} bash scripts/deploy/compose.sh ps --format 'table {{.Service}}\t{{.State}}\t{{.Status}}' \
       && ${as_app} bash scripts/deploy/healthcheck.sh \
@@ -43,10 +50,11 @@ case "$TASK" in
       echo "Missing required secret name: OWNER_INITIAL_PASSWORD" >&2
       exit 1
     fi
-    # The password travels on stdin into STAFF_PASSWORD inside the
-    # container; create-staff prints it only when it generated one itself.
+    # The password travels on stdin, then only in the environment (runuser
+    # keeps exported variables), never in a command line another account
+    # could read with ps. create-staff prints it only when it generated one.
     printf '%s\n' "$OWNER_INITIAL_PASSWORD" | ssh_remote "cd /opt/r2nette && IFS= read -r STAFF_PASSWORD && export STAFF_PASSWORD \
-      && ${as_app} STAFF_PASSWORD=\"\$STAFF_PASSWORD\" bash scripts/deploy/compose.sh exec -T -e STAFF_PASSWORD web \
+      && ${as_app} bash scripts/deploy/compose.sh exec -T -e STAFF_PASSWORD web \
          npm run --silent staff:create -- --email '${OWNER_EMAIL}' --name '${OWNER_NAME}' --role OWNER"
     echo "Sign in at /admin with ${OWNER_EMAIL} and the password you saved as OWNER_INITIAL_PASSWORD, then change it and turn on two-step verification."
     ;;

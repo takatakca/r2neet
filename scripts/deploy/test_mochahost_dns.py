@@ -177,7 +177,9 @@ class DnsPhases(unittest.TestCase):
         self.assertEqual(self.fake.get(f"ftp.{DOMAIN}", "A"), [[MOCHA]])
         self.assertEqual(self.fake.get(f"autodiscover.{DOMAIN}", "A"), [[MOCHA]])
         self.assertEqual(self.fake.get(DOMAIN, "MX"), [["0", f"mail.{DOMAIN}."]])
-        self.assertEqual(self.fake.get(DOMAIN, "TXT")[0], [f"v=spf1 +a +mx +ip4:{MOCHA} ~all"])
+        # SPF keeps authorising MochaHost, including the IPv6 address the
+        # bare domain's AAAA gave it, which the web phase removes.
+        self.assertEqual(self.fake.get(DOMAIN, "TXT")[0], [f"v=spf1 +a +mx +ip4:{MOCHA} +ip6:2001:db8::10 ~all"])
         self.assertEqual(self.fake.routing, "local")
         # The website has not moved yet.
         self.assertEqual(self.fake.get(DOMAIN, "A"), [[MOCHA]])
@@ -210,6 +212,55 @@ class DnsPhases(unittest.TestCase):
         self.assertNotIn("wrong-secret-token", out)
 
 
+class ZoneVariants(DnsPhases):
+    """Real zones differ from cPanel's template; each case below is one."""
+
+    def zone_with(self, *extra, drop=()):
+        records = [r for r in standard_zone() if (r[0], r[1]) not in drop] + list(extra)
+        self.server.shutdown(); self.server.server_close()
+        self.fake = FakeCpanel(records)
+        self.server = self.fake.serve()
+        self.env["CPANEL_HOST"] = f"http://127.0.0.1:{self.server.server_port}"
+
+    def test_mail_with_only_a_txt_record_still_gets_an_address(self):
+        d = DOMAIN + "."
+        self.zone_with(("TXT", "mail." + d, ["note"]), drop={("CNAME", "mail." + d)})
+        self.assertEqual(self.run_mode("email")[0], 0)
+        self.assertEqual(self.fake.get(f"mail.{DOMAIN}", "A"), [[MOCHA]])
+
+    def test_mail_alias_to_the_mochahost_server_is_kept_and_web_allowed(self):
+        d = DOMAIN + "."
+        self.zone_with(("CNAME", "mail." + d, ["server123.mochahost.com."]), drop={("CNAME", "mail." + d)})
+        self.assertEqual(self.run_mode("email")[0], 0)
+        self.assertEqual(self.fake.get(f"mail.{DOMAIN}", "CNAME"), [["server123.mochahost.com."]])
+        code, out = self.run_mode("web")
+        self.assertEqual(code, 0, out)
+
+    def test_secondary_mx_and_srv_records(self):
+        d = DOMAIN + "."
+        self.zone_with(("MX", d, ["10", "mx2.mochahost.com."]),
+                       ("SRV", "_caldavs._tcp." + d, ["0", "0", "2080", d]))
+        self.assertEqual(self.run_mode("email")[0], 0)
+        self.assertIn(["10", "mx2.mochahost.com."], self.fake.get(DOMAIN, "MX"))
+        self.assertIn(["0", f"mail.{DOMAIN}."], self.fake.get(DOMAIN, "MX"))
+        self.assertEqual(self.fake.get(f"_caldavs._tcp.{DOMAIN}", "SRV"), [["0", "0", "2080", f"mail.{DOMAIN}."]])
+
+    def test_web_is_refused_while_any_email_change_is_outstanding(self):
+        self.assertEqual(self.run_mode("email")[0], 0)
+        # Someone re-adds an alias of the website by hand.
+        self.fake._add({"record_type": "CNAME", "dname": f"webdisk.{DOMAIN}.", "ttl": 14400, "data": [DOMAIN + "."]})
+        code, out = self.run_mode("web")
+        self.assertNotEqual(code, 0)
+        self.assertIn("webdisk", out)
+        self.assertEqual(self.fake.get(DOMAIN, "A"), [[MOCHA]])
+
+    def test_a_host_name_for_the_vps_is_resolved(self):
+        self.env["SERVER_IP"] = "localhost"
+        code, out = self.run_mode("plan")
+        self.assertEqual(code, 0, out)
+        self.assertIn("-> 127.0.0.1", out)
+
+
 class Spf(unittest.TestCase):
     def test_adds_ip_only_when_spf_relies_on_a(self):
         self.assertEqual(dns.spf_with_ip("v=spf1 +a +mx ~all", MOCHA), f"v=spf1 +a +mx +ip4:{MOCHA} ~all")
@@ -217,6 +268,20 @@ class Spf(unittest.TestCase):
         self.assertIsNone(dns.spf_with_ip(f"v=spf1 +a +ip4:{MOCHA} ~all", MOCHA))
         self.assertIsNone(dns.spf_with_ip("v=spf1 +mx include:_spf.mochahost.com ~all", MOCHA))
         self.assertIsNone(dns.spf_with_ip("google-site-verification=abc", MOCHA))
+
+    def test_every_form_of_a_on_the_bare_domain(self):
+        for mech in ("a", "+a", "a/24", f"a:{DOMAIN}", f"+a:{DOMAIN}/24"):
+            self.assertEqual(
+                dns.spf_with_ip(f"v=spf1 {mech} ~all", MOCHA, DOMAIN),
+                f"v=spf1 {mech} +ip4:{MOCHA} ~all", mech)
+        # a on another host, or a failing/neutral qualifier, does not authorise MochaHost.
+        for mech in ("a:other.example", "-a", "~a", "?a"):
+            self.assertIsNone(dns.spf_with_ip(f"v=spf1 {mech} ~all", MOCHA, DOMAIN), mech)
+
+    def test_keeps_mochahost_ipv6(self):
+        self.assertEqual(
+            dns.spf_with_ip("v=spf1 +a ~all", MOCHA, DOMAIN, ("2001:db8::10",)),
+            f"v=spf1 +a +ip4:{MOCHA} +ip6:2001:db8::10 ~all")
 
 
 if __name__ == "__main__":

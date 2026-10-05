@@ -30,6 +30,8 @@ permissions:
 jobs:
   setup:
     name: Set up the VPS
+    # Only main's scripts may run with root and cPanel credentials.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: production

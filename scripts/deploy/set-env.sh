@@ -39,19 +39,22 @@ PLAIN = re.compile(r"^[A-Za-z0-9_./:@+=,%-]*$")
 def encode(name, value):
     if PLAIN.match(value):
         return value
-    if "'" in value:
-        sys.exit(f"{name}: the value contains a single quote, which a .env file cannot hold safely.")
+    if "'" in value or value.endswith("\\"):
+        sys.exit(f"{name}: the value contains a single quote or ends in a backslash, which a .env file cannot hold safely.")
     # Single quotes: docker compose reads the value literally.
     return f"'{value}'"
 
 updates = {}
-for raw in sys.stdin.read().splitlines():
+# Split on "\n" only: splitlines() also breaks on characters like U+2028,
+# which could cut a secret in two and print its tail below.
+for number, raw in enumerate(sys.stdin.read().split("\n"), start=1):
     if not raw.strip():
         continue
     name, sep, value = raw.partition("=")
     name = name.strip()
     if not sep or name not in ALLOWED:
-        sys.exit(f"Refusing to set {name or '(blank)'}: not an allowed setting.")
+        shown = name if re.fullmatch(r"[A-Z0-9_]{1,64}", name) else f"(line {number})"
+        sys.exit(f"Refusing to set {shown}: not an allowed setting.")
     updates[name] = encode(name, value.strip())
 
 if not updates:

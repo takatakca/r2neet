@@ -50,8 +50,8 @@ present=()
 for name in "${settings[@]}"; do
   value="${!name:-}"
   if [[ -n "$value" ]]; then
-    if [[ "$value" == *$'\n'* ]]; then
-      echo "${name} contains a line break; skipped." >&2
+    if [[ "$value" == *[[:cntrl:]]* ]]; then
+      echo "${name} contains a line break or another control character; skipped. Re-enter that secret." >&2
       continue
     fi
     payload+="${name}=${value}"$'\n'
@@ -66,7 +66,8 @@ else
 fi
 
 echo
-echo "Host key line(s) for deploy/known_hosts (public keys, safe to commit):"
+echo "Server host key (public, safe to share). Deploy and Server admin need it pinned:"
+echo "copy the line(s) below into a secret named CONTABO_SSH_KNOWN_HOSTS, or commit them to deploy/known_hosts."
 ssh_known_hosts_lines
 echo
-echo "Server setup complete. Next: run the Deploy workflow."
+echo "Server setup complete. Next: pin the host key as above, then run the Deploy workflow."

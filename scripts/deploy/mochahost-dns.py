@@ -121,20 +121,27 @@ def a_record(name: str, ttl: int, ip: str) -> dict:
     return {"dname": f"{name}.", "ttl": ttl, "record_type": "A", "data": [ip]}
 
 
-def spf_with_ip(value: str, ip: str) -> str | None:
-    """SPF that still authorises `ip` after the bare domain moves, or None if
-    no change is needed."""
+def spf_with_ip(value: str, ip: str, domain: str = "", ip6: tuple[str, ...] = ()) -> str | None:
+    """SPF that still authorises MochaHost (`ip`, and its IPv6 addresses
+    `ip6`) after the bare domain moves, or None if no change is needed.
+
+    Only an `a` mechanism that resolves the bare domain loses MochaHost when
+    it moves: `a`, `+a`, `a/24`, `a:<domain>`, `+a:<domain>/24`."""
     tokens = value.split()
     if not tokens or tokens[0].lower() != "v=spf1":
         return None
-    relies_on_a = any(t.lower() in ("a", "+a") for t in tokens[1:])
-    has_ip = any(t.lower() in (f"ip4:{ip}", f"+ip4:{ip}") for t in tokens[1:])
-    if not relies_on_a or has_ip:
+    apex = re.escape(domain.lower()) if domain else None
+    pattern = rf"\+?a(:{apex}\.?)?(/\d+)?(//\d+)?" if apex else r"\+?a(/\d+)?(//\d+)?"
+    relies_on_a = any(re.fullmatch(pattern, t.lower()) for t in tokens[1:])
+    if not relies_on_a:
         return None
-    if re.fullmatch(r"[-~?+]?all", tokens[-1].lower()):
-        tokens.insert(len(tokens) - 1, f"+ip4:{ip}")
-    else:
-        tokens.append(f"+ip4:{ip}")
+    present = {t.lower().lstrip("+") for t in tokens[1:]}
+    wanted = [f"ip4:{ip}"] + [f"ip6:{a}" for a in ip6]
+    missing = [w for w in wanted if w.lower() not in present]
+    if not missing:
+        return None
+    insert_at = len(tokens) - 1 if re.fullmatch(r"[-~?+]?all", tokens[-1].lower()) else len(tokens)
+    tokens[insert_at:insert_at] = [f"+{w}" for w in missing]
     return " ".join(tokens)
 
 
@@ -156,7 +163,7 @@ def email_phase(zone: Zone, server_ip: str) -> list[Change]:
             changes.append(Change("remove", f"{name} CNAME -> {d} (alias of the website)", line_index=r.line_index))
         if cnames and not a_recs:
             changes.append(Change("add", f"{name} A -> {ip} (stays on MochaHost)", a_record(name, cnames[0].ttl, ip)))
-        elif label == "mail" and not a_recs and not zone.find(name):
+        elif label == "mail" and not a_recs and not any(r.rtype in ("A", "CNAME") for r in zone.find(name)):
             changes.append(Change("add", f"{name} A -> {ip} (mail gets its own address)", a_record(name, default_ttl, ip)))
         for r in a_recs:
             if r.data and r.data[0] == server_ip:
@@ -171,9 +178,20 @@ def email_phase(zone: Zone, server_ip: str) -> list[Change]:
                 {"dname": r.raw_dname, "ttl": r.ttl, "record_type": "MX", "data": [r.data[0], f"mail.{d}."]},
                 r.line_index))
 
+    # cPanel's calendar/contacts SRV records (_caldav._tcp, ...) may target
+    # the bare domain; keep them on MochaHost with mail.
+    for r in zone.records:
+        if r.rtype == "SRV" and len(r.data) >= 4 and fqdn(r.data[3], d) == d:
+            changes.append(Change(
+                "edit", f"{r.name} SRV -> mail.{d} (stays on MochaHost)",
+                {"dname": r.raw_dname, "ttl": r.ttl, "record_type": "SRV",
+                 "data": [r.data[0], r.data[1], r.data[2], f"mail.{d}."]},
+                r.line_index))
+
+    apex_v6 = tuple(r.data[0] for r in zone.find(d, "AAAA") if r.data)
     for r in zone.find(d, "TXT"):
         value = "".join(r.data)
-        new = spf_with_ip(value, ip)
+        new = spf_with_ip(value, ip, d, apex_v6)
         if new:
             changes.append(Change(
                 "edit", f"{d} SPF '{value}' -> '{new}'",
@@ -183,16 +201,22 @@ def email_phase(zone: Zone, server_ip: str) -> list[Change]:
 
 
 def email_phase_done(zone: Zone, server_ip: str) -> list[str]:
+    """Why moving the website now would take email with it (empty = safe)."""
     d = zone.domain
     problems = []
     for r in zone.find(d, "MX"):
-        if len(r.data) >= 2 and fqdn(r.data[1], d) == d:
+        if len(r.data) < 2:
+            problems.append(f"an MX record for {d} has an unexpected shape")  # fail closed
+        elif fqdn(r.data[1], d) == d:
             problems.append(f"MX still names {d}")
     mail_a = zone.find(f"mail.{d}", "A")
-    if any(fqdn(r.data[0], d) == d for r in zone.find(f"mail.{d}", "CNAME") if r.data):
+    mail_cname = [r for r in zone.find(f"mail.{d}", "CNAME") if r.data]
+    if any(fqdn(r.data[0], d) == d for r in mail_cname):
         problems.append(f"mail.{d} is still an alias of {d}")
-    elif not mail_a and any(len(r.data) >= 2 and fqdn(r.data[1], d) == f"mail.{d}" for r in zone.find(d, "MX")):
-        problems.append(f"mail.{d} has no A record")
+    elif not mail_a and not mail_cname and any(
+        len(r.data) >= 2 and fqdn(r.data[1], d) == f"mail.{d}" for r in zone.find(d, "MX")
+    ):
+        problems.append(f"mail.{d} has no address record")
     if any(r.data and r.data[0] == server_ip for r in mail_a):
         problems.append(f"mail.{d} points at the VPS")
     return problems
@@ -224,6 +248,26 @@ def web_phase(zone: Zone, server_ip: str) -> list[Change]:
             changes.append(Change("remove", f"{name} AAAA {r.data[0] if r.data else ''} (would still reach MochaHost)",
                                   line_index=r.line_index))
     return changes
+
+
+def resolve_ipv4(value: str) -> str:
+    """The VPS address as IPv4: accept an IP or a hostname with one A record."""
+    value = value.strip()
+    try:
+        addr = ipaddress.ip_address(value)
+        if addr.version == 4:
+            return value
+        raise SystemExit("The VPS address must be IPv4 for the A records.")
+    except ValueError:
+        pass
+    import socket
+    try:
+        found = sorted({ai[4][0] for ai in socket.getaddrinfo(value, None, socket.AF_INET)})
+    except socket.gaierror:
+        raise SystemExit("The VPS address (CONTABO_SSH_HOST) is neither an IPv4 address nor a resolvable host.") from None
+    if len(found) != 1:
+        raise SystemExit("The VPS host name resolves to several addresses; put the IPv4 address in CONTABO_SSH_HOST.")
+    return found[0]
 
 
 class Cpanel:
@@ -275,7 +319,7 @@ def show(title: str, changes: list[Change]) -> None:
 
 def show_zone(zone: Zone) -> None:
     print(f"Zone {zone.domain} (serial {zone.serial}):")
-    interesting = {"A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA"}
+    interesting = {"A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA", "SRV"}
     for r in zone.records:
         if r.rtype in interesting:
             print(f"  {r.name:40} {r.ttl:>6} {r.rtype:5} {' '.join(r.data)[:120]}")
@@ -290,11 +334,7 @@ def main() -> None:
         raise SystemExit("MODE must be plan, email or web.")
     if not re.fullmatch(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+", domain):
         raise SystemExit("DOMAIN is not a domain name.")
-    try:
-        if ipaddress.ip_address(server_ip).version != 4:
-            raise ValueError
-    except ValueError:
-        raise SystemExit("SERVER_IP must be the VPS's IPv4 address.") from None
+    server_ip = resolve_ipv4(server_ip)
     for name in ("CPANEL_HOST", "CPANEL_USER", "CPANEL_TOKEN"):
         if not env.get(name):
             raise SystemExit(f"Missing required secret name: MOCHAHOST_{name}")
@@ -322,13 +362,16 @@ def main() -> None:
         except SystemExit as e:
             print(f"WARNING: could not set mail routing automatically ({e}). In cPanel > Email Routing choose Local Mail Exchanger.")
         remaining = email_phase(zone, server_ip)
-        if remaining:
+        problems = email_phase_done(zone, server_ip)
+        if remaining or problems:
             show("Still not applied", remaining)
+            for p in problems:
+                print(f"  problem {p}")
             raise SystemExit(1)
         print("\nEmail phase is in place.")
         return
 
-    problems = email_phase_done(zone, server_ip)
+    problems = email_phase_done(zone, server_ip) + [c.description for c in email_changes]
     if problems:
         raise SystemExit("Run the email phase first: " + "; ".join(problems))
     web_changes = web_phase(zone, server_ip)
