@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
 import { createApi } from '../src/api/app.js';
+import { customerSession } from './customer-session.js';
 import { FakeVerificationProvider } from '../src/identity/identity.js';
 import {
   FakePlacesProvider,
@@ -120,9 +121,7 @@ d('address HTTP routes', () => {
   });
 
   async function login(phone = '514 825 2825') {
-    await request(app).post('/api/v1/auth/phone/send').send({ phone });
-    const v = await request(app).post('/api/v1/auth/phone/verify').send({ phone, code: '123456' });
-    return (v.headers['set-cookie'] as unknown as string[]).find((c) => c.startsWith('r2n_session'))!;
+    return customerSession(app, phone);
   }
 
   it('returns suggestions and keeps one token per search session', async () => {

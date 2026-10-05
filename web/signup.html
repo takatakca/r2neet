@@ -49,9 +49,9 @@
 
     <section class="auth-card">
       <div class="language">
-        <button type="button" aria-pressed="true">EN</button>
+        <button type="button" id="localeEn" data-locale="en" aria-pressed="true">EN</button>
         <span>|</span>
-        <button type="button" aria-pressed="false">FR</button>
+        <button type="button" id="localeFr" data-locale="fr" aria-pressed="false">FR</button>
       </div>
 
       <a class="brand brand-small" href="/" aria-label="R2NETTE home">
@@ -91,7 +91,12 @@
           </div>
         </div>
 
-        <form id="profileForm" novalidate>
+        <form
+          id="profileForm"
+          method="post"
+          action="/api/v1/auth/registration/complete"
+          novalidate
+        >
           <div class="two-fields">
             <div class="field">
               <label for="firstName">First name</label>
@@ -121,10 +126,7 @@
           </div>
 
           <div class="field">
-            <label for="email">
-              Email address
-              <span class="optional">(optional)</span>
-            </label>
+            <label for="email">Email address</label>
 
             <input
               class="input"
@@ -133,6 +135,7 @@
               type="email"
               autocomplete="email"
               placeholder="e.g. alex@example.ca"
+              required
             >
           </div>
 

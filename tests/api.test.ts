@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
-import { createApi, SESSION_COOKIE } from '../src/api/app.js';
+import { createApi } from '../src/api/app.js';
+import { customerSession } from './customer-session.js';
 import { FakeVerificationProvider } from '../src/identity/identity.js';
 import { seed } from '../prisma/seed.js';
 import { localToUtc } from '../src/scheduling/availability.js';
@@ -65,13 +66,9 @@ d('HTTP API', () => {
     app = createApi({ prisma, verification: new FakeVerificationProvider('123456') });
   });
 
-  /** Verify a phone and return the session cookie. */
+  /** Register a phone and return the customer session cookie. */
   async function login(phone: string): Promise<string> {
-    await request(app).post('/api/v1/auth/phone/send').send({ phone });
-    const res = await request(app).post('/api/v1/auth/phone/verify').send({ phone, code: '123456' });
-    expect(res.status).toBe(200);
-    const cookie = res.headers['set-cookie'] as unknown as string[];
-    return cookie.find((c) => c.startsWith(SESSION_COOKIE))!;
+    return customerSession(app, phone);
   }
 
   async function addressFor(cookie: string): Promise<string> {
@@ -105,10 +102,14 @@ d('HTTP API', () => {
 
   it('OTP send is neutral for known and unknown numbers alike', async () => {
     await login('514 825 2825'); // this number now exists
-    const known = await request(app).post('/api/v1/auth/phone/send').send({ phone: '514 825 2826' });
+    const known = await request(app)
+      .post('/api/v1/auth/phone/send')
+      .send({ phone: '514 825 2826', intent: 'signup' });
     const unknown = await request(app)
       .post('/api/v1/auth/phone/send')
-      .send({ phone: '514 825 2827' });
+      .send({ phone: '514 825 2827', intent: 'signup' });
+    expect(known.status).toBe(200);
+    expect(unknown.status).toBe(200);
     expect(Object.keys(known.body).sort()).toEqual(Object.keys(unknown.body).sort());
     expect(known.body.sent).toBe(unknown.body.sent);
     expect(known.body.message).toBe(unknown.body.message);
@@ -116,10 +117,13 @@ d('HTTP API', () => {
   });
 
   it('a wrong code does not create a session', async () => {
-    await request(app).post('/api/v1/auth/phone/send').send({ phone: '514 825 2825' });
+    const sent = await request(app)
+      .post('/api/v1/auth/phone/send')
+      .send({ phone: '514 825 2825', intent: 'signup' });
+    expect(sent.status).toBe(200);
     const res = await request(app)
       .post('/api/v1/auth/phone/verify')
-      .send({ phone: '514 825 2825', code: '000000' });
+      .send({ phone: '514 825 2825', code: '000000', intent: 'signup' });
     expect(res.status).toBe(400);
     expect(res.headers['set-cookie']).toBeUndefined();
   });
@@ -602,13 +606,7 @@ d('durability across process restart', () => {
 
   it('a session created by context A is valid in context B after A is gone', async () => {
     const a = freshContext();
-    await request(a.app).post('/api/v1/auth/phone/send').send({ phone: '514 825 2825' });
-    const verify = await request(a.app)
-      .post('/api/v1/auth/phone/verify')
-      .send({ phone: '514 825 2825', code: '123456' });
-    const cookie = (verify.headers['set-cookie'] as unknown as string[]).find((c) =>
-      c.startsWith(SESSION_COOKIE),
-    )!;
+    const cookie = await customerSession(a.app, '514 825 2825');
     await a.client.$disconnect(); // context A is gone
 
     const b = freshContext();
@@ -620,13 +618,7 @@ d('durability across process restart', () => {
 
   it('the raw session token is never stored — only its hash', async () => {
     const a = freshContext();
-    await request(a.app).post('/api/v1/auth/phone/send').send({ phone: '514 825 2825' });
-    const verify = await request(a.app)
-      .post('/api/v1/auth/phone/verify')
-      .send({ phone: '514 825 2825', code: '123456' });
-    const cookie = (verify.headers['set-cookie'] as unknown as string[]).find((c) =>
-      c.startsWith(SESSION_COOKIE),
-    )!;
+    const cookie = await customerSession(a.app, '514 825 2825');
     const token = cookie.split(';')[0]!.split('=')[1]!;
 
     const rows = await prisma.customerSession.findMany();
@@ -638,13 +630,7 @@ d('durability across process restart', () => {
 
   it('logout in one context revokes the session everywhere', async () => {
     const a = freshContext();
-    await request(a.app).post('/api/v1/auth/phone/send').send({ phone: '514 825 2825' });
-    const verify = await request(a.app)
-      .post('/api/v1/auth/phone/verify')
-      .send({ phone: '514 825 2825', code: '123456' });
-    const cookie = (verify.headers['set-cookie'] as unknown as string[]).find((c) =>
-      c.startsWith(SESSION_COOKIE),
-    )!;
+    const cookie = await customerSession(a.app, '514 825 2825');
     await request(a.app).post('/api/v1/auth/logout').set('Cookie', cookie);
     await a.client.$disconnect();
 
@@ -656,13 +642,7 @@ d('durability across process restart', () => {
 
   it('an idempotent booking replays in a different context after a restart', async () => {
     const a = freshContext();
-    await request(a.app).post('/api/v1/auth/phone/send').send({ phone: '514 825 2825' });
-    const verify = await request(a.app)
-      .post('/api/v1/auth/phone/verify')
-      .send({ phone: '514 825 2825', code: '123456' });
-    const cookie = (verify.headers['set-cookie'] as unknown as string[]).find((c) =>
-      c.startsWith(SESSION_COOKIE),
-    )!;
+    const cookie = await customerSession(a.app, '514 825 2825');
     const me = await request(a.app).get('/api/v1/customer/me').set('Cookie', cookie);
     const addr = await prisma.customerAddress.create({
       data: {
@@ -716,13 +696,7 @@ d('durability across process restart', () => {
 
   it('a failed booking frees the idempotency key for a genuine retry', async () => {
     const a = freshContext();
-    await request(a.app).post('/api/v1/auth/phone/send').send({ phone: '514 825 2825' });
-    const verify = await request(a.app)
-      .post('/api/v1/auth/phone/verify')
-      .send({ phone: '514 825 2825', code: '123456' });
-    const cookie = (verify.headers['set-cookie'] as unknown as string[]).find((c) =>
-      c.startsWith(SESSION_COOKIE),
-    )!;
+    const cookie = await customerSession(a.app, '514 825 2825');
     const me = await request(a.app).get('/api/v1/customer/me').set('Cookie', cookie);
     const addr = await prisma.customerAddress.create({
       data: {
@@ -806,9 +780,7 @@ d('returning-customer booking template', () => {
   });
 
   async function login(phone: string) {
-    await request(app).post('/api/v1/auth/phone/send').send({ phone });
-    const v = await request(app).post('/api/v1/auth/phone/verify').send({ phone, code: '123456' });
-    return (v.headers['set-cookie'] as unknown as string[]).find((c) => c.startsWith(SESSION_COOKIE))!;
+    return customerSession(app, phone);
   }
 
   /** Book once so there is history to build a template from. */

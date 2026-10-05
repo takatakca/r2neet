@@ -40,8 +40,22 @@ const ALL_WEEK = [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
   endMinute: 17 * 60,
 }));
 
-const START = localToUtc(2026, 9, 14, 10 * 60);
-const NOW = localToUtc(2026, 9, 14, 6 * 60);
+// Holds block capacity only while expiresAt is still ahead of the database
+// clock. A fixed September 2026 instant is already in the past, so the
+// fixture clock stays a minute ahead of the wall clock and the visit is on
+// a later local day. The assertions still require the second hold to lose
+// until that fixture clock passes the 10-minute hold.
+const WALL = Date.now();
+const NOW = new Date(WALL + 60_000);
+const LATER_DAY = new Date(WALL + 36 * 3600 * 1000);
+const LATER_KEY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Toronto',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+}).format(LATER_DAY);
+const [LATER_Y, LATER_M, LATER_D] = LATER_KEY.split('-').map(Number);
+const START = localToUtc(LATER_Y!, LATER_M!, LATER_D!, 10 * 60);
 
 describe('database safety guard', () => {
   it('refuses to fall back to DATABASE_URL when TEST_DATABASE_URL is missing', () => {

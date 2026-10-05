@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
-import { createApi, SESSION_COOKIE } from '../src/api/app.js';
+import { createApi } from '../src/api/app.js';
+import { customerSession } from './customer-session.js';
 import { FakeVerificationProvider } from '../src/identity/identity.js';
 import { localToUtc } from '../src/scheduling/availability.js';
 import { assertDestructiveAllowed } from '../src/db/safety.js';
@@ -58,12 +59,9 @@ d('customer account', () => {
   });
 
   async function login(phone: string) {
-    await request(app).post('/api/v1/auth/phone/send').send({ phone });
-    const v = await request(app).post('/api/v1/auth/phone/verify').send({ phone, code: '123456' });
-    const cookie = (v.headers['set-cookie'] as unknown as string[]).find((c) =>
-      c.startsWith(SESSION_COOKIE),
-    )!;
+    const cookie = await customerSession(app, phone);
     const me = await request(app).get('/api/v1/customer/me').set('Cookie', cookie);
+    expect(me.status).toBe(200);
     return { cookie, customerId: me.body.customer.id as string };
   }
 

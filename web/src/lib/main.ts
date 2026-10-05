@@ -316,7 +316,7 @@ async function sendCode(): Promise<void> {
     btn.innerHTML = `<span class="spin"></span> ${esc(t('otp.sending'))}`;
   }
   try {
-    const res = await api.sendCode(phoneRaw);
+    const res = await api.sendCode(phoneRaw, 'login');
     openOtpSheet(res.maskedPhone);
   } catch (e) {
     const err = $('phErr');
@@ -382,7 +382,7 @@ async function verifyCode(code: string): Promise<void> {
   inputs.forEach((i) => (i.disabled = true));
   if (err) err.hidden = true;
   try {
-    await api.verifyCode(phoneRaw, code);
+    await api.verifyCode(phoneRaw, code, 'login');
     verified = true;
     closeSheet();
     try {

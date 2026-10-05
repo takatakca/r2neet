@@ -17,6 +17,7 @@ import { assertDestructiveAllowed } from '../src/db/safety.js';
 import { seed } from '../prisma/seed.js';
 import request from 'supertest';
 import { createApi } from '../src/api/app.js';
+import { customerSession } from './customer-session.js';
 import { FakeVerificationProvider } from '../src/identity/identity.js';
 
 const URL = process.env.TEST_DATABASE_URL;
@@ -649,13 +650,7 @@ d('payment HTTP routes', () => {
   });
 
   async function loggedInBooking() {
-    await request(app).post('/api/v1/auth/phone/send').send({ phone: '514 825 2825' });
-    const verify = await request(app)
-      .post('/api/v1/auth/phone/verify')
-      .send({ phone: '514 825 2825', code: '123456' });
-    const cookie = (verify.headers['set-cookie'] as unknown as string[]).find((c) =>
-      c.startsWith('r2n_session'),
-    )!;
+    const cookie = await customerSession(app, '514 825 2825');
     const me = await request(app).get('/api/v1/customer/me').set('Cookie', cookie);
     const customerId = me.body.customer.id;
 
@@ -724,13 +719,7 @@ d('payment HTTP routes', () => {
 
   it('a customer cannot start payment for another customer booking', async () => {
     const first = await loggedInBooking();
-    await request(app).post('/api/v1/auth/phone/send').send({ phone: '514 825 2826' });
-    const verify = await request(app)
-      .post('/api/v1/auth/phone/verify')
-      .send({ phone: '514 825 2826', code: '123456' });
-    const attacker = (verify.headers['set-cookie'] as unknown as string[]).find((c) =>
-      c.startsWith('r2n_session'),
-    )!;
+    const attacker = await customerSession(app, '514 825 2826');
 
     const res = await request(app)
       .post('/api/v1/payments/payment-intent')

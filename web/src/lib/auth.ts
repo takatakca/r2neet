@@ -24,23 +24,8 @@ interface SendCodeResponse {
 }
 
 interface VerifyCodeResponse {
-  customer: {
-    id: string;
-    firstName: string | null;
-    email: string | null;
-    isReturningCustomer: boolean;
-  };
-}
-
-interface CustomerResponse {
-  customer: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    email: string | null;
-    verifiedPhone: string | null;
-    isReturningCustomer: boolean;
-  };
+  outcome: 'AUTHENTICATED' | 'PROFILE_REQUIRED';
+  intent: AuthIntent;
 }
 
 type AuthPage = 'login' | 'verify' | 'signup';
@@ -65,6 +50,65 @@ function showError(message: string): void {
 
   error.textContent = message;
   error.hidden = message.length === 0;
+}
+
+function storedIntent(): AuthIntent | null {
+  const value = sessionStorage.getItem('r2nette.authIntent');
+
+  if (value === 'login' || value === 'signup') return value;
+
+  return null;
+}
+
+/** Customer copy only. Prisma codes, stacks, and provider dumps stay hidden. */
+function isSafeCustomerMessage(message: string): boolean {
+  if (message.length === 0 || message.length > 240) return false;
+  if (/[\r\n]/.test(message)) return false;
+  if (/\bP\d{4}\b/.test(message)) return false;
+  if (
+    /prisma|stack trace|node_modules|twilio|sqlstate|econn|etimedout|at\s+\S+\s+\(/i.test(
+      message,
+    )
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function customerFacingMessage(
+  status: number,
+  backendMessage: string | undefined,
+): string {
+  if (backendMessage && isSafeCustomerMessage(backendMessage)) {
+    return backendMessage;
+  }
+
+  if (status === 400) {
+    return 'The information submitted is not valid. Check the highlighted fields and try again.';
+  }
+
+  if (status === 401) {
+    return 'Your verified registration session expired. Please verify your number again.';
+  }
+
+  if (status === 404) {
+    return 'No completed R2NETTE account was found for this phone number.';
+  }
+
+  if (status === 409) {
+    return 'An R2NETTE account already exists for this phone number.';
+  }
+
+  if (status === 429) {
+    return 'Too many verification attempts. Please wait before trying again.';
+  }
+
+  if (status >= 500) {
+    return 'The verification service is temporarily unavailable. Please try again shortly.';
+  }
+
+  return 'The request could not be completed. Please try again.';
 }
 
 function safeReturnPath(): string {
@@ -101,8 +145,8 @@ async function apiRequest<T>(
     });
   } catch {
     throw new ApiRequestError(
-      "We could not connect to R2NETTE. Check your internet connection and try again.",
       "NETWORK_ERROR",
+      "We could not connect to R2NETTE. Check your internet connection and try again.",
       0,
     );
   }
@@ -125,32 +169,9 @@ async function apiRequest<T>(
     const backendMessage = failure?.error?.message;
     const backendCode = failure?.error?.code;
 
-    let message = backendMessage;
-
-    if (!message) {
-      if (response.status === 400) {
-        message =
-          "The information submitted is not valid. Check the phone number and try again.";
-      } else if (response.status === 404) {
-        message =
-          "No completed R2NETTE account was found for this phone number.";
-      } else if (response.status === 409) {
-        message =
-          "An R2NETTE account already exists for this phone number.";
-      } else if (response.status === 429) {
-        message =
-          "Too many verification attempts. Please wait before trying again.";
-      } else if (response.status >= 500) {
-        message =
-          "The verification service is temporarily unavailable. Please try again shortly.";
-      } else {
-        message = `The request could not be completed (error ${response.status}).`;
-      }
-    }
-
     throw new ApiRequestError(
-      message,
       backendCode ?? `HTTP_${response.status}`,
+      customerFacingMessage(response.status, backendMessage),
       response.status,
     );
   }
@@ -160,8 +181,8 @@ async function apiRequest<T>(
     body === null
   ) {
     throw new ApiRequestError(
-      "R2NETTE received an invalid response from the verification service.",
       "INVALID_RESPONSE",
+      "R2NETTE received an invalid response from the verification service.",
       response.status,
     );
   }
@@ -373,8 +394,9 @@ function initializeLoginPage(): void {
 
 function initializeVerifyPage(): void {
   const phone = sessionStorage.getItem('r2nette.authPhone');
+  const intent = storedIntent();
 
-  if (!phone) {
+  if (!phone || !intent) {
     window.location.replace('/login');
     return;
   }
@@ -436,24 +458,35 @@ function initializeVerifyPage(): void {
           body: JSON.stringify({
             phone,
             code,
+            intent,
           }),
         },
       );
 
       sessionStorage.removeItem('r2nette.authPhone');
       sessionStorage.removeItem('r2nette.maskedPhone');
+      sessionStorage.removeItem('r2nette.authIntent');
 
       const returnTo = safeReturnPath();
 
-      if (result.customer.isReturningCustomer) {
+      if (result.outcome === 'AUTHENTICATED') {
         sessionStorage.removeItem('r2nette.returnTo');
         window.location.assign(returnTo);
         return;
       }
 
-      window.location.assign(
-        `/signup?returnTo=${encodeURIComponent(returnTo)}`,
+      if (result.outcome === 'PROFILE_REQUIRED') {
+        window.location.assign(
+          `/signup?returnTo=${encodeURIComponent(returnTo)}`,
+        );
+        return;
+      }
+
+      showError(
+        'The verification service returned an unexpected result. Try again.',
       );
+      setInputsDisabled(false);
+      clearInputs();
     } catch (error) {
       showError(
         error instanceof Error
@@ -549,7 +582,7 @@ function initializeVerifyPage(): void {
         '/api/v1/auth/phone/send',
         {
           method: 'POST',
-          body: JSON.stringify({ phone }),
+          body: JSON.stringify({ phone, intent }),
         },
       );
 
@@ -580,16 +613,25 @@ function initializeSignupPage(): void {
   const consent = element<HTMLInputElement>('consent');
   const button = element<HTMLButtonElement>('submitButton');
   const label = element<HTMLSpanElement>('submitLabel');
+  const localeEn = element<HTMLButtonElement>('localeEn');
+  const localeFr = element<HTMLButtonElement>('localeFr');
 
-  void apiRequest<CustomerResponse>('/api/v1/customer/me')
-    .then((result) => {
-      firstName.value = result.customer.firstName ?? '';
-      lastName.value = result.customer.lastName ?? '';
-      email.value = result.customer.email ?? '';
-    })
-    .catch(() => {
-      window.location.replace('/login');
-    });
+  function setLocale(locale: 'en' | 'fr'): void {
+    localeEn.setAttribute('aria-pressed', String(locale === 'en'));
+    localeFr.setAttribute('aria-pressed', String(locale === 'fr'));
+  }
+
+  function currentLocale(): 'en' | 'fr' {
+    return localeFr.getAttribute('aria-pressed') === 'true' ? 'fr' : 'en';
+  }
+
+  localeEn.addEventListener('click', () => {
+    setLocale('en');
+  });
+
+  localeFr.addEventListener('click', () => {
+    setLocale('fr');
+  });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -611,7 +653,7 @@ function initializeSignupPage(): void {
       return;
     }
 
-    if (cleanEmail && !/^\S+@\S+\.\S{2,}$/.test(cleanEmail)) {
+    if (!/^\S+@\S+\.\S{2,}$/.test(cleanEmail)) {
       showError('Enter a valid email address.');
       email.focus();
       return;
@@ -622,31 +664,25 @@ function initializeSignupPage(): void {
 
     try {
       await apiRequest<{
-        firstName: string | null;
-        lastName: string | null;
-        email: string | null;
-      }>('/api/v1/account/profile', {
-        method: 'PATCH',
+        customer: {
+          id: string;
+          firstName: string | null;
+          lastName: string | null;
+          email: string | null;
+        };
+      }>('/api/v1/auth/registration/complete', {
+        method: 'POST',
 
         body: JSON.stringify({
           firstName: cleanFirstName,
           lastName: cleanLastName,
-          email: cleanEmail || undefined,
+          email: cleanEmail,
+          locale: currentLocale(),
+          termsAccepted: true,
+          privacyAccepted: true,
+          marketingConsent: consent.checked,
         }),
       });
-
-      if (cleanEmail && consent.checked) {
-        await apiRequest('/api/v1/marketing/leads', {
-          method: 'POST',
-
-          body: JSON.stringify({
-            email: cleanEmail,
-            locale: 'en',
-            consent: true,
-            source: 'WELCOME_MODAL',
-          }),
-        }).catch(() => undefined);
-      }
 
       const returnTo = safeReturnPath();
 

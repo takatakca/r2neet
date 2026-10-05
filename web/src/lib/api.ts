@@ -189,17 +189,20 @@ export const api = {
 
   services: () => call<{ services: ServiceOption[] }>('/api/v1/services'),
 
-  sendCode: (phone: string) =>
+  sendCode: (phone: string, intent: 'login' | 'signup') =>
     call<{ sent: boolean; message: string; maskedPhone: string }>('/api/v1/auth/phone/send', {
       method: 'POST',
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ phone, intent }),
     }),
 
-  verifyCode: (phone: string, code: string) =>
-    call<{ customer: { id: string; firstName: string | null; isReturningCustomer: boolean } }>(
-      '/api/v1/auth/phone/verify',
-      { method: 'POST', body: JSON.stringify({ phone, code }) },
-    ),
+  verifyCode: (phone: string, code: string, intent: 'login' | 'signup') =>
+    call<{
+      outcome: 'AUTHENTICATED' | 'PROFILE_REQUIRED';
+      intent: 'login' | 'signup';
+    }>('/api/v1/auth/phone/verify', {
+      method: 'POST',
+      body: JSON.stringify({ phone, code, intent }),
+    }),
 
   context: () => call<CustomerContext>('/api/v1/customer/context'),
 
