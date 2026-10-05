@@ -143,7 +143,13 @@ export async function loadBusy(
   const busy: StaffBusy[] = [];
   for (const b of bookings) {
     for (const a of b.staff) {
-      busy.push({ staffId: a.staffId, startUtc: b.startAt, endUtc: b.endAt, kind: 'BOOKING' });
+      busy.push({
+        staffId: a.staffId,
+        startUtc: b.startAt,
+        endUtc: b.endAt,
+        kind: 'BOOKING',
+        bookingId: b.id,
+      });
     }
   }
   for (const h of holds) {
@@ -154,6 +160,7 @@ export async function loadBusy(
         endUtc: h.endAt,
         kind: 'HOLD',
         expiresAtUtc: h.expiresAt,
+        holdId: h.id,
       });
     }
   }
@@ -161,6 +168,30 @@ export async function loadBusy(
     busy.push({ staffId: t.staffId, startUtc: t.startAt, endUtc: t.endAt, kind: 'TIME_OFF' });
   }
   return busy;
+}
+
+/**
+ * Active staff with skills and weekly hours, read through `db` (the client or
+ * an open transaction). Code holding the capacity locks must read through
+ * its own transaction: a second pooled connection can be unavailable while
+ * same-day writers queue on the lock, and the lock holder then stalls.
+ */
+export async function loadStaff(db: PrismaClient | Tx): Promise<StaffMember[]> {
+  const rows = await db.staff.findMany({
+    where: { active: true },
+    include: { skills: true, availability: true },
+  });
+  return rows.map((s) => ({
+    id: s.id,
+    displayName: s.displayName,
+    active: s.active,
+    skills: s.skills.map((k) => k.serviceOptionId),
+    weeklyAvailability: s.availability.map((a) => ({
+      weekday: a.weekday,
+      startMinute: a.startMinute,
+      endMinute: a.endMinute,
+    })),
+  }));
 }
 
 export class PrismaSchedulingRepo implements SchedulingRepository {
@@ -204,21 +235,7 @@ export class PrismaSchedulingRepo implements SchedulingRepository {
   }
 
   async listStaff(): Promise<StaffMember[]> {
-    const rows = await this.db.staff.findMany({
-      where: { active: true },
-      include: { skills: true, availability: true },
-    });
-    return rows.map((s) => ({
-      id: s.id,
-      displayName: s.displayName,
-      active: s.active,
-      skills: s.skills.map((k) => k.serviceOptionId),
-      weeklyAvailability: s.availability.map((a) => ({
-        weekday: a.weekday,
-        startMinute: a.startMinute,
-        endMinute: a.endMinute,
-      })),
-    }));
+    return loadStaff(this.db);
   }
 
   /** Everything consuming capacity in this window. See `loadBusy`. */
@@ -256,14 +273,17 @@ export class PrismaSchedulingRepo implements SchedulingRepository {
       createdAt: h.createdAt,
       expiresAt: h.expiresAt,
       consumedAt: h.consumedAt,
+      status: h.status,
     };
   }
 
-  async markHoldConsumed(id: string, at: Date): Promise<void> {
-    await this.db.bookingHold.update({
-      where: { id },
+  async markHoldConsumed(id: string, at: Date): Promise<boolean> {
+    // Conditional: only a live hold can become a booking, and only once.
+    const { count } = await this.db.bookingHold.updateMany({
+      where: { id, status: 'ACTIVE', consumedAt: null },
       data: { status: 'CONSUMED', consumedAt: at },
     });
+    return count === 1;
   }
 
   async insertBooking(booking: Booking): Promise<void> {

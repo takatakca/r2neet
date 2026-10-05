@@ -22,6 +22,9 @@ import {
   PrismaSchedulingRepo,
   PrismaQuoteRepo,
   PrismaCustomerRepo,
+  acquireCapacityLocks,
+  loadBusy,
+  loadStaff,
 } from '../db/prisma-repositories.js';
 import {
   IdentityService,
@@ -1125,62 +1128,61 @@ export function createApi(deps: ApiDeps) {
         newStart.getTime() + service.appointmentDurationMinutes * 60000,
       );
 
-      await scheduling.withCapacityLock(
-        { startUtc: newStart, endUtc: newEnd },
-        async () => {
-          const staff = await scheduling.listStaff();
-          const busy = (
-            await scheduling.listBusy({ startUtc: newStart, endUtc: newEnd })
-          )
-            // The booking's own current assignment must not block its move.
-            .filter(
-              (b) =>
-                !(
-                  b.kind === 'BOOKING' &&
-                  booking.staff.some((a) => a.staffId === b.staffId) &&
-                  b.startUtc.getTime() === booking.startAt.getTime()
-                ),
-            );
+      // One transaction holds the capacity locks and does every read and
+      // write. A second pooled connection while holding the lock can wait
+      // behind same-day writers queued on that lock and time out.
+      const window = { startUtc: newStart, endUtc: newEnd };
+      await prisma.$transaction(
+        async (tx) => {
+          await acquireCapacityLocks(tx, window);
 
-          const check = verifySlotStillOpen(
-            service,
-            newStart,
-            staff,
-            busy,
-            now(),
-          );
-          if (!check.ok) {
+          // Re-read under the lock: it may have been cancelled or moved.
+          const current = await tx.booking.findUnique({ where: { id: booking.id } });
+          if (
+            !current ||
+            ['CANCELLED', 'NO_SHOW', 'COMPLETED', 'IN_PROGRESS'].includes(current.status)
+          ) {
             throw new ApiError(
               409,
-              'SLOT_UNAVAILABLE',
-              'That time is no longer free.',
+              'BOOKING_NOT_RESCHEDULABLE',
+              'This booking can no longer be changed online. Please call us.',
             );
           }
 
-          await prisma.$transaction(async (tx) => {
-            await tx.booking.update({
-              where: { id: booking.id },
-              data: { startAt: newStart, endAt: newEnd, status: 'CONFIRMED' },
-            });
-            await tx.bookingStaff.deleteMany({
-              where: { bookingId: booking.id },
-            });
-            await tx.bookingStaff.createMany({
-              data: check.staffIds.map((staffId) => ({
-                bookingId: booking.id,
-                staffId,
-              })),
-            });
-            await tx.bookingStatusHistory.create({
-              data: {
-                bookingId: booking.id,
-                status: 'RESCHEDULED',
-                actor: `CUSTOMER:${customerId}`,
-                reason: `Moved to ${newStart.toISOString()}`,
-              },
-            });
+          const staff = await loadStaff(tx);
+          // The booking's own current assignment must not block its move.
+          const busy = (await loadBusy(tx, window)).filter(
+            (b) => !(b.kind === 'BOOKING' && b.bookingId === booking.id),
+          );
+
+          const check = verifySlotStillOpen(service, newStart, staff, busy, now());
+          if (!check.ok) {
+            throw new ApiError(409, 'SLOT_UNAVAILABLE', 'That time is no longer free.');
+          }
+
+          await tx.booking.update({
+            where: { id: booking.id },
+            data: { startAt: newStart, endAt: newEnd, status: 'CONFIRMED' },
+          });
+          await tx.bookingStaff.deleteMany({
+            where: { bookingId: booking.id },
+          });
+          await tx.bookingStaff.createMany({
+            data: check.staffIds.map((staffId) => ({
+              bookingId: booking.id,
+              staffId,
+            })),
+          });
+          await tx.bookingStatusHistory.create({
+            data: {
+              bookingId: booking.id,
+              status: 'RESCHEDULED',
+              actor: `CUSTOMER:${customerId}`,
+              reason: `Moved to ${newStart.toISOString()}`,
+            },
           });
         },
+        { timeout: 20000 },
       );
 
       res.json({

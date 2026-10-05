@@ -374,6 +374,92 @@ d('postgres persistence', () => {
     expect(history).toHaveLength(1);
   });
 
+  async function bookingFixture(phone: string) {
+    const cid = await makeCustomer(phone);
+    const addr = await prisma.customerAddress.create({
+      data: { customerId: cid, formattedAddress: '754 Av. 36e, Lachine', city: 'Lachine', postalCode: 'H8T1B7' },
+    });
+    const q = await makeQuote(cid);
+    return { cid, addressId: addr.id, quoteId: q.id };
+  }
+
+  async function addCleaners(...names: string[]) {
+    for (const displayName of names) {
+      await prisma.staff.create({ data: { displayName, availability: { create: ALL_WEEK } } });
+    }
+  }
+
+  it('a released hold cannot be confirmed, and cannot take the crew from a live hold', async () => {
+    const a = await bookingFixture('+15148252825');
+    const b = await bookingFixture('+15148252826');
+    const s = service(prisma);
+
+    const heldA = await s.holdSlot({ service: svc('svc_basic_2x3'), startUtc: START, customerId: a.cid });
+    // DELETE /booking-holds/:id: the customer let it go.
+    await prisma.bookingHold.update({ where: { id: heldA.id }, data: { status: 'CANCELLED' } });
+    const heldB = await s.holdSlot({ service: svc('svc_basic_2x3'), startUtc: START, customerId: b.cid });
+    expect([...heldB.staffIds].sort()).toEqual([...heldA.staffIds].sort());
+
+    await expect(
+      s.confirmBooking({ holdId: heldA.id, quoteId: a.quoteId, customerId: a.cid, addressId: a.addressId, service: svc('svc_basic_2x3') }),
+    ).rejects.toMatchObject({ code: 'HOLD_NOT_FOUND' });
+
+    const booked = await s.confirmBooking({
+      holdId: heldB.id, quoteId: b.quoteId, customerId: b.cid, addressId: b.addressId, service: svc('svc_basic_2x3'),
+    });
+    expect([...booked.staffIds].sort()).toEqual([...heldB.staffIds].sort());
+    expect(await prisma.booking.count()).toBe(1);
+  });
+
+  it('two confirms of one hold racing on separate clients make exactly one booking', async () => {
+    // Spare cleaners, so "enough free cleaners" cannot stop the second one;
+    // only the hold being spent can.
+    await addCleaners('Chloé', 'Dmitri');
+    const a = await bookingFixture('+15148252825');
+    const hold = await service(prisma).holdSlot({ service: svc('svc_basic_2x3'), startUtc: START, customerId: a.cid });
+    const confirm = (client: PrismaClient) =>
+      service(client).confirmBooking({
+        holdId: hold.id, quoteId: a.quoteId, customerId: a.cid, addressId: a.addressId, service: svc('svc_basic_2x3'),
+      });
+
+    const results = await Promise.allSettled([confirm(prisma), confirm(prismaB)]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+    expect(rejected.reason).toMatchObject({ code: 'HOLD_CONSUMED' });
+    expect(await prisma.booking.count()).toBe(1);
+    expect(await prisma.bookingStaff.count()).toBe(2);
+  });
+
+  it('the held crew must still be free; other free cleaners do not stand in for them', async () => {
+    await addCleaners('Chloé', 'Dmitri');
+    const a = await bookingFixture('+15148252825');
+    const other = await bookingFixture('+15148252826');
+    const hold = await service(prisma).holdSlot({ service: svc('svc_basic_2x3'), startUtc: START, customerId: a.cid });
+
+    // Meanwhile dispatch puts one of the held cleaners on an overlapping job.
+    await prisma.booking.create({
+      data: {
+        bookingNumber: 'R2N-2026-900001',
+        customerId: other.cid,
+        serviceOptionId: 'svc_basic_2x3',
+        addressId: other.addressId,
+        quoteId: other.quoteId,
+        startAt: new Date(START.getTime() + 60 * 60000),
+        endAt: new Date(START.getTime() + 4 * 60 * 60000),
+        grandTotalCents: 25869,
+        priceSnapshot: {},
+        staff: { create: [{ staffId: hold.staffIds[0]! }] },
+      },
+    });
+
+    await expect(
+      service(prisma).confirmBooking({
+        holdId: hold.id, quoteId: a.quoteId, customerId: a.cid, addressId: a.addressId, service: svc('svc_basic_2x3'),
+      }),
+    ).rejects.toMatchObject({ code: 'SLOT_UNAVAILABLE' });
+    expect(await prisma.bookingStaff.count({ where: { staffId: hold.staffIds[0]! } })).toBe(1);
+  });
+
   it('booking survives a client restart — it is on disk, not in memory', async () => {
     const cid = await makeCustomer('+15148252825');
     const addr = await prisma.customerAddress.create({

@@ -49,6 +49,7 @@ export class MemorySchedulingRepo implements SchedulingRepository {
         endUtc: hold.endUtc,
         kind: 'HOLD',
         expiresAtUtc: hold.expiresAt,
+        holdId: hold.id,
       });
     }
   }
@@ -57,9 +58,12 @@ export class MemorySchedulingRepo implements SchedulingRepository {
     return this.holds.get(id) ?? null;
   }
 
-  async markHoldConsumed(id: string, at: Date): Promise<void> {
+  async markHoldConsumed(id: string, at: Date): Promise<boolean> {
     const h = this.holds.get(id);
-    if (h) h.consumedAt = at;
+    if (!h || h.consumedAt !== null || (h.status ?? 'ACTIVE') !== 'ACTIVE') return false;
+    h.consumedAt = at;
+    h.status = 'CONSUMED';
+    return true;
   }
 
   async insertBooking(booking: Booking): Promise<void> {
@@ -70,6 +74,7 @@ export class MemorySchedulingRepo implements SchedulingRepository {
         startUtc: booking.startUtc,
         endUtc: booking.endUtc,
         kind: 'BOOKING',
+        bookingId: booking.id,
       });
     }
   }

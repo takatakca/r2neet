@@ -293,6 +293,22 @@ d('customer account', () => {
     expect(history.some((h) => h.status === 'RESCHEDULED')).toBe(true);
   });
 
+  it('a cancelled booking cannot be rescheduled back to life', async () => {
+    const { cookie, customerId } = await login('514 825 2825');
+    const { booking } = await makeBooking(customerId, 72);
+    await request(app).post(`/api/v1/account/bookings/${booking.id}/cancel`).set('Cookie', cookie);
+
+    const res = await request(app)
+      .post(`/api/v1/account/bookings/${booking.id}/reschedule`)
+      .set('Cookie', cookie)
+      .send({ startAt: soon(13).toISOString() });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('BOOKING_NOT_RESCHEDULABLE');
+    const row = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
+    expect(row.status).toBe('CANCELLED');
+  });
+
   it('[INV-CAP-02] refuses a slot the business cannot staff', async () => {
     const { cookie, customerId } = await login('514 825 2825');
     const { booking } = await makeBooking(customerId, 72);
