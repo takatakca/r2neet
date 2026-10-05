@@ -2,11 +2,14 @@ name: Deploy
 
 # Runs only after the CI workflow succeeds for a push to main.
 # Pull requests do not deploy. The image tag is the full commit SHA.
+# "Run workflow" redeploys the current main, e.g. after the server's
+# secrets are first added; only main can be deployed that way.
 on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: production-deploy
@@ -20,9 +23,10 @@ jobs:
   deploy:
     name: Deploy immutable image
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main'
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
@@ -30,23 +34,23 @@ jobs:
       - name: Check out the exact commit CI passed
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
 
       - name: Build and push the immutable image
         env:
-          GIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/deploy/publish-image.sh
 
       - name: Roll the VPS to that image
         env:
-          GIT_SHA: ${{ github.event.workflow_run.head_sha }}
-          MOCHAHOST_SSH_HOST: ${{ secrets.MOCHAHOST_SSH_HOST }}
-          MOCHAHOST_SSH_PORT: ${{ secrets.MOCHAHOST_SSH_PORT }}
-          MOCHAHOST_SSH_USER: ${{ secrets.MOCHAHOST_SSH_USER }}
-          MOCHAHOST_SSH_KEY: ${{ secrets.MOCHAHOST_SSH_KEY }}
-          MOCHAHOST_SSH_KNOWN_HOSTS: ${{ secrets.MOCHAHOST_SSH_KNOWN_HOSTS }}
+          GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          CONTABO_SSH_HOST: ${{ secrets.CONTABO_SSH_HOST }}
+          CONTABO_SSH_PORT: ${{ secrets.CONTABO_SSH_PORT }}
+          CONTABO_SSH_USER: ${{ secrets.CONTABO_SSH_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_SSH_KNOWN_HOSTS: ${{ secrets.CONTABO_SSH_KNOWN_HOSTS }}
           GHCR_PULL_USER: ${{ github.actor }}
           GHCR_PULL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/deploy/ci-deploy.sh

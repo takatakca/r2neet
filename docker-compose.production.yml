@@ -1,4 +1,4 @@
-# Production stack for the MochaHost VPS.
+# Production stack for the Contabo VPS.
 #
 # PostgreSQL has no host port. The only published ports are 80 and 443.
 # Web and workers start only after `migrate` exits successfully.

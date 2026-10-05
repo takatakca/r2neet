@@ -325,8 +325,8 @@ function loadEnvFile(path: string): void {
   }
 }
 
-function main(): void {
-  const composePath = process.argv[2] ?? 'docker-compose.production.yml';
+/** Validate the environment and the compose file; exit 1 on any FATAL issue. */
+export function runProductionGate(composePath = process.argv[2] ?? 'docker-compose.production.yml'): void {
   loadEnvFile('.env');
   const composeSource = existsSync(composePath) ? readFileSync(composePath, 'utf8') : '';
   if (!composeSource) {
@@ -343,6 +343,9 @@ function main(): void {
   }
 }
 
+// Under vite-node, process.argv[1] is vite-node itself, so this check is
+// false and nothing runs. The deploy calls check-production-env.ts, which
+// always runs the gate; this guard only serves plain `node` invocations.
 const invokedDirectly =
   process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (invokedDirectly) main();
+if (invokedDirectly) runProductionGate();

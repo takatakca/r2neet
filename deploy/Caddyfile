@@ -11,14 +11,22 @@
 	reverse_proxy web:3000
 }
 
-http://{$PRODUCTION_DOMAIN} {
+# One canonical host. Needs the www DNS record to point here too; until it
+# does, only this certificate request fails and the bare domain is unaffected.
+www.{$PRODUCTION_DOMAIN} {
+	redir https://{$PRODUCTION_DOMAIN}{uri} 308
+}
+
+http://{$PRODUCTION_DOMAIN}, http://www.{$PRODUCTION_DOMAIN} {
 	@unsafe {
 		not method GET
 		not method HEAD
 	}
-	handle @unsafe {
-		header Content-Type application/json
-		respond "{\"error\":{\"code\":\"HTTPS_REQUIRED\",\"message\":\"This endpoint requires a secure connection.\"}}" 403
+	# `route` keeps this order. Without it Caddy sorts redir ahead of
+	# handle/respond, and every insecure POST was redirected instead of refused.
+	route {
+		header @unsafe Content-Type application/json
+		respond @unsafe "{\"error\":{\"code\":\"HTTPS_REQUIRED\",\"message\":\"This endpoint requires a secure connection.\"}}" 403
+		redir https://{$PRODUCTION_DOMAIN}{uri} 308
 	}
-	redir https://{host}{uri} 308
 }

@@ -29,6 +29,7 @@ if [[ "${1:-}" == "--preflight" ]]; then
   [[ -f deploy/Caddyfile ]]
   [[ -f scripts/deploy/healthcheck.sh ]]
   [[ -f scripts/deploy/rollback.sh ]]
+  [[ -f scripts/deploy/check-production-env.ts ]]
   echo "preflight ok for ${SHA}"
   exit 0
 fi
@@ -72,7 +73,7 @@ docker compose -f docker-compose.production.yml pull
 docker compose -f docker-compose.production.yml run --rm --no-deps \
   -v "${ROOT}/docker-compose.production.yml:/compose.yml:ro" \
   --entrypoint ./node_modules/vite-node/vite-node.mjs \
-  web scripts/deploy/validate-production-env.ts /compose.yml
+  web scripts/deploy/check-production-env.ts /compose.yml
 
 deploy_started=1
 docker compose -f docker-compose.production.yml up -d
@@ -88,3 +89,13 @@ fi
 printf '%s\n' "$image" > state/current-image-ref
 chmod 600 state/current-image-ref
 echo "Deploy verified for commit ${SHA}."
+
+# Every deploy pulls a new SHA-tagged image. Keep the running one and the
+# rollback target; remove older ones so the disk does not fill up.
+keep_previous="$(cat state/previous-image-ref 2>/dev/null || true)"
+docker image ls --format '{{.Repository}}:{{.Tag}}' "ghcr.io/${image_owner}/${image_name}" \
+  | while read -r old; do
+      if [[ "$old" != "$image" && "$old" != "$keep_previous" ]]; then
+        docker image rm "$old" >/dev/null 2>&1 || true
+      fi
+    done

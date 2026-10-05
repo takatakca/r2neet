@@ -13,10 +13,10 @@ require() {
 }
 
 require GIT_SHA
-require MOCHAHOST_SSH_HOST
-require MOCHAHOST_SSH_USER
-require MOCHAHOST_SSH_KEY
-require MOCHAHOST_SSH_KNOWN_HOSTS
+require CONTABO_SSH_HOST
+require CONTABO_SSH_USER
+require CONTABO_SSH_KEY
+require CONTABO_SSH_KNOWN_HOSTS
 require GHCR_PULL_USER
 require GHCR_PULL_TOKEN
 
@@ -25,7 +25,7 @@ if [[ ! "$GIT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   exit 1
 fi
 
-port="${MOCHAHOST_SSH_PORT:-22}"
+port="${CONTABO_SSH_PORT:-22}"
 owner="$(printf '%s' "${GITHUB_REPOSITORY_OWNER:?}" | tr '[:upper:]' '[:lower:]')"
 repo_name="$(printf '%s' "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')"
 
@@ -35,8 +35,8 @@ cleanup() {
   rm -f "$key_file" "$known_hosts"
 }
 trap cleanup EXIT
-printf '%s\n' "$MOCHAHOST_SSH_KEY" > "$key_file"
-printf '%s\n' "$MOCHAHOST_SSH_KNOWN_HOSTS" > "$known_hosts"
+printf '%s\n' "$CONTABO_SSH_KEY" > "$key_file"
+printf '%s\n' "$CONTABO_SSH_KNOWN_HOSTS" > "$known_hosts"
 chmod 600 "$key_file" "$known_hosts"
 
 ssh_base=(
@@ -46,7 +46,7 @@ ssh_base=(
   -o BatchMode=yes
   -o StrictHostKeyChecking=yes
   -o UserKnownHostsFile="$known_hosts"
-  "${MOCHAHOST_SSH_USER}@${MOCHAHOST_SSH_HOST}"
+  "${CONTABO_SSH_USER}@${CONTABO_SSH_HOST}"
 )
 
 "${ssh_base[@]}" "install -d -m 0750 /opt/r2nette"

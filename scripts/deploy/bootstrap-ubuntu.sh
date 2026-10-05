@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Idempotent Ubuntu bootstrap for a MochaHost VPS.
+# Idempotent Ubuntu bootstrap for the Contabo VPS.
 #
 # Installs Docker Engine from Docker's repository, creates a non-root deploy
 # user, prepares /opt/r2nette, turns on unattended security updates, and
