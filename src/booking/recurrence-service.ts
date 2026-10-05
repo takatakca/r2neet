@@ -9,6 +9,7 @@ import {
   ProductSupplyType,
 } from '../domain/types.js';
 import { verifySlotStillOpen, type StaffBusy } from '../scheduling/availability.js';
+import { acquireCapacityLocks, loadBusy } from '../db/prisma-repositories.js';
 import { formatBookingNumber } from './booking.js';
 
 /**
@@ -180,28 +181,20 @@ export class RecurrenceService {
 
       try {
         const created = await this.prisma.$transaction(async (tx) => {
-          await tx.$queryRaw`SELECT pg_advisory_xact_lock(${this.lockKey(start)}::bigint)::text AS l`;
+          // The same locks as holds, confirmations and reschedules. A key of
+          // our own would never contend with a customer confirming an
+          // overlapping visit, and both bookings would land on one crew.
+          await acquireCapacityLocks(tx, { startUtc: start, endUtc: end });
 
           const staff = await tx.staff.findMany({
             where: { active: true },
             include: { skills: true, availability: true },
           });
-          const bookings = await tx.booking.findMany({
-            where: {
-              status: { notIn: ['CANCELLED', 'NO_SHOW'] },
-              startAt: { lt: end },
-              endAt: { gt: start },
-            },
-            include: { staff: true },
-          });
-          const busy: StaffBusy[] = bookings.flatMap((b) =>
-            b.staff.map((a) => ({
-              staffId: a.staffId,
-              startUtc: b.startAt,
-              endUtc: b.endAt,
-              kind: 'BOOKING' as const,
-            })),
-          );
+          // The same busy view holds and confirmations use: active holds,
+          // time off, and jobs within travel-buffer distance, not only
+          // bookings overlapping this exact window. Holds are judged live by
+          // this run's clock.
+          const busy: StaffBusy[] = await loadBusy(tx, { startUtc: start, endUtc: end });
 
           const check = verifySlotStillOpen(
             service,
@@ -359,17 +352,5 @@ export class RecurrenceService {
     const series = await this.prisma.recurrenceSeries.findUniqueOrThrow({ where: { id: seriesId } });
     if (series.customerId !== customerId) throw new Error('NOT_FOUND');
     return this.prisma.recurrenceSeries.update({ where: { id: seriesId }, data: { status } });
-  }
-
-  /** Stable 64-bit advisory lock key for an instant. */
-  private lockKey(start: Date): bigint {
-    const s = String(Math.floor(start.getTime() / 60000));
-    let hash = 0xcbf29ce484222325n;
-    const prime = 0x100000001b3n;
-    const mask = (1n << 64n) - 1n;
-    for (let i = 0; i < s.length; i++) {
-      hash = ((hash ^ BigInt(s.charCodeAt(i))) * prime) & mask;
-    }
-    return BigInt.asIntN(64, hash);
   }
 }

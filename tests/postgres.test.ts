@@ -5,6 +5,7 @@ import {
   PrismaQuoteRepo,
   PrismaCustomerRepo,
   capacityLockKey,
+  capacityLockKeys,
 } from '../src/db/prisma-repositories.js';
 import { BookingService } from '../src/booking/booking.js';
 import { localToUtc } from '../src/scheduling/availability.js';
@@ -282,6 +283,53 @@ d('postgres persistence', () => {
     expect(await prisma.bookingHold.count({ where: { status: 'ACTIVE' } })).toBe(1);
   });
 
+  it('two clients racing for OVERLAPPING windows cannot both take the last crew', async () => {
+    const c1 = await makeCustomer('+15148252825');
+    const c2 = await makeCustomer('+15148252826');
+
+    // 10:00-13:00 and 11:00-14:00 need the same two cleaners. Locking on the
+    // exact window gave these different keys, so both read "free" and both
+    // won. They must serialize like identical windows do.
+    const overlapping = new Date(START.getTime() + 60 * 60000);
+    const results = await Promise.allSettled([
+      service(prisma).holdSlot({ service: svc('svc_basic_2x3'), startUtc: START, customerId: c1 }),
+      service(prismaB).holdSlot({ service: svc('svc_basic_2x3'), startUtc: overlapping, customerId: c2 }),
+    ]);
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(await prisma.bookingHold.count({ where: { status: 'ACTIVE' } })).toBe(1);
+  });
+
+  it('one repo instance never leaks a transaction between concurrent callers', async () => {
+    // The app shares one repo across every request. Two capacity
+    // transactions on different days do not contend, so they interleave.
+    const repo = new PrismaSchedulingRepo(prisma);
+    const dayA = { startUtc: START, endUtc: new Date(START.getTime() + 3 * 3600000) };
+    const dayB = {
+      startUtc: new Date(START.getTime() + 3 * 86400000),
+      endUtc: new Date(START.getTime() + 3 * 86400000 + 3 * 3600000),
+    };
+    let entered!: () => void;
+    const firstInside = new Promise<void>((r) => (entered = r));
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    const first = repo.withCapacityLock(dayA, async () => {
+      entered();
+      await sleep(50);
+      return repo.listBusy(dayA);
+    });
+    await firstInside;
+    const second = repo.withCapacityLock(dayB, async () => {
+      await sleep(150);
+      return repo.listBusy(dayB);
+    });
+    await Promise.all([first, second]);
+
+    // With a shared "current transaction" field, the repo was left pointing
+    // at the first, now-closed transaction and every later query failed.
+    await expect(repo.listBusy(dayA)).resolves.toEqual([]);
+  });
+
   it('confirms a booking, assigns two staff rows, and consumes the hold', async () => {
     const cid = await makeCustomer('+15148252825');
     const addr = await prisma.customerAddress.create({
@@ -455,7 +503,7 @@ d('postgres persistence', () => {
     expect(Math.max(...values)).toBe(20);
   });
 
-  it('the advisory lock key is stable per window and differs across windows', () => {
+  it('the advisory lock key is stable per service day and differs across days', () => {
     const a = capacityLockKey(START, new Date(START.getTime() + 3 * 3600000));
     const b = capacityLockKey(START, new Date(START.getTime() + 3 * 3600000));
     const c = capacityLockKey(
@@ -465,6 +513,18 @@ d('postgres persistence', () => {
     expect(a).toBe(b);
     expect(a).not.toBe(c);
     expect(a >= -(2n ** 63n) && a < 2n ** 63n).toBe(true);
+  });
+
+  it('windows that could compete for one cleaner always share a lock key', () => {
+    const at = (min: number) => new Date(START.getTime() + min * 60000);
+    const morning = capacityLockKeys({ startUtc: at(0), endUtc: at(180) });
+    const overlap = capacityLockKeys({ startUtc: at(60), endUtc: at(240) });
+    const afterBuffer = capacityLockKeys({ startUtc: at(200), endUtc: at(380) });
+    for (const other of [overlap, afterBuffer]) {
+      expect(morning.some((k) => other.includes(k))).toBe(true);
+    }
+    // Acquisition order is fixed, so two transactions cannot deadlock.
+    expect([...morning].sort((x, y) => (x < y ? -1 : x > y ? 1 : 0))).toEqual(morning);
   });
 
   it('a service address row is never the business origin', async () => {

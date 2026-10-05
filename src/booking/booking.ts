@@ -74,10 +74,11 @@ export interface Booking {
 
 export interface SchedulingRepository {
   /**
-   * Run `fn` with the staff rows for this window locked against concurrent
-   * writers. The Postgres implementation uses SELECT ... FOR UPDATE; the
-   * in-memory one serializes. Without this, two customers can buy the same
-   * last crew.
+   * Run `fn` with capacity for this window locked against concurrent
+   * writers, including writers of overlapping or buffer-adjacent windows.
+   * The Postgres implementation takes a transaction-level advisory lock per
+   * local service day; the in-memory one serializes. Without this, two
+   * customers can buy the same last crew.
    */
   withCapacityLock<T>(window: { startUtc: Date; endUtc: Date }, fn: () => Promise<T>): Promise<T>;
   listStaff(): Promise<StaffMember[]>;
