@@ -28,6 +28,75 @@ Optional features**. Replace `SERVER_IP`, `MOCHAHOST_IP` and `yourdomain.com`
 with your own values every time. A block that says **on the server** runs inside
 an `ssh` session; everything else runs on your own computer.
 
+## Fastest path: let GitHub Actions do it
+
+Apart from one optional login to back up a key, you never need to SSH in. You
+add a few **secrets** in GitHub, then run four workflows from the **Actions**
+tab (or ask Claude to run them). They do steps 3–8 below for you. The workflows
+only appear under Actions once the deployment pull request is merged into
+`main` (step 1).
+
+**1. Add the secrets to the `production` environment.** In the repository, go
+to **Settings → Environments → production**. Under **Deployment branches and
+tags**, choose **Selected branches and tags** and add `main`. That way only
+`main`'s code can ever use these credentials. Then, under **Environment
+secrets**, choose **Add environment secret** once per name:
+
+| Secret | Value | Needed for |
+|---|---|---|
+| `CONTABO_SSH_HOST` | The VPS IPv4 address, from the Contabo panel | everything |
+| `CONTABO_ROOT_PASSWORD` | The VPS root password, from Contabo's welcome email (or set `CONTABO_ROOT_SSH_KEY` to a root private key instead) | everything |
+| `OWNER_INITIAL_PASSWORD` | The password for your first `/admin` login. Rules: at least 12 characters, upper- and lower-case letters and a digit, and none of `password`, `12345678`, `r2nette`, `qwerty`, `letmein` or `admin`. You change it at first sign-in | creating the owner |
+| `MOCHAHOST_CPANEL_HOST` | Your cPanel address without `https://` or `:2083`, e.g. `server123.mochahost.com` (it appears in cPanel's address bar) | DNS |
+| `MOCHAHOST_CPANEL_USER` | Your cPanel username | DNS |
+| `MOCHAHOST_CPANEL_TOKEN` | cPanel → **Security → Manage API Tokens → Create**. Name it `r2nette-dns` and copy the token it shows once | DNS |
+| `CONTABO_SSH_PORT` | Only if SSH is not on port 22 | optional |
+
+Provider keys can be added the same way whenever you have them, and **Server
+setup** copies each one it finds into the server's `.env`: `TWILIO_ACCOUNT_SID`,
+`TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID`, `STRIPE_SECRET_KEY`,
+`STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `GOOGLE_MAPS_API_KEY`,
+`EMAIL_API_URL`, `EMAIL_API_KEY`, `EMAIL_FROM`, `BACKUP_S3_*`, `ALERT_WEBHOOK_*`.
+After adding one, run **Server setup** again, then **Deploy**.
+
+**2. Run the workflows.** For each, open **Actions → (workflow) → Run
+workflow**, keep the branch on `main`, and run them in this order:
+
+1. **Server setup**, with your domain and an email for certificate notices. It
+   installs Docker, turns on the firewall, writes `/opt/r2nette/.env` with
+   generated secrets, and ends by printing the server's **host key**, a line
+   starting with `* ssh-ed25519`.
+2. **Pin the host key.** Copy that line (or lines) into a new environment secret
+   named `CONTABO_SSH_KNOWN_HOSTS`. From now on, every workflow refuses to talk
+   to any machine that does not present this key.
+3. **Deploy**. It builds, starts and health-checks the app. Do this before DNS,
+   so a failed deploy never takes your current site offline.
+4. **DNS (MochaHost)**, three times:
+   - First `plan`. It is read-only and lists every change.
+   - Then `email`. It gives mail its own records, so your mail stays at MochaHost.
+   - Then `web`, ideally after the TTL the plan shows (often 4 hours). It points
+     the domain and `www` at the VPS.
+5. **Server admin** → `restart-proxy` right after `web`, so HTTPS certificates
+   are requested immediately rather than at Caddy's next retry.
+6. **Server admin** → `create-owner`, with your email and name. Then sign in at
+   `https://yourdomain.com/admin` with `OWNER_INITIAL_PASSWORD`, change it, and
+   turn on two-step verification.
+
+**Server admin** → `status` shows health at any time.
+
+The repository is public, so these logs are public. The workflows print names,
+public DNS records and host keys, never a secret value; GitHub also masks every
+secret, which is why the server's IP appears as `***`.
+
+**Back up `FIELD_ENCRYPTION_KEY` (one login).** It is generated on the server and
+never leaves it, so no log can expose it. Without it, a restored database
+locks out every two-step-verification login. Once, log in with
+`ssh root@SERVER_IP` (or Contabo's web console), run
+`grep FIELD_ENCRYPTION_KEY /opt/r2nette/.env`, and keep the value in your
+password manager.
+
+The manual steps below do the same things by hand, and explain each one.
+
 ## What is in the repo
 
 | Piece | Where |
@@ -41,6 +110,8 @@ an `ssh` session; everything else runs on your own computer.
 | Compose wrapper for manual commands | `scripts/deploy/compose.sh` |
 | Health check / rollback | `scripts/deploy/healthcheck.sh`, `scripts/deploy/rollback.sh` |
 | Deploy workflow | `.github/workflows/deploy.yml` |
+| Setup / admin / DNS workflows | `.github/workflows/server-setup.yml`, `server-admin.yml`, `dns-mochahost.yml` |
+| DNS automation (cPanel API) | `scripts/deploy/mochahost-dns.py` |
 
 The services are `postgres`, `migrate`, `web`, `billing`, `scheduler`, `backup` and `caddy`.
 `migrate` runs `prisma migrate deploy` and must finish before `web` or any

@@ -11,7 +11,8 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-cid="$(docker compose -f docker-compose.production.yml ps -q web)"
+# compose.sh supplies R2NETTE_IMAGE from state/ when the caller has not.
+cid="$(bash scripts/deploy/compose.sh ps -q web)"
 if [[ -z "$cid" ]]; then
   echo "web container is not running." >&2
   exit 1

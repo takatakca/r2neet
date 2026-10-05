@@ -173,6 +173,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
+      - name: DNS automation keeps email at MochaHost
+        run: python3 -m unittest scripts/deploy/test_mochahost_dns.py
+
       - name: No secrets committed
         run: |
           # Real credentials only. Test fixtures deliberately contain

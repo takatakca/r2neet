@@ -1,0 +1,59 @@
+name: DNS (MochaHost)
+
+# Point the domain at the VPS through cPanel's API, keeping email at
+# MochaHost. Run `plan` first (read-only), then `email`, then `web`.
+# See scripts/deploy/mochahost-dns.py for exactly what each phase changes.
+# Needs MOCHAHOST_CPANEL_HOST, MOCHAHOST_CPANEL_USER and MOCHAHOST_CPANEL_TOKEN
+# (cPanel > Security > Manage API Tokens) in the `production` environment.
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: Domain, e.g. r2nette.ca
+        required: true
+        type: string
+      mode:
+        description: plan (read-only), email, or web
+        required: true
+        type: choice
+        options: [plan, email, web]
+
+concurrency:
+  group: dns-${{ inputs.domain }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  dns:
+    name: ${{ inputs.mode }}
+    # Only main's scripts may run with root and cPanel credentials.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: ${{ inputs.mode }}
+        env:
+          MODE: ${{ inputs.mode }}
+          DOMAIN: ${{ inputs.domain }}
+          SERVER_IP: ${{ secrets.CONTABO_SSH_HOST }}
+          CPANEL_HOST: ${{ secrets.MOCHAHOST_CPANEL_HOST }}
+          CPANEL_USER: ${{ secrets.MOCHAHOST_CPANEL_USER }}
+          CPANEL_TOKEN: ${{ secrets.MOCHAHOST_CPANEL_TOKEN }}
+        run: python3 scripts/deploy/mochahost-dns.py
+
+      - name: What the internet sees now
+        if: always()
+        env:
+          DOMAIN: ${{ inputs.domain }}
+        run: |
+          for t in A MX; do echo "$DOMAIN $t: $(dig +short "$DOMAIN" "$t" | tr '\n' ' ')"; done
+          echo "www.$DOMAIN: $(dig +short "www.$DOMAIN" | tr '\n' ' ')"
+          echo "mail.$DOMAIN: $(dig +short "mail.$DOMAIN" | tr '\n' ' ')"
+          echo "Nameservers: $(dig +short NS "$DOMAIN" | tr '\n' ' ')"

@@ -1,0 +1,86 @@
+name: Server setup
+
+# One-time (and safe to repeat) setup of the Contabo VPS, run from GitHub so
+# nobody has to SSH in by hand. Logs in as root with the CONTABO_ROOT_PASSWORD
+# (or CONTABO_ROOT_SSH_KEY) secret, installs Docker and the firewall, creates
+# /opt/r2nette/.env with generated secrets, and copies any provider settings
+# stored as secrets in the `production` environment into that file.
+#
+# This repository is public, so this log is public: it prints names and the
+# server's public host key, never a secret value.
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: Production domain, e.g. r2nette.ca (no https://, no www)
+        required: true
+        type: string
+      acme_email:
+        description: Email for HTTPS certificate notices
+        required: true
+        type: string
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    name: Set up the VPS
+    # Only main's scripts may run with root and cPanel credentials.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install sshpass
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null
+
+      - name: Bootstrap the server and write its settings
+        env:
+          DOMAIN: ${{ inputs.domain }}
+          ACME_EMAIL: ${{ inputs.acme_email }}
+          CONTABO_SSH_HOST: ${{ secrets.CONTABO_SSH_HOST }}
+          CONTABO_SSH_PORT: ${{ secrets.CONTABO_SSH_PORT }}
+          CONTABO_SSH_KNOWN_HOSTS: ${{ secrets.CONTABO_SSH_KNOWN_HOSTS }}
+          CONTABO_ROOT_PASSWORD: ${{ secrets.CONTABO_ROOT_PASSWORD }}
+          CONTABO_ROOT_SSH_KEY: ${{ secrets.CONTABO_ROOT_SSH_KEY }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_VERIFY_SERVICE_SID: ${{ secrets.TWILIO_VERIFY_SERVICE_SID }}
+          TWILIO_VOICE_NUMBER: ${{ secrets.TWILIO_VOICE_NUMBER }}
+          TWILIO_SMS_NUMBER: ${{ secrets.TWILIO_SMS_NUMBER }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          BUSINESS_ORIGIN_LAT: ${{ secrets.BUSINESS_ORIGIN_LAT }}
+          BUSINESS_ORIGIN_LNG: ${{ secrets.BUSINESS_ORIGIN_LNG }}
+          GOOGLE_BUSINESS_CLIENT_ID: ${{ secrets.GOOGLE_BUSINESS_CLIENT_ID }}
+          GOOGLE_BUSINESS_CLIENT_SECRET: ${{ secrets.GOOGLE_BUSINESS_CLIENT_SECRET }}
+          GOOGLE_BUSINESS_REFRESH_TOKEN: ${{ secrets.GOOGLE_BUSINESS_REFRESH_TOKEN }}
+          GOOGLE_BUSINESS_ACCOUNT_ID: ${{ secrets.GOOGLE_BUSINESS_ACCOUNT_ID }}
+          GOOGLE_BUSINESS_LOCATION_ID: ${{ secrets.GOOGLE_BUSINESS_LOCATION_ID }}
+          EMAIL_API_URL: ${{ secrets.EMAIL_API_URL }}
+          EMAIL_API_KEY: ${{ secrets.EMAIL_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_REGION: ${{ secrets.BACKUP_S3_REGION }}
+          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_FORCE_PATH_STYLE: ${{ secrets.BACKUP_S3_FORCE_PATH_STYLE }}
+          BACKUP_S3_PREFIX: ${{ secrets.BACKUP_S3_PREFIX }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          ALERT_WEBHOOK_SECRET: ${{ secrets.ALERT_WEBHOOK_SECRET }}
+          AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+          AI_MODEL: ${{ secrets.AI_MODEL }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+        run: bash scripts/deploy/ci-server-setup.sh

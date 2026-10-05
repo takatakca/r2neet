@@ -1,0 +1,63 @@
+name: Server admin
+
+# Small, safe operations on the running server, without SSHing in by hand.
+#   status        containers, health checks, running revision
+#   restart-proxy Caddy retries HTTPS certificates now (run after DNS web)
+#   create-owner  the first OWNER login; its password is the
+#                 OWNER_INITIAL_PASSWORD secret and is never printed
+# The log is public (public repository): nothing here prints a secret,
+# an application log line, or customer data.
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: What to do
+        required: true
+        type: choice
+        options: [status, restart-proxy, create-owner]
+      owner_email:
+        description: create-owner only — the owner's email
+        required: false
+        type: string
+      owner_name:
+        description: create-owner only — the owner's name
+        required: false
+        type: string
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  admin:
+    name: ${{ inputs.task }}
+    # Only main's scripts may run with root and cPanel credentials.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install sshpass
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null
+
+      - name: Run ${{ inputs.task }}
+        env:
+          TASK: ${{ inputs.task }}
+          OWNER_EMAIL: ${{ inputs.owner_email }}
+          OWNER_NAME: ${{ inputs.owner_name }}
+          OWNER_INITIAL_PASSWORD: ${{ secrets.OWNER_INITIAL_PASSWORD }}
+          CONTABO_SSH_HOST: ${{ secrets.CONTABO_SSH_HOST }}
+          CONTABO_SSH_PORT: ${{ secrets.CONTABO_SSH_PORT }}
+          CONTABO_SSH_USER: ${{ secrets.CONTABO_SSH_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_SSH_KNOWN_HOSTS: ${{ secrets.CONTABO_SSH_KNOWN_HOSTS }}
+          CONTABO_ROOT_PASSWORD: ${{ secrets.CONTABO_ROOT_PASSWORD }}
+          CONTABO_ROOT_SSH_KEY: ${{ secrets.CONTABO_ROOT_SSH_KEY }}
+        run: bash scripts/deploy/ci-server-admin.sh
