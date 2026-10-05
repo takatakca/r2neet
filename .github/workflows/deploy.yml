@@ -3,7 +3,8 @@ name: Deploy
 # Runs only after the CI workflow succeeds for a push to main.
 # Pull requests do not deploy. The image tag is the full commit SHA.
 # "Run workflow" redeploys the current main, e.g. after the server's
-# secrets are first added; only main can be deployed that way.
+# secrets are first added; only main can be deployed that way, and only once
+# CI has passed on its current commit.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -18,6 +19,8 @@ concurrency:
 permissions:
   contents: read
   packages: write
+  # Lets "Run workflow" confirm that CI passed on the commit it deploys.
+  actions: read
 
 jobs:
   deploy:
@@ -31,6 +34,24 @@ jobs:
     timeout-minutes: 30
     environment: production
     steps:
+      # The workflow_run path only starts after CI succeeded. "Run workflow"
+      # deploys whatever main points at now, so check CI passed on it first.
+      - name: Require a passing CI run for this commit
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          passed=$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --limit 100 \
+            --json conclusion,event \
+            --jq '[.[] | select(.conclusion == "success")] | length')
+          if [ "${passed:-0}" -gt 0 ]; then
+            echo "CI passed for ${GITHUB_SHA}."
+          else
+            echo "::error::CI has not passed for ${GITHUB_SHA}. Wait for the CI run on main to finish green, then run this workflow again."
+            exit 1
+          fi
+
       - name: Check out the exact commit CI passed
         uses: actions/checkout@v4
         with:
