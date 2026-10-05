@@ -258,6 +258,17 @@ jobs:
       - name: Build image
         run: docker build -t r2nette:ci .
 
+      - name: Backup client matches the PostgreSQL 16 server
+        run: |
+          # pg_dump refuses to dump a server newer than itself, so the nightly
+          # backup needs a version 16 client for the postgres:16 database.
+          VERSION=$(docker run --rm --entrypoint pg_dump r2nette:ci --version)
+          echo "$VERSION"
+          if ! echo "$VERSION" | grep -Eq ' 16\.'; then
+            echo "::error::The image's pg_dump is not version 16, so backups of the postgres:16 database would fail."
+            exit 1
+          fi
+
       - name: Refuses an unsafe production configuration
         run: |
           # Startup validation must block a leftover shared token.
