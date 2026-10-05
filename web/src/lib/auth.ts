@@ -7,9 +7,12 @@ interface ApiFailure {
 }
 
 class ApiRequestError extends Error {
+  // (message, code, status): the order every call site uses. With code first,
+  // customers saw "ACCOUNT_NOT_FOUND" instead of the sentence, and checks on
+  // error.code never matched.
   constructor(
-    readonly code: string,
     message: string,
+    readonly code: string,
     readonly status: number,
   ) {
     super(message);
@@ -23,25 +26,10 @@ interface SendCodeResponse {
   maskedPhone: string;
 }
 
-interface VerifyCodeResponse {
-  customer: {
-    id: string;
-    firstName: string | null;
-    email: string | null;
-    isReturningCustomer: boolean;
-  };
-}
-
-interface CustomerResponse {
-  customer: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    email: string | null;
-    verifiedPhone: string | null;
-    isReturningCustomer: boolean;
-  };
-}
+/** /verify answers once the code is proven. Account existence is only revealed here. */
+type VerifyCodeResponse =
+  | { outcome: 'AUTHENTICATED'; intent: AuthIntent }
+  | { outcome: 'PROFILE_REQUIRED'; intent: AuthIntent };
 
 type AuthPage = 'login' | 'verify' | 'signup';
 type AuthIntent = 'login' | 'signup';
@@ -65,6 +53,25 @@ function showError(message: string): void {
 
   error.textContent = message;
   error.hidden = message.length === 0;
+}
+
+/** An error with a way forward, e.g. "No account for this number. Go to Sign up". */
+function showErrorWithLink(message: string, href: string, linkText: string): void {
+  const error = document.getElementById('error');
+
+  if (!error) return;
+
+  const link = document.createElement('a');
+  link.href = href;
+  link.textContent = linkText;
+
+  error.replaceChildren(document.createTextNode(`${message} `), link);
+  error.hidden = false;
+}
+
+/** The mode chosen on the login page, carried to /verify and the resend button. */
+function storedIntent(): AuthIntent {
+  return sessionStorage.getItem('r2nette.authIntent') === 'signup' ? 'signup' : 'login';
 }
 
 function safeReturnPath(): string {
@@ -436,6 +443,7 @@ function initializeVerifyPage(): void {
           body: JSON.stringify({
             phone,
             code,
+            intent: storedIntent(),
           }),
         },
       );
@@ -445,21 +453,34 @@ function initializeVerifyPage(): void {
 
       const returnTo = safeReturnPath();
 
-      if (result.customer.isReturningCustomer) {
+      if (result.outcome === 'AUTHENTICATED') {
+        sessionStorage.removeItem('r2nette.authIntent');
         sessionStorage.removeItem('r2nette.returnTo');
         window.location.assign(returnTo);
         return;
       }
 
+      // PROFILE_REQUIRED: the number is proven; a registration cookie now
+      // carries that proof to the profile form.
       window.location.assign(
         `/signup?returnTo=${encodeURIComponent(returnTo)}`,
       );
     } catch (error) {
-      showError(
+      const message =
         error instanceof Error
           ? error.message
-          : 'That code was not accepted. Try again.',
-      );
+          : 'That code was not accepted. Try again.';
+
+      if (error instanceof ApiRequestError && error.code === 'ACCOUNT_NOT_FOUND') {
+        showErrorWithLink(message, '/login?mode=signup', 'Go to Sign up');
+      } else if (
+        error instanceof ApiRequestError &&
+        error.code === 'ACCOUNT_ALREADY_EXISTS'
+      ) {
+        showErrorWithLink(message, '/login', 'Go to Login');
+      } else {
+        showError(message);
+      }
 
       setInputsDisabled(false);
       clearInputs();
@@ -549,7 +570,7 @@ function initializeVerifyPage(): void {
         '/api/v1/auth/phone/send',
         {
           method: 'POST',
-          body: JSON.stringify({ phone }),
+          body: JSON.stringify({ phone, intent: storedIntent() }),
         },
       );
 
@@ -581,15 +602,8 @@ function initializeSignupPage(): void {
   const button = element<HTMLButtonElement>('submitButton');
   const label = element<HTMLSpanElement>('submitLabel');
 
-  void apiRequest<CustomerResponse>('/api/v1/customer/me')
-    .then((result) => {
-      firstName.value = result.customer.firstName ?? '';
-      lastName.value = result.customer.lastName ?? '';
-      email.value = result.customer.email ?? '';
-    })
-    .catch(() => {
-      window.location.replace('/login');
-    });
+  // No session exists yet: the verified number is carried by the
+  // registration cookie, which /auth/registration/complete consumes.
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -611,7 +625,7 @@ function initializeSignupPage(): void {
       return;
     }
 
-    if (cleanEmail && !/^\S+@\S+\.\S{2,}$/.test(cleanEmail)) {
+    if (!/^\S+@\S+\.\S{2,}$/.test(cleanEmail)) {
       showError('Enter a valid email address.');
       email.focus();
       return;
@@ -621,32 +635,23 @@ function initializeSignupPage(): void {
     label.textContent = 'Saving…';
 
     try {
-      await apiRequest<{
-        firstName: string | null;
-        lastName: string | null;
-        email: string | null;
-      }>('/api/v1/account/profile', {
-        method: 'PATCH',
+      await apiRequest('/api/v1/auth/registration/complete', {
+        method: 'POST',
 
         body: JSON.stringify({
           firstName: cleanFirstName,
           lastName: cleanLastName,
-          email: cleanEmail || undefined,
+          email: cleanEmail,
+          locale: document.documentElement.lang.startsWith('fr') ? 'fr' : 'en',
+          // The form states that continuing accepts the Terms and Privacy
+          // Policy; the server records when and which version.
+          termsAccepted: true,
+          privacyAccepted: true,
+          marketingConsent: consent.checked,
         }),
       });
 
-      if (cleanEmail && consent.checked) {
-        await apiRequest('/api/v1/marketing/leads', {
-          method: 'POST',
-
-          body: JSON.stringify({
-            email: cleanEmail,
-            locale: 'en',
-            consent: true,
-            source: 'WELCOME_MODAL',
-          }),
-        }).catch(() => undefined);
-      }
+      sessionStorage.removeItem('r2nette.authIntent');
 
       const returnTo = safeReturnPath();
 
@@ -654,11 +659,17 @@ function initializeSignupPage(): void {
 
       window.location.assign(returnTo);
     } catch (error) {
-      showError(
-        error instanceof Error
-          ? error.message
-          : 'Unable to create your account.',
-      );
+      const message =
+        error instanceof Error ? error.message : 'Unable to create your account.';
+
+      if (
+        error instanceof ApiRequestError &&
+        error.code === 'REGISTRATION_SESSION_EXPIRED'
+      ) {
+        showErrorWithLink(message, '/login?mode=signup', 'Verify your number again');
+      } else {
+        showError(message);
+      }
     } finally {
       button.disabled = false;
       label.textContent = 'Create account & continue';

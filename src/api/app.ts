@@ -427,37 +427,11 @@ export function createApi(deps: ApiDeps) {
       const { phone, intent } = phoneSchema.parse(req.body);
       const phoneE164 = normalizePhone(phone);
 
-      const existingPhone = await prisma.customerPhone.findUnique({
-        where: {
-          phoneE164,
-        },
-        include: {
-          customer: true,
-        },
-      });
-
-      const hasCompleteAccount = Boolean(
-        existingPhone?.verifiedAt &&
-        existingPhone.customer.firstName?.trim() &&
-        existingPhone.customer.lastName?.trim(),
-      );
-
-      if (intent === 'login' && !hasCompleteAccount) {
-        throw new ApiError(
-          404,
-          'ACCOUNT_NOT_FOUND',
-          'No completed R2NETTE account was found for this number. Please sign up first.',
-        );
-      }
-
-      if (intent === 'signup' && hasCompleteAccount) {
-        throw new ApiError(
-          409,
-          'ACCOUNT_ALREADY_EXISTS',
-          'An R2NETTE account already exists for this number. Please log in instead.',
-        );
-      }
-
+      // Deliberately no account lookup here. Answering "no account" or
+      // "already registered" before the caller proves they own the phone
+      // would let anyone enumerate customers by number. Those outcomes
+      // (ACCOUNT_NOT_FOUND / ACCOUNT_ALREADY_EXISTS) come from /verify, after
+      // the code is checked.
       const ip = req.ip ?? 'unknown';
 
       const out = await identity.startVerification(phoneE164, ip);

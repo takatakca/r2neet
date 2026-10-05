@@ -10,6 +10,7 @@ import {
 } from '../src/integrations/places.js';
 import { assertDestructiveAllowed } from '../src/db/safety.js';
 import { seed } from '../prisma/seed.js';
+import { signUp } from './support/customer-auth.js';
 
 const URL = process.env.TEST_DATABASE_URL;
 const d = URL ? describe : describe.skip;
@@ -119,10 +120,9 @@ d('address HTTP routes', () => {
     });
   });
 
+  /** Register a new customer through the real sign-up flow; returns the session cookie. */
   async function login(phone = '514 825 2825') {
-    await request(app).post('/api/v1/auth/phone/send').send({ phone });
-    const v = await request(app).post('/api/v1/auth/phone/verify').send({ phone, code: '123456' });
-    return (v.headers['set-cookie'] as unknown as string[]).find((c) => c.startsWith('r2n_session'))!;
+    return (await signUp(app, phone)).cookie;
   }
 
   it('returns suggestions and keeps one token per search session', async () => {
