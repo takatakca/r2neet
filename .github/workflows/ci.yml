@@ -43,14 +43,31 @@ jobs:
 
       # The bundle is what customers actually load. A silent size jump usually
       # means a dependency was pulled into the browser by accident.
+      # Code only: photos copied from web/public are budgeted separately below,
+      # so a new image can never hide a dependency leaking into the browser.
       - name: Check bundle size
         run: |
-          TOTAL=$(du -sk dist/assets | cut -f1)
+          TOTAL=$(find dist/assets -type f \( -name '*.js' -o -name '*.css' \) -exec du -ck {} + | tail -1 | cut -f1)
           echo "Bundle: ${TOTAL}KB"
           if [ "$TOTAL" -gt 400 ]; then
             echo "::error::Bundle grew to ${TOTAL}KB (limit 400KB)."
             exit 1
           fi
+
+      # Customers arrive on phones from social links. An unoptimised photo
+      # costs them seconds on a mobile connection.
+      - name: Check image sizes
+        run: |
+          FAIL=0
+          while IFS= read -r f; do
+            KB=$(du -k "$f" | cut -f1)
+            echo "${f}: ${KB}KB"
+            if [ "$KB" -gt 400 ]; then
+              echo "::error file=${f}::Image is ${KB}KB (limit 400KB per image). Resize or recompress it."
+              FAIL=1
+            fi
+          done < <(find web/public -type f \( -name '*.jpg' -o -name '*.jpeg' -o -name '*.png' -o -name '*.webp' \))
+          exit $FAIL
 
   test:
     name: Tests
