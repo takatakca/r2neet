@@ -15,7 +15,7 @@
     "build": "vite build",
     "build:single": "SINGLE_FILE=1 vite build",
     "dev": "node scripts/dev.mjs",
-    "start": "node --env-file=.env ./node_modules/vite-node/vite-node.mjs src/api/server.ts",
+    "start": "node --env-file-if-exists=.env ./node_modules/vite-node/vite-node.mjs src/api/server.ts",
     "staff:create": "vite-node scripts/create-staff.ts --",
     "worker:recurrence": "vite-node scripts/recurrence-worker.ts",
     "worker:billing": "vite-node scripts/billing-worker.ts",

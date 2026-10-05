@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Filter a log stream. Keep the failure, drop credential-shaped text.
+if sed --version >/dev/null 2>&1; then
+  SED=(sed -E)
+else
+  SED=(sed -E)
+fi
+
+"${SED[@]}" \
+  -e 's#(postgres(ql)?://)[^[:space:]@]+@#\1***@#g' \
+  -e 's#\b(sk|pk|rk)_(live|test)_[A-Za-z0-9]+#\1_\2_***#g' \
+  -e 's#\bwhsec_[A-Za-z0-9]+#whsec_***#g' \
+  -e 's#\b(AKIA|ASIA)[0-9A-Z]{16}\b#\1***#g' \
+  -e 's#\b((ADMIN_TOKEN|GITHUB_TOKEN|MOCHAHOST_SSH_KEY|STAFF_PASSWORD|POSTGRES_PASSWORD|DATABASE_URL|PRISMA_DATABASE_URL|FIELD_ENCRYPTION_KEY|FIELD_ENCRYPTION_KEYS_RETIRED|TWILIO_AUTH_TOKEN|TWILIO_ACCOUNT_SID|TWILIO_VERIFY_SERVICE_SID|STRIPE_SECRET_KEY|STRIPE_PUBLISHABLE_KEY|STRIPE_WEBHOOK_SECRET|GOOGLE_MAPS_API_KEY|GOOGLE_BUSINESS_CLIENT_SECRET|GOOGLE_BUSINESS_REFRESH_TOKEN|BACKUP_S3_SECRET_ACCESS_KEY|BACKUP_S3_ACCESS_KEY_ID|ALERT_WEBHOOK_SECRET|ALERT_WEBHOOK_URL|EMAIL_API_KEY|AI_PROVIDER_API_KEY|AI_API_KEY)=)[^[:space:]]+#\1***#g'

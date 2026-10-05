@@ -21,7 +21,12 @@ COPY . .
 RUN npx prisma generate && npm run build
 
 FROM base AS runtime
+ARG GIT_SHA=unknown
 ENV NODE_ENV=production
+ENV R2NETTE_GIT_SHA=${GIT_SHA}
+LABEL org.opencontainers.image.revision="${GIT_SHA}" \
+      org.opencontainers.image.source="https://github.com/takatakca/r2neet" \
+      org.opencontainers.image.title="r2nette"
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma

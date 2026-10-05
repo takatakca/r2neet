@@ -1,0 +1,52 @@
+name: Deploy
+
+# Runs only after the CI workflow succeeds for a push to main.
+# Pull requests do not deploy. The image tag is the full commit SHA.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    name: Deploy immutable image
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - name: Check out the exact commit CI passed
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Build and push the immutable image
+        env:
+          GIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/deploy/publish-image.sh
+
+      - name: Roll the VPS to that image
+        env:
+          GIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          MOCHAHOST_SSH_HOST: ${{ secrets.MOCHAHOST_SSH_HOST }}
+          MOCHAHOST_SSH_PORT: ${{ secrets.MOCHAHOST_SSH_PORT }}
+          MOCHAHOST_SSH_USER: ${{ secrets.MOCHAHOST_SSH_USER }}
+          MOCHAHOST_SSH_KEY: ${{ secrets.MOCHAHOST_SSH_KEY }}
+          MOCHAHOST_SSH_KNOWN_HOSTS: ${{ secrets.MOCHAHOST_SSH_KNOWN_HOSTS }}
+          GHCR_PULL_USER: ${{ github.actor }}
+          GHCR_PULL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/deploy/ci-deploy.sh

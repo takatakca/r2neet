@@ -43,13 +43,26 @@ const app = createApi({
 });
 
 // Serve the BUILT frontend. Never raw source, never a loose HTML file.
+// Clean paths match vite.config.ts. The dev server rewrites them; production
+// has to do the same or /login, /verify and /signup 404 after the image boots.
 import express from 'express';
 import path from 'node:path';
 const dist = path.resolve('dist');
-app.get('/book', (_req, res) => res.sendFile(path.join(dist, 'index.html')));
-app.get('/account', (_req, res) => res.sendFile(path.join(dist, 'account.html')));
-app.get('/admin', (_req, res) => res.sendFile(path.join(dist, 'admin.html')));
-app.get('/crew', (_req, res) => res.sendFile(path.join(dist, 'crew.html')));
+const pages: Record<string, string> = {
+  '/book': 'index.html',
+  '/auth': 'auth.html',
+  '/login': 'auth.html',
+  '/verify': 'verify.html',
+  '/signup': 'signup.html',
+  '/account': 'account.html',
+  '/admin': 'admin.html',
+  '/crew': 'crew.html',
+};
+for (const [route, file] of Object.entries(pages)) {
+  app.get(route, (_req, res) => {
+    res.sendFile(path.join(dist, file));
+  });
+}
 app.use(express.static(dist));
 
 const problems = validateProductionConfig(process.env);
@@ -61,9 +74,10 @@ if (problems.some((p) => p.severity === 'FATAL')) {
   process.exit(1);
 }
 
+const host = process.env.HOST ?? '0.0.0.0';
 const port = Number(process.env.PORT ?? 3000);
-const server = app.listen(port, () => {
-  console.log(`R2NETTE API on :${port} — database ${db.describe} (${db.environment})`);
+const server = app.listen(port, host, () => {
+  console.log(`R2NETTE API on ${host}:${port} — database ${db.describe} (${db.environment})`);
   for (const i of integrationStatus(process.env)) {
     console.log(`  ${i.status === 'CONNECTED' ? '✓' : '·'} ${i.label}: ${i.status}`);
   }

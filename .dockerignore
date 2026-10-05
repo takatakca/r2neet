@@ -1,0 +1,16 @@
+.git
+.github
+node_modules
+dist
+dist-single
+coverage
+backups
+*.dump
+.env
+.env.*
+npm-debug.log*
+*.log
+.DS_Store
+tmp
+var
+supabase
