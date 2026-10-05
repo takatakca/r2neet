@@ -60,3 +60,6 @@ next-env.d.ts
 
 # Local remaining-work notes (not for the repo)
 R2NETTE-COMPLETE-REMAINING-WORK-GUIDE.md
+
+# Python bytecode (scripts/deploy tests)
+__pycache__/
