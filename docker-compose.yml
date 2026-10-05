@@ -20,6 +20,8 @@ x-app: &app
   environment:
     NODE_ENV: production
     TRUST_PROXY: "true"
+    # The container always listens on 3000; the host side is mapped below.
+    PORT: "3000"
   depends_on:
     postgres:
       condition: service_healthy
@@ -50,8 +52,11 @@ services:
   web:
     <<: *app
     command: npm start
+    # Loopback only: in production the public entry point is Caddy
+    # (docker-compose.prod.yml), which terminates HTTPS. Publishing this port
+    # on all interfaces would let anyone bypass TLS and the proxy headers.
     ports:
-      - "${PORT:-3000}:3000"
+      - "127.0.0.1:${PORT:-3000}:3000"
     depends_on:
       migrate:
         condition: service_completed_successfully

@@ -1,0 +1,70 @@
+name: Deploy
+
+# Ships main to the Contabo VPS, but only after CI passed on that commit.
+# Pushing from Cursor, the GitHub web UI, or anywhere else works the same way.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # Never two deploys at once; never cancel one halfway through a migration.
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Contabo
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      HOST: ${{ secrets.CONTABO_HOST }}
+      USER: ${{ secrets.CONTABO_USER || 'deploy' }}
+      APP_DIR: ${{ secrets.CONTABO_APP_DIR || '/opt/r2nette' }}
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Check secrets are configured
+        run: |
+          if [ -z "$HOST" ] || [ -z "${{ secrets.CONTABO_SSH_KEY }}" ]; then
+            echo "::error::Set CONTABO_HOST and CONTABO_SSH_KEY in Settings → Secrets and variables → Actions. See docs/DEPLOY-CONTABO.md."
+            exit 1
+          fi
+
+      - name: Configure SSH
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "${{ secrets.CONTABO_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Pull, build and restart
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes "$USER@$HOST" \
+            APP_DIR="$APP_DIR" SHA="$SHA" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd "$APP_DIR"
+          git fetch --quiet origin main
+          git reset --hard "$SHA"
+          COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+          # `migrate` runs to completion before web/billing/scheduler start.
+          $COMPOSE up -d --build --remove-orphans
+          docker image prune -f >/dev/null
+          $COMPOSE ps
+          REMOTE
+
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 30); do
+            if ssh -i ~/.ssh/id_deploy -o BatchMode=yes "$USER@$HOST" \
+                 'curl -fsS http://127.0.0.1:3000/healthz' >/dev/null 2>&1; then
+              echo "App is live."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::/healthz did not respond within 150s. On the server: docker compose logs web migrate"
+          exit 1
