@@ -1,9 +1,17 @@
 # Apply only after a key login works from a second terminal.
 # Do not install this file until that second session is confirmed.
 # Installing it earlier can lock the owner out of the VPS.
+#
+# Install as /etc/ssh/sshd_config.d/00-r2nette-hardening.conf (see the SSH
+# hardening section of docs/deployment/contabo-runbook.md). sshd keeps the
+# first value it reads for each setting, and the 00- prefix puts this file
+# ahead of a cloud image's own file that may turn passwords back on.
 
 PasswordAuthentication no
 KbdInteractiveAuthentication no
-PermitRootLogin no
+# Root may still log in with the owner's own key; only root's password is
+# refused. The runbook's admin steps log in as root, so "no" would lock the
+# owner out.
+PermitRootLogin prohibit-password
 PubkeyAuthentication yes
 AuthenticationMethods publickey
