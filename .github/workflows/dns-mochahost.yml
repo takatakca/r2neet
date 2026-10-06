@@ -60,6 +60,18 @@ jobs:
           # Which MochaHost server hosts the domain today, so the right cPanel
           # account can be found: the address's reverse name and the name on
           # the certificate cPanel's port presents. Both are public.
+          # Straight from the domain's own name server, so a change shows here
+          # at once, while the answers above may still come from caches.
+          ns="$(dig +short NS "$DOMAIN" | head -n 1)"
+          if [ -n "$ns" ]; then
+            echo "At the domain's name server $ns (no caches):"
+            for n in "$DOMAIN" "www.$DOMAIN" "mail.$DOMAIN"; do
+              echo "  $n: $(dig +short @"$ns" "$n" A | tr '\n' ' ')"
+            done
+            echo "  $DOMAIN MX: $(dig +short @"$ns" "$DOMAIN" MX | tr '\n' ' ')"
+            echo "  $DOMAIN TXT: $(dig +short @"$ns" "$DOMAIN" TXT | tr '\n' ' ')"
+            echo "  $DOMAIN A record TTL (seconds caches may keep the old answer): $(dig +noall +answer @"$ns" "$DOMAIN" A | awk '{print $2}' | head -n 1)"
+          fi
           ip="$(dig +short "$DOMAIN" A | grep -E '^[0-9.]+$' | head -n 1)"
           if [ -n "$ip" ]; then
             echo "Server name of $ip: $(dig +short -x "$ip" | tr '\n' ' ')"
