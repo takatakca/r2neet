@@ -18,7 +18,7 @@ TASK="${TASK:?TASK is required}"
 source "$(dirname "${BASH_SOURCE[0]}")/ssh-common.sh"
 ssh_check_login
 
-if [[ "$SSH_LOGIN_USER" == "root" ]]; then
+if [[ "$SSH_AS_ROOT" == "1" ]]; then
   as_app="runuser -u r2nette -- env HOME=/home/r2nette"
 else
   as_app=""

@@ -3,8 +3,9 @@
 # and runs the remote script. Never prints secret values.
 #
 # Logs in with the r2nette deploy key (CONTABO_SSH_KEY) when one is set,
-# otherwise as root (CONTABO_ROOT_SSH_KEY or CONTABO_ROOT_PASSWORD) and then
-# runs every step as the r2nette user. Either way the containers run as
+# otherwise as root (CONTABO_ROOT_SSH_KEY or CONTABO_ROOT_PASSWORD, or the
+# CONTABO_SSH_ADMIN_USER account with sudo) and then runs every step as the
+# r2nette user. Either way the containers run as
 # r2nette, which owns /opt/r2nette.
 set -euo pipefail
 umask 077
@@ -37,7 +38,7 @@ ssh_check_login
 owner="$(printf '%s' "${GITHUB_REPOSITORY_OWNER:?}" | tr '[:upper:]' '[:lower:]')"
 repo_name="$(printf '%s' "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')"
 
-if [[ "$SSH_LOGIN_USER" == "root" ]]; then
+if [[ "$SSH_AS_ROOT" == "1" ]]; then
   # Run as r2nette with its own HOME, so the registry login lands in its
   # ~/.docker and every file the deploy writes is owned by it.
   as_app="runuser -u r2nette -- env HOME=/home/r2nette"

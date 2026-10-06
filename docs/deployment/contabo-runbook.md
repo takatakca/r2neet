@@ -51,6 +51,7 @@ secrets**, choose **Add environment secret** once per name:
 | `MOCHAHOST_CPANEL_HOST` | Your cPanel address without `https://` or `:2083`, e.g. `server123.mochahost.com` (it appears in cPanel's address bar) | DNS |
 | `MOCHAHOST_CPANEL_USER` | Your cPanel username | DNS |
 | `MOCHAHOST_CPANEL_TOKEN` | cPanel → **Security → Manage API Tokens → Create**. Name it `r2nette-dns` and copy the token it shows once | DNS |
+| `CONTABO_SSH_ADMIN_USER` | Only when the server refuses root logins (`PermitRootLogin no`): the account `CONTABO_ROOT_SSH_KEY` logs in as, which must be able to use `sudo` without a password. On a Coolify server it is the account Coolify uses; its **Terminal** prompt shows it as `user@server` | when root login is off |
 | `CONTABO_SSH_PORT` | Only if SSH is not on port 22 | optional |
 
 Provider keys can be added the same way whenever you have them, and **Server
@@ -115,6 +116,9 @@ instead of starting the bundled Caddy:
   not touched. Do not also add the domain to a Coolify resource.
 - Server setup skips the package upgrade (it could restart Docker and every
   Coolify app) and leaves the firewall alone.
+- When the server refuses root logins, set `CONTABO_SSH_ADMIN_USER` to the
+  account Coolify uses. The workflows log in as that account with Coolify's
+  key and run their commands as root through `sudo`.
 - `restart-proxy` recreates only R2NETTE's `web` container, which makes
   Coolify's proxy retry the certificate without restarting the other apps.
 
