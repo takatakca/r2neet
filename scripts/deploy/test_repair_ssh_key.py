@@ -34,6 +34,16 @@ class RepairSshKey(unittest.TestCase):
             subprocess.run(["ssh-keygen", "-q", "-N", "", "-C", "test", "-f", str(path), *args], check=True)
             cls.keys[kind] = path.read_text()
         cls.public = (cls.dir / "ed25519.pub").read_text()
+        ec_params = cls.dir / "ec-params.pem"
+        # openssl's default output: an EC PARAMETERS block, then the key.
+        subprocess.run(["openssl", "ecparam", "-name", "prime256v1", "-genkey", "-out", str(ec_params)], check=True)
+        cls.ec_with_params = ec_params.read_text()
+        encrypted = cls.dir / "encrypted"
+        subprocess.run(
+            ["ssh-keygen", "-q", "-N", "secret-pass", "-m", "PEM", "-t", "rsa", "-b", "2048", "-f", str(encrypted)],
+            check=True,
+        )
+        cls.encrypted_pem = encrypted.read_text()
 
     @classmethod
     def tearDownClass(cls):
@@ -125,14 +135,69 @@ class RepairSshKey(unittest.TestCase):
                 self.assertEqual(result.returncode, 2)
                 self.assertIn(reason, result.stderr)
 
-    def test_encrypted_pem_headers_are_kept(self):
-        block = (
-            "-----BEGIN RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\n"
-            "DEK-Info: AES-128-CBC,00\n\nQUJD\n-----END RSA PRIVATE KEY-----"
-        )
+    def test_other_pem_headers_are_kept(self):
+        block = "-----BEGIN RSA PRIVATE KEY-----\nComment: test\n\nQUJD\n-----END RSA PRIVATE KEY-----"
         clean, notes = repair.repair(block)
         self.assertEqual(clean, block + "\n")
         self.assertEqual(notes, [])
+
+    def test_extra_block_before_the_key(self):
+        result, path = self.run_script(self.ec_with_params)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ignored text before or after the key", result.stdout)
+        self.assert_ssh_reads(path, self.ec_with_params)
+
+    def test_public_key_block_alone_is_refused(self):
+        result, _ = self.run_script("-----BEGIN PUBLIC KEY-----\nQUJD\n-----END PUBLIC KEY-----\n")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("holds a PUBLIC KEY block, not a private key", result.stderr)
+
+    def test_no_break_spaces(self):
+        key = self.keys["ed25519"]
+        result, path = self.run_script(key.replace(" ", "\u00a0"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("replaced special spaces", result.stdout)
+        self.assert_ssh_reads(path, key)
+
+    def test_invisible_characters(self):
+        key = self.keys["ed25519"]
+        lines = key.split("\n")
+        damaged = "\ufeff" + "\n".join(
+            line[:10] + "\u200b" + line[10:20] + "\u2060" + line[20:30] + "\u00ad" + line[30:]
+            if line and not line.startswith("-----") else line
+            for line in lines
+        )
+        result, path = self.run_script(damaged)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("removed invisible characters", result.stdout)
+        self.assert_ssh_reads(path, key)
+
+    def test_escaped_line_breaks_from_json(self):
+        key = self.keys["ed25519"]
+        for text in [key.replace("\n", "\\n"), '"' + key.replace("\n", "\\r\\n") + '"']:
+            with self.subTest(text=text[:40]):
+                result, path = self.run_script(text)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("escapes into line breaks", result.stdout)
+                self.assert_ssh_reads(path, key)
+
+    def test_cut_off_copy_then_whole_key(self):
+        key = self.keys["ed25519"]
+        pasted = "\n".join(key.split("\n")[:3]) + "\n" + key
+        result, path = self.run_script(pasted)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ignored text before or after the key", result.stdout)
+        self.assert_ssh_reads(path, key)
+
+    def test_passphrase_protected_keys_are_refused_with_that_reason(self):
+        for label, text in [("intact", self.encrypted_pem), ("one line", self.encrypted_pem.replace("\n", " "))]:
+            with self.subTest(label):
+                result, _ = self.run_script(text)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("protected by a passphrase", result.stderr)
+                self.assert_no_key_material(result, self.encrypted_pem)
+        with self.assertRaisesRegex(ValueError, "passphrase"):
+            repair.repair("-----BEGIN ENCRYPTED PRIVATE KEY-----\nQUJD\n-----END ENCRYPTED PRIVATE KEY-----")
 
     def test_errors_never_echo_the_key(self):
         key = self.keys["rsa-pem"]
