@@ -96,6 +96,11 @@ jobs:
             done
             echo "  $DOMAIN MX: $(dig +short @"$ns" "$DOMAIN" MX | tr '\n' ' ')"
             echo "  $DOMAIN TXT: $(dig +short @"$ns" "$DOMAIN" TXT | tr '\n' ' ')"
+            # Let's Encrypt prefers IPv6, and a CAA record can forbid it.
+            for n in "$DOMAIN" "www.$DOMAIN"; do
+              echo "  $n AAAA: $(dig +short @"$ns" "$n" AAAA | tr '\n' ' ')"
+              echo "  $n CAA: $(dig +short @"$ns" "$n" CAA | tr '\n' ' ')"
+            done
             echo "  $DOMAIN A record TTL (seconds caches may keep the old answer): $(dig +noall +answer @"$ns" "$DOMAIN" A | awk '{print $2}' | head -n 1)"
           fi
           ip="$(dig +short "$DOMAIN" A | grep -E '^[0-9.]+$' | head -n 1)"
