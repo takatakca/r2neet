@@ -3,6 +3,7 @@
 #
 #   TASK=status        containers, health, and the running revision
 #   TASK=restart-proxy make the proxy request certificates now (after DNS)
+#   TASK=proxy-log     the proxy's certificate and routing messages for this site
 #   TASK=create-owner  create the OWNER staff login. The password comes from
 #                      the OWNER_INITIAL_PASSWORD secret over stdin and is
 #                      never printed; change it at first sign-in.
@@ -38,6 +39,16 @@ case "$TASK" in
            ${as_app} bash scripts/deploy/compose.sh restart caddy \
            && echo 'Caddy restarted; it will request the HTTPS certificates now.'; \
          fi"
+    ;;
+  proxy-log)
+    # Certificate and routing messages from the proxy about this site only
+    # (lines naming r2nette or the domain), with IP addresses blanked: the
+    # log is public and the proxy also serves other apps.
+    ssh_remote "cd /opt/r2nette && domain=\$(grep -E '^PRODUCTION_DOMAIN=' .env | cut -d= -f2) \
+      && mode=\$(cat state/proxy-mode 2>/dev/null || echo own) \
+      && if [ \"\$mode\" = coolify ]; then docker logs --since 3h coolify-proxy 2>&1; \
+         else ${as_app} bash scripts/deploy/compose.sh logs --no-color --since 3h caddy 2>&1; fi \
+      | grep -i -E \"r2nette|\$domain\" | sed -E 's/[0-9]{1,3}([.][0-9]{1,3}){3}/<ip>/g' | tail -n 40; true"
     ;;
   status)
     ssh_remote "cd /opt/r2nette && ${as_app} bash scripts/deploy/compose.sh ps --format 'table {{.Service}}\t{{.State}}\t{{.Status}}' \
