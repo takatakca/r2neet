@@ -77,7 +77,9 @@ _write_key() {
     if [[ "$err" == *passphrase* ]]; then
       echo "${name} is protected by a passphrase; the workflows need a key without one." >&2
     else
-      echo "${name} still cannot be read as a private key: part of it is probably missing. Copy it again, the whole block from -----BEGIN to -----END." >&2
+      # ssh-keygen's reason ("invalid format", "error in libcrypto") without
+      # the file path; it never contains key material.
+      echo "${name} still cannot be read as a private key (${err##*: }): part of it is probably missing. Copy it again, the whole block from -----BEGIN to -----END." >&2
     fi
     exit 1
   fi

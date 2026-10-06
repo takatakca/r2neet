@@ -16,20 +16,46 @@ from __future__ import annotations
 
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
-BLOCK = re.compile(r"-----BEGIN ([A-Z0-9 ]+)-----(.*?)-----END \1-----", re.S)
+# A BEGIN/END block whose body does not run into another BEGIN, so a cut-off
+# first paste does not swallow a complete second one.
+BLOCK = re.compile(r"-----BEGIN ([A-Z0-9 ]+)-----((?:(?!-----BEGIN ).)*?)-----END \1-----", re.S)
 PUBLIC = re.compile(r"\s*(ssh-(ed25519|rsa|dss)|ecdsa-sha2-|sk-)")
+
+
+def normalise(text: str, notes: list[str]) -> str:
+    """Undo what web pages, editors and JSON do to text, noting each change."""
+    if "\r" in text:
+        text = text.replace("\r", "")
+        notes.append("removed Windows line endings")
+    if "\\n" in text:
+        # A key copied out of JSON or a .env file. Backslashes never occur in
+        # a key, so the two-character pair can only be an escaped line break.
+        text = text.replace("\\r\\n", "\n").replace("\\n", "\n")
+        notes.append("turned \\n escapes into line breaks")
+    invisible = [c for c in text if unicodedata.category(c) == "Cf"]
+    if invisible:
+        # Zero-width spaces, word joiners, soft hyphens, byte order marks.
+        text = "".join(c for c in text if unicodedata.category(c) != "Cf")
+        notes.append("removed invisible characters")
+    if any(c.isspace() and c not in " \t\n" for c in text):
+        # No-break and other Unicode spaces, e.g. in the BEGIN/END lines.
+        text = "".join(" " if c.isspace() and c != "\n" else c for c in text)
+        notes.append("replaced special spaces")
+    return text
 
 
 def repair(text: str) -> tuple[str, list[str]]:
     """Return (clean key block, notes). Raises ValueError with a reason."""
     notes: list[str] = []
-    if "\r" in text:
-        text = text.replace("\r", "")
-        notes.append("removed Windows line endings")
-    match = BLOCK.search(text)
+    text = normalise(text, notes)
+    blocks = list(BLOCK.finditer(text))
+    match = next((m for m in blocks if "PRIVATE KEY" in m.group(1)), None)
     if not match:
+        if blocks:
+            raise ValueError(f"holds a {blocks[0].group(1)} block, not a private key")
         if PUBLIC.match(text):
             raise ValueError(
                 "holds a public key (it starts with ssh-...); it needs the private key, "
@@ -41,13 +67,12 @@ def repair(text: str) -> tuple[str, list[str]]:
             raise ValueError("is empty")
         raise ValueError("does not contain a -----BEGIN ... PRIVATE KEY----- block")
     kind, body = match.group(1), match.group(2)
-    if "PRIVATE KEY" not in kind:
-        raise ValueError(f"holds a {kind} block, not a private key")
+    if kind == "ENCRYPTED PRIVATE KEY" or re.search(r"Proc-Type:\s*4,ENCRYPTED", body):
+        raise ValueError("is protected by a passphrase; the workflows need a key without one")
     if text[: match.start()].strip() or text[match.end():].strip():
         notes.append("ignored text before or after the key")
     if ":" in body:
-        # An old-style PEM key with headers (e.g. Proc-Type: 4,ENCRYPTED).
-        # Its layout matters; keep it as it is.
+        # An old-style PEM key with headers. Its layout matters; keep it.
         return match.group(0) + "\n", notes
     compact = re.sub(r"\s+", "", body)
     if not compact:
