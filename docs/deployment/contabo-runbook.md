@@ -46,7 +46,7 @@ secrets**, choose **Add environment secret** once per name:
 |---|---|---|
 | `CONTABO_SSH_HOST` | The VPS IPv4 address, from the Contabo panel | everything |
 | `CONTABO_ROOT_PASSWORD` | The VPS root password, from Contabo's welcome email (or set `CONTABO_ROOT_SSH_KEY` to a root private key instead) | everything |
-| `CONTABO_ROOT_SSH_KEY` | Instead of the password, when the server accepts SSH keys only (the log then says `Permission denied (publickey)`). On a Coolify server: Coolify → **Keys & Tokens → Private Keys → localhost** key, the whole block from `-----BEGIN` to `-----END ... KEY-----` | everything |
+| `CONTABO_ROOT_SSH_KEY` | Instead of the password, when the server accepts SSH keys only (the log then says `Permission denied (publickey)`). On a Coolify server: Coolify → **Keys & Tokens → Private Keys → localhost** key, the whole block from `-----BEGIN` to `-----END ... KEY-----`. Line breaks lost in copying are repaired automatically, and the log says what is wrong with an unusable key without showing it | everything |
 | `OWNER_INITIAL_PASSWORD` | The password for your first `/admin` login. Rules: at least 12 characters, upper- and lower-case letters and a digit, and none of `password`, `12345678`, `r2nette`, `qwerty`, `letmein` or `admin`. You change it at first sign-in | creating the owner |
 | `MOCHAHOST_CPANEL_HOST` | Your cPanel address without `https://` or `:2083`, e.g. `server123.mochahost.com` (it appears in cPanel's address bar) | DNS |
 | `MOCHAHOST_CPANEL_USER` | Your cPanel username | DNS |
