@@ -8,6 +8,10 @@
 #   CONTABO_SSH_KEY          deploy key for the r2nette user (optional)
 #   CONTABO_SSH_USER         user for CONTABO_SSH_KEY, default r2nette
 #   CONTABO_ROOT_SSH_KEY     root's private key (optional)
+#   CONTABO_SSH_ADMIN_USER   with CONTABO_ROOT_SSH_KEY: log in as this account
+#                            instead of root and run every command through
+#                            passwordless sudo (servers with PermitRootLogin
+#                            no, e.g. the account Coolify uses)
 #   CONTABO_ROOT_PASSWORD    root's password, used through sshpass (optional)
 #   CONTABO_SSH_KNOWN_HOSTS  pinned host key line(s) (optional; otherwise
 #                            deploy/known_hosts in the repo is used)
@@ -16,6 +20,7 @@
 #                            presents now (first setup only) and print it
 #
 # Provides: ssh_remote <command>, ssh_check_login, SSH_LOGIN_USER,
+# SSH_AS_ROOT (1 when remote commands run as root, directly or via sudo),
 # SSH_HOST_KEY_SOURCE (secret, repo or first-contact), ssh_cleanup.
 
 set -euo pipefail
@@ -94,13 +99,23 @@ _ssh_opts=(
   -o ServerAliveCountMax=10
 )
 _ssh_prefix=()
+_use_sudo=0
+SSH_AS_ROOT=1
 
 if [[ -n "${CONTABO_SSH_KEY:-}" && "${SSH_REQUIRE_ROOT:-}" != "1" ]]; then
   SSH_LOGIN_USER="${CONTABO_SSH_USER:-r2nette}"
+  SSH_AS_ROOT=0
   _write_key CONTABO_SSH_KEY "${_ssh_dir}/key"
   _ssh_opts+=(-i "${_ssh_dir}/key" -o BatchMode=yes -o IdentitiesOnly=yes)
 elif [[ -n "${CONTABO_ROOT_SSH_KEY:-}" ]]; then
-  SSH_LOGIN_USER=root
+  SSH_LOGIN_USER="${CONTABO_SSH_ADMIN_USER:-root}"
+  if [[ ! "$SSH_LOGIN_USER" =~ ^[a-z_][a-z0-9_.-]{0,31}$ ]]; then
+    echo "CONTABO_SSH_ADMIN_USER is not a Linux user name." >&2
+    exit 1
+  fi
+  if [[ "$SSH_LOGIN_USER" != "root" ]]; then
+    _use_sudo=1
+  fi
   _write_key CONTABO_ROOT_SSH_KEY "${_ssh_dir}/key"
   _ssh_opts+=(-i "${_ssh_dir}/key" -o BatchMode=yes -o IdentitiesOnly=yes)
 elif [[ -n "${CONTABO_ROOT_PASSWORD:-}" ]]; then
@@ -126,11 +141,23 @@ else
   fi
   exit 1
 fi
-export SSH_LOGIN_USER SSH_HOST_KEY_SOURCE
+export SSH_LOGIN_USER SSH_AS_ROOT SSH_HOST_KEY_SOURCE
 
-# Run a command on the server. stdin is passed through.
+# Quote a string for a POSIX shell: the result is one single-quoted word.
+_sh_quote() {
+  printf "'%s'" "${1//\'/\'\\\'\'}"
+}
+
+# Run a command on the server (as root when SSH_AS_ROOT=1). stdin is passed
+# through, so tar streams and secrets on stdin work the same either way.
 ssh_remote() {
-  "${_ssh_prefix[@]}" ssh "${_ssh_opts[@]}" "${SSH_LOGIN_USER}@${CONTABO_SSH_HOST}" "$@"
+  local cmd="$*"
+  if [[ "$_use_sudo" == "1" ]]; then
+    # One quoted word, so the login shell expands nothing and bash, running
+    # as root, sees exactly the command root would have run.
+    cmd="sudo -n -- bash -c $(_sh_quote "$cmd")"
+  fi
+  "${_ssh_prefix[@]}" ssh "${_ssh_opts[@]}" "${SSH_LOGIN_USER}@${CONTABO_SSH_HOST}" "$cmd"
 }
 
 # Log in once and explain the common failures in plain words.
@@ -142,12 +169,17 @@ ssh_check_login() {
   printf '%s\n' "$err" >&2
   if [[ "$err" == *"REMOTE HOST IDENTIFICATION HAS CHANGED"* || "$err" == *"Host key verification failed"* ]]; then
     echo "The server's identity key does not match the pinned one (deploy/known_hosts or CONTABO_SSH_KNOWN_HOSTS). If the server was reinstalled, update the pin; otherwise do not continue." >&2
+  elif [[ "$err" == *"a password is required"* || "$err" == *"may not run sudo"* || "$err" == *"not in the sudoers"* ]]; then
+    echo "${SSH_LOGIN_USER} logged in but cannot use sudo without a password, which the workflows need (Coolify's non-root user is set up that way)." >&2
   elif [[ "$err" == *"Permission denied (publickey)"* && -n "$_key_secret" ]]; then
     # The fingerprint identifies the public half of the key; it is safe to
     # print and lets the owner compare it with the server's authorized_keys.
     echo "The server did not accept the key in ${_key_secret} for ${SSH_LOGIN_USER}. Its public fingerprint is:" >&2
     ssh-keygen -l -f "${_ssh_dir}/key" | awk '{print "  " $2 " " $NF}' >&2
-    echo "Compare it with the server's: ssh-keygen -lf /root/.ssh/authorized_keys (e.g. in Coolify's Terminal for this server)." >&2
+    echo "Compare it with the server's: ssh-keygen -lf ~/.ssh/authorized_keys (e.g. in Coolify's Terminal for this server)." >&2
+    if [[ "$SSH_LOGIN_USER" == "root" ]]; then
+      echo "If the server does not allow root logins (PermitRootLogin no), put the account Coolify uses (its terminal prompt shows user@server) in the CONTABO_SSH_ADMIN_USER secret." >&2
+    fi
   elif [[ "$err" == *"Permission denied (publickey)"* ]]; then
     echo "The server accepts SSH keys only. Put a private key that the server's root account accepts into the CONTABO_ROOT_SSH_KEY secret (on a Coolify server: Keys & Tokens > Private Keys > localhost's key)." >&2
   elif [[ "$err" == *"Permission denied"* ]]; then

@@ -26,7 +26,11 @@ SSH_ALLOW_FIRST_CONTACT=1
 # shellcheck source=scripts/deploy/ssh-common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/ssh-common.sh"
 
-echo "Connecting to ${CONTABO_SSH_HOST}:${SSH_PORT} as ${SSH_LOGIN_USER}."
+if [[ "$SSH_LOGIN_USER" == "root" ]]; then
+  echo "Connecting to ${CONTABO_SSH_HOST}:${SSH_PORT} as root."
+else
+  echo "Connecting to ${CONTABO_SSH_HOST}:${SSH_PORT} as ${SSH_LOGIN_USER}, running commands as root through sudo."
+fi
 ssh_check_login
 ssh_remote "install -d -m 0700 /root/r2nette-setup && rm -rf /root/r2nette-setup/scripts"
 tar -czf - scripts/deploy | ssh_remote "tar -xzf - --no-same-owner -C /root/r2nette-setup"

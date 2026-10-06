@@ -77,6 +77,7 @@ jobs:
           CONTABO_SSH_KNOWN_HOSTS: ${{ secrets.CONTABO_SSH_KNOWN_HOSTS }}
           CONTABO_ROOT_PASSWORD: ${{ secrets.CONTABO_ROOT_PASSWORD }}
           CONTABO_ROOT_SSH_KEY: ${{ secrets.CONTABO_ROOT_SSH_KEY }}
+          CONTABO_SSH_ADMIN_USER: ${{ secrets.CONTABO_SSH_ADMIN_USER }}
           GHCR_PULL_USER: ${{ github.actor }}
           GHCR_PULL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/deploy/ci-deploy.sh
