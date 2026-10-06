@@ -63,6 +63,24 @@ else
   exit 1
 fi
 
+# Write the private key held in the secret named $1 to $2, repaired from
+# common copy-and-paste damage, and make sure ssh can read it. Prints what
+# is wrong with it, never the key itself.
+_write_key() {
+  local name="$1" dest="$2" err
+  printf '%s\n' "${!name}" > "$dest"
+  chmod 600 "$dest"
+  python3 "${_repo_root}/scripts/deploy/repair-ssh-key.py" "$dest" "$name" || exit 1
+  if ! err="$(ssh-keygen -y -P '' -f "$dest" 2>&1 >/dev/null)"; then
+    if [[ "$err" == *passphrase* ]]; then
+      echo "${name} is protected by a passphrase; the workflows need a key without one." >&2
+    else
+      echo "${name} still cannot be read as a private key: part of it is probably missing. Copy it again, the whole block from -----BEGIN to -----END." >&2
+    fi
+    exit 1
+  fi
+}
+
 _ssh_opts=(
   -p "$SSH_PORT"
   -o StrictHostKeyChecking=yes
@@ -75,13 +93,11 @@ _ssh_prefix=()
 
 if [[ -n "${CONTABO_SSH_KEY:-}" && "${SSH_REQUIRE_ROOT:-}" != "1" ]]; then
   SSH_LOGIN_USER="${CONTABO_SSH_USER:-r2nette}"
-  printf '%s\n' "$CONTABO_SSH_KEY" > "${_ssh_dir}/key"
-  chmod 600 "${_ssh_dir}/key"
+  _write_key CONTABO_SSH_KEY "${_ssh_dir}/key"
   _ssh_opts+=(-i "${_ssh_dir}/key" -o BatchMode=yes -o IdentitiesOnly=yes)
 elif [[ -n "${CONTABO_ROOT_SSH_KEY:-}" ]]; then
   SSH_LOGIN_USER=root
-  printf '%s\n' "$CONTABO_ROOT_SSH_KEY" > "${_ssh_dir}/key"
-  chmod 600 "${_ssh_dir}/key"
+  _write_key CONTABO_ROOT_SSH_KEY "${_ssh_dir}/key"
   _ssh_opts+=(-i "${_ssh_dir}/key" -o BatchMode=yes -o IdentitiesOnly=yes)
 elif [[ -n "${CONTABO_ROOT_PASSWORD:-}" ]]; then
   SSH_LOGIN_USER=root

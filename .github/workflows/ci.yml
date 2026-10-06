@@ -176,6 +176,9 @@ jobs:
       - name: DNS automation keeps email at MochaHost
         run: python3 -m unittest scripts/deploy/test_mochahost_dns.py
 
+      - name: Pasted SSH keys are repaired, never printed
+        run: python3 -m unittest scripts/deploy/test_repair_ssh_key.py
+
       - name: No secrets committed
         run: |
           # Real credentials only. Test fixtures deliberately contain
