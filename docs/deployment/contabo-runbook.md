@@ -119,6 +119,9 @@ instead of starting the bundled Caddy:
 - When the server refuses root logins, set `CONTABO_SSH_ADMIN_USER` to the
   account Coolify uses. The workflows log in as that account with Coolify's
   key and run their commands as root through `sudo`.
+- Because `web` joins Coolify's network, where Coolify's own database answers
+  to `postgres`, R2NETTE's database is reached as `r2nette-db`. A deploy
+  rewrites an older `.env` that still says `@postgres:5432` (host part only).
 - `restart-proxy` recreates only R2NETTE's `web` container, which makes
   Coolify's proxy retry the certificate without restarting the other apps.
 

@@ -25,7 +25,10 @@ x-app: &app
     PORT: "3000"
     TRUST_PROXY: "true"
     REQUIRE_HTTPS: "true"
-    POSTGRES_HOST: postgres
+    # r2nette-db, not "postgres": on a Coolify server the web container also
+    # joins Coolify's network, where Coolify's own database answers to
+    # "postgres".
+    POSTGRES_HOST: r2nette-db
     R2NETTE_IMAGE: ${R2NETTE_IMAGE:?set R2NETTE_IMAGE to an immutable git SHA tag}
   stop_grace_period: 40s
   networks:
@@ -42,7 +45,7 @@ x-worker-health: &worker-health
     - node
     - --input-type=module
     - -e
-    - "import net from 'node:net'; const socket = net.connect(5432, 'postgres'); const fail = () => process.exit(1); socket.setTimeout(3000); socket.on('connect', () => { socket.end(); process.exit(0); }); socket.on('timeout', fail); socket.on('error', fail);"
+    - "import net from 'node:net'; const socket = net.connect(5432, 'r2nette-db'); const fail = () => process.exit(1); socket.setTimeout(3000); socket.on('connect', () => { socket.end(); process.exit(0); }); socket.on('timeout', fail); socket.on('error', fail);"
   interval: 30s
   timeout: 5s
   retries: 5
@@ -65,7 +68,11 @@ services:
       retries: 10
       start_period: 20s
     networks:
-      - private
+      private:
+        # The name the app uses (DATABASE_URL). Unique, unlike "postgres",
+        # which Coolify's own database also answers to on Coolify's network.
+        aliases:
+          - r2nette-db
     <<: *log
 
   migrate:
