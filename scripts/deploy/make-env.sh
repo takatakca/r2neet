@@ -55,8 +55,8 @@ REQUIRE_HTTPS=true
 POSTGRES_USER=r2nette
 POSTGRES_PASSWORD=${pg_password}
 POSTGRES_DB=r2nette
-DATABASE_URL=postgresql://r2nette:${pg_password}@postgres:5432/r2nette
-PRISMA_DATABASE_URL=postgresql://r2nette:${pg_password}@postgres:5432/r2nette
+DATABASE_URL=postgresql://r2nette:${pg_password}@r2nette-db:5432/r2nette
+PRISMA_DATABASE_URL=postgresql://r2nette:${pg_password}@r2nette-db:5432/r2nette
 
 # Encrypts two-factor secrets. Back this up somewhere safe, apart from the
 # database backups: without it a restored database locks out every 2FA user.

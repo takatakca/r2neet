@@ -15,6 +15,12 @@ if [[ -z "${R2NETTE_IMAGE:-}" ]]; then
   R2NETTE_IMAGE="$(cat state/current-image-ref 2>/dev/null || true)"
 fi
 if [[ -z "$R2NETTE_IMAGE" ]]; then
+  # A first deploy that failed its checks records nothing but may have left
+  # containers running; use their image so status and logs still work.
+  R2NETTE_IMAGE="$(docker ps -a --filter label=com.docker.compose.project=r2nette \
+    --filter label=com.docker.compose.service=web --format '{{.Image}}' 2>/dev/null | head -n 1 || true)"
+fi
+if [[ -z "$R2NETTE_IMAGE" ]]; then
   echo "No deployed image is recorded in state/current-image-ref yet. Deploy once first." >&2
   exit 1
 fi

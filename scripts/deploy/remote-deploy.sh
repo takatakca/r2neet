@@ -51,6 +51,14 @@ echo "Deploying commit ${SHA}"
 
 export R2NETTE_IMAGE="$image"
 
+# Settings written before the database got its unique name point the app at
+# "postgres", which on a Coolify server can reach Coolify's own database.
+# Rewrite only the host part; the values are never printed.
+if [[ -f .env ]] && grep -qE '^(DATABASE_URL|PRISMA_DATABASE_URL)=[^@]*@postgres:5432/' .env; then
+  sed -i -E 's#^((DATABASE_URL|PRISMA_DATABASE_URL)=[^@]*@)postgres:5432/#\1r2nette-db:5432/#' .env
+  echo "Pointed the database address in .env at r2nette-db."
+fi
+
 # Coolify already runs a proxy on 80/443: sit behind it rather than start a
 # second one. Recorded so compose.sh, rollback and manual commands agree.
 proxy_mode="$(bash scripts/deploy/detect-proxy.sh)"

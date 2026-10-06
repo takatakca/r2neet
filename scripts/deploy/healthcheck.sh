@@ -18,18 +18,33 @@ if [[ -z "$cid" ]]; then
   exit 1
 fi
 
-docker exec "$cid" node --input-type=module -e '
+# A container that has just started may need a few seconds before the
+# database answers; wait up to HEALTH_WAIT_SECONDS (default 90) for both
+# probes. Prints status words only (e.g. "not_ready (database)").
+docker exec -e HEALTH_WAIT_MS="$(( ${HEALTH_WAIT_SECONDS:-90} * 1000 ))" "$cid" node --input-type=module -e '
 const port = process.env.PORT || "3000";
-for (const path of ["/healthz", "/readyz"]) {
-  let res;
+const deadline = Date.now() + Number(process.env.HEALTH_WAIT_MS || 90000);
+const probe = async (path) => {
   try {
-    res = await fetch("http://127.0.0.1:" + port + path);
+    const res = await fetch("http://127.0.0.1:" + port + path);
+    let word = "";
+    try {
+      const body = await res.json();
+      word = [body.status, body.reason].filter((v) => typeof v === "string").join(" ");
+    } catch {}
+    return { ok: res.ok, detail: res.status + (word ? " (" + word + ")" : "") };
   } catch {
-    console.error(path + " failed");
-    process.exit(1);
+    return { ok: false, detail: "no answer" };
   }
-  if (!res.ok) {
-    console.error(path + " returned " + res.status);
+};
+for (const path of ["/healthz", "/readyz"]) {
+  let result = await probe(path);
+  while (!result.ok && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    result = await probe(path);
+  }
+  if (!result.ok) {
+    console.error(path + " returned " + result.detail);
     process.exit(1);
   }
   console.log(path + " ok");
