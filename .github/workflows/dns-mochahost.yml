@@ -103,6 +103,16 @@ jobs:
             done
             echo "  $DOMAIN A record TTL (seconds caches may keep the old answer): $(dig +noall +answer @"$ns" "$DOMAIN" A | awk '{print $2}' | head -n 1)"
           fi
+          # Every name server must give the same answer: Let's Encrypt may ask
+          # any of them, and one that lags behind fails the certificate.
+          echo "Each name server:"
+          for s in $(dig +short NS "$DOMAIN" | sort); do
+            echo "  $s $DOMAIN: $(dig +short @"$s" "$DOMAIN" A | tr '\n' ' ')| www: $(dig +short @"$s" "www.$DOMAIN" A | tr '\n' ' ')"
+          done
+          echo "Public resolvers (caches):"
+          for r in 1.1.1.1 8.8.8.8 9.9.9.9 208.67.222.222; do
+            echo "  $r $DOMAIN: $(dig +short @"$r" "$DOMAIN" A | tr '\n' ' ')| www: $(dig +short @"$r" "www.$DOMAIN" A | tr '\n' ' ')"
+          done
           ip="$(dig +short "$DOMAIN" A | grep -E '^[0-9.]+$' | head -n 1)"
           if [ -n "$ip" ]; then
             echo "Server name of $ip: $(dig +short -x "$ip" | tr '\n' ' ')"
