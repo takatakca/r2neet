@@ -66,6 +66,13 @@ jobs:
               --resolve "$host:$port:$SERVER_IP" "$url" || true)"
             echo "$url: $code"
           done
+          # The certificate the server presents for the domain: Let's Encrypt
+          # once issued, the proxy's own default certificate before that.
+          for name in "$DOMAIN" "www.$DOMAIN"; do
+            cert="$(echo | timeout 15 openssl s_client -connect "$SERVER_IP:443" -servername "$name" 2>/dev/null \
+              | openssl x509 -noout -subject -issuer -enddate 2>/dev/null | tr '\n' ';' || true)"
+            echo "Certificate for $name: ${cert:-none}"
+          done
 
       - name: What the internet sees now
         if: always()
