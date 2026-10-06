@@ -48,6 +48,25 @@ jobs:
           CPANEL_TOKEN: ${{ secrets.MOCHAHOST_CPANEL_TOKEN }}
         run: python3 scripts/deploy/mochahost-dns.py
 
+      - name: The new server answers for the domain
+        if: always()
+        env:
+          DOMAIN: ${{ inputs.domain }}
+          SERVER_IP: ${{ secrets.CONTABO_SSH_HOST }}
+        run: |
+          # Ask the VPS directly as if DNS already pointed there, so routing
+          # through its proxy is proven before the web phase moves the site.
+          # Status codes only; -k because the certificate is only issued once
+          # DNS points at the server.
+          [ -n "$SERVER_IP" ] || { echo "CONTABO_SSH_HOST is not set."; exit 0; }
+          for url in "http://$DOMAIN/healthz" "https://$DOMAIN/healthz" "https://$DOMAIN/readyz" "https://$DOMAIN/" "https://www.$DOMAIN/"; do
+            host="${url#*://}"; host="${host%%/*}"
+            case "$url" in https*) port=443 ;; *) port=80 ;; esac
+            code="$(curl -sk -o /dev/null --max-time 20 -w '%{http_code} -> %{redirect_url}' \
+              --resolve "$host:$port:$SERVER_IP" "$url" || true)"
+            echo "$url: $code"
+          done
+
       - name: What the internet sees now
         if: always()
         env:
