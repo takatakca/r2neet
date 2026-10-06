@@ -289,7 +289,13 @@ class Cpanel:
             raise SystemExit(f"cPanel {module}::{function} returned HTTP {e.code}. Check the API token and user.") from None
         if not payload.get("status"):
             errors = "; ".join(payload.get("errors") or ["unknown error"])
-            raise SystemExit(f"cPanel {module}::{function} failed: {errors}")
+            hint = ""
+            if "do not control a DNS zone" in str(errors):
+                hint = (" The cPanel account in MOCHAHOST_CPANEL_USER does not manage this domain:"
+                        " use a token and user name from the cPanel account that lists the domain"
+                        " (General Information > Primary Domain, or Domains). The step 'What the"
+                        " internet sees now' names the server that hosts it.")
+            raise SystemExit(f"cPanel {module}::{function} failed: {errors}{hint}")
         return payload
 
 
