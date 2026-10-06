@@ -142,7 +142,11 @@ services:
       backup-init:
         condition: service_completed_successfully
 
+  # The bundled HTTPS proxy, for a server with nothing else on 80/443. On a
+  # Coolify server compose.sh leaves this profile off and uses
+  # docker-compose.coolify.yml to sit behind Coolify's proxy instead.
   caddy:
+    profiles: ["own-proxy"]
     image: caddy:2-alpine
     restart: unless-stopped
     environment:

@@ -1,0 +1,9 @@
+# Public SSH host keys of the production VPS (Contabo), as it presented them
+# to the 'Server setup' workflow on 2026-10-06. Public keys, safe to publish.
+# The host pattern is "*" because the server address is a secret, masked in
+# logs; ssh still refuses any server that does not present one of these keys.
+# If the server is reinstalled, replace these lines with the ones the next
+# Server setup run prints (after removing this file's key lines).
+* ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMwGG6242Mr+5PiVo+ogWxmJ1ld1FETFTh2m9i/sdzrppAkeHvN+fCbaBCc4vbsX3GNvFM3DK9wg5ffgfeerr84=
+* ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDOCt2e3GN5rmP3OuVc59WtIkLXJ/V+H8on9Niv4PTBFN1UsBjXS8ayMYcwXgDQeTivIrtsmCxvn+WujxibmP8oZK+pFTvEy/Pu+uhmEynXKPJEH2WkS/MBrg8h86RFJLsCvUVd6eTQrBS6imtskr3IfsFG8XxPumUqFuw/li397PUUgyeILMqgQqId9ZqItgzRT/Sc/u3pz0nDmhh1mcwCVjuPWFwBc27tAZ1Kk5Z2VK5v6ZuxtQ4aj1rrOEgBZ/b5aSwN9lRINA5Wzkjj16DOzWvWfoXn+ENwI4lpMa8n7j118+Ei4YIxvvWa4V6H0X0rwlR2BE7aszt2JaSe0kO8DgF27iuwdpex4zH0Yh4Wb6XHjW8Yn4A9iQqAu5VPLYXOC+1Z65Oss8/4ljfUw4jdXEp2HNgS8+TUgEQXEz4lhGa4KMzEMwqWpKhRwTUXBC/9X0RitWIZfBPB58ceQctZGFt6AHM4tJM2fnq0p4oYV2IRu+IudUAtc+UlA3Or6ps=
+* ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMaZTpLCO+q8eeT31DkengOzNdpfx+n3WJ/9uHABo0Ug

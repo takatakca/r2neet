@@ -46,6 +46,7 @@ secrets**, choose **Add environment secret** once per name:
 |---|---|---|
 | `CONTABO_SSH_HOST` | The VPS IPv4 address, from the Contabo panel | everything |
 | `CONTABO_ROOT_PASSWORD` | The VPS root password, from Contabo's welcome email (or set `CONTABO_ROOT_SSH_KEY` to a root private key instead) | everything |
+| `CONTABO_ROOT_SSH_KEY` | Instead of the password, when the server accepts SSH keys only (the log then says `Permission denied (publickey)`). On a Coolify server: Coolify → **Keys & Tokens → Private Keys → localhost** key, the whole block from `-----BEGIN` to `-----END ... KEY-----` | everything |
 | `OWNER_INITIAL_PASSWORD` | The password for your first `/admin` login. Rules: at least 12 characters, upper- and lower-case letters and a digit, and none of `password`, `12345678`, `r2nette`, `qwerty`, `letmein` or `admin`. You change it at first sign-in | creating the owner |
 | `MOCHAHOST_CPANEL_HOST` | Your cPanel address without `https://` or `:2083`, e.g. `server123.mochahost.com` (it appears in cPanel's address bar) | DNS |
 | `MOCHAHOST_CPANEL_USER` | Your cPanel username | DNS |
@@ -63,12 +64,15 @@ After adding one, run **Server setup** again, then **Deploy**.
 workflow**, keep the branch on `main`, and run them in this order:
 
 1. **Server setup**, with your domain and an email for certificate notices. It
-   installs Docker, turns on the firewall, writes `/opt/r2nette/.env` with
-   generated secrets, and ends by printing the server's **host key**, a line
-   starting with `* ssh-ed25519`.
-2. **Pin the host key.** Copy that line (or lines) into a new environment secret
-   named `CONTABO_SSH_KNOWN_HOSTS`. From now on, every workflow refuses to talk
-   to any machine that does not present this key.
+   installs Docker, turns on the firewall, and writes `/opt/r2nette/.env` with
+   generated secrets. On a Coolify server it leaves packages, Docker and the
+   firewall as Coolify set them (see *Coolify servers* below).
+2. **Pin the host key.** The production server's public host keys are already
+   pinned in `deploy/known_hosts`, so every workflow refuses to talk to any
+   machine that does not present one of them. For a different or reinstalled
+   server, delete the key lines in that file: the next Server setup prints the
+   new server's lines (starting with `* ssh-ed25519`); commit them there or put
+   them in an environment secret named `CONTABO_SSH_KNOWN_HOSTS`.
 3. **Deploy**. It builds, starts and health-checks the app. Do this before DNS,
    so a failed deploy never takes your current site offline.
 4. **DNS (MochaHost)**, three times:
@@ -77,7 +81,7 @@ workflow**, keep the branch on `main`, and run them in this order:
    - Then `web`, ideally after the TTL the plan shows (often 4 hours). It points
      the domain and `www` at the VPS.
 5. **Server admin** → `restart-proxy` right after `web`, so HTTPS certificates
-   are requested immediately rather than at Caddy's next retry.
+   are requested immediately rather than at the proxy's next retry.
 6. **Server admin** → `create-owner`, with your email and name. Then sign in at
    `https://yourdomain.com/admin` with `OWNER_INITIAL_PASSWORD`, change it, and
    turn on two-step verification.
@@ -95,6 +99,25 @@ locks out every two-step-verification login. Once, log in with
 `grep FIELD_ENCRYPTION_KEY /opt/r2nette/.env`, and keep the value in your
 password manager.
 
+### Coolify servers
+
+When Coolify runs on the VPS, its proxy (container `coolify-proxy`) already
+owns ports 80 and 443. The deploy detects it and serves R2NETTE through it
+instead of starting the bundled Caddy:
+
+- `scripts/deploy/compose.sh` adds `docker-compose.coolify.yml`, which joins
+  the `web` container to Coolify's `coolify` network and labels it so that
+  Coolify's proxy (Traefik or Caddy) routes the domain and `www` to it and
+  obtains the Let's Encrypt certificate. The choice is recorded in
+  `/opt/r2nette/state/proxy-mode`.
+- R2NETTE stays a separate Docker Compose project in `/opt/r2nette`; it does
+  not appear as a resource in Coolify's dashboard, and Coolify's other apps are
+  not touched. Do not also add the domain to a Coolify resource.
+- Server setup skips the package upgrade (it could restart Docker and every
+  Coolify app) and leaves the firewall alone.
+- `restart-proxy` recreates only R2NETTE's `web` container, which makes
+  Coolify's proxy retry the certificate without restarting the other apps.
+
 The manual steps below do the same things by hand, and explain each one.
 
 ## What is in the repo
@@ -103,7 +126,8 @@ The manual steps below do the same things by hand, and explain each one.
 |---|---|
 | Production image | `Dockerfile` |
 | Stack | `docker-compose.production.yml` |
-| HTTPS proxy | `deploy/Caddyfile` |
+| HTTPS proxy | `deploy/Caddyfile`, or Coolify's proxy via `docker-compose.coolify.yml` |
+| Pinned server host keys | `deploy/known_hosts` |
 | Server bootstrap | `scripts/deploy/bootstrap-ubuntu.sh` |
 | `.env` generator | `scripts/deploy/make-env.sh` |
 | Production gate | `scripts/deploy/check-production-env.ts` (rules in `validate-production-env.ts`) |
@@ -113,7 +137,8 @@ The manual steps below do the same things by hand, and explain each one.
 | Setup / admin / DNS workflows | `.github/workflows/server-setup.yml`, `server-admin.yml`, `dns-mochahost.yml` |
 | DNS automation (cPanel API) | `scripts/deploy/mochahost-dns.py` |
 
-The services are `postgres`, `migrate`, `web`, `billing`, `scheduler`, `backup` and `caddy`.
+The services are `postgres`, `migrate`, `web`, `billing`, `scheduler`, `backup` and `caddy`
+(`caddy` only on a server without Coolify; see *Coolify servers*).
 `migrate` runs `prisma migrate deploy` and must finish before `web` or any
 worker starts. PostgreSQL has no published port, and the host publishes only 80
 and 443. `GET /healthz` checks liveness without touching the database. `GET /readyz`

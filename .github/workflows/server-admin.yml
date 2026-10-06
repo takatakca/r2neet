@@ -2,7 +2,7 @@ name: Server admin
 
 # Small, safe operations on the running server, without SSHing in by hand.
 #   status        containers, health checks, running revision
-#   restart-proxy Caddy retries HTTPS certificates now (run after DNS web)
+#   restart-proxy the proxy retries HTTPS certificates now (run after DNS web)
 #   create-owner  the first OWNER login; its password is the
 #                 OWNER_INITIAL_PASSWORD secret and is never printed
 # The log is public (public repository): nothing here prints a secret,

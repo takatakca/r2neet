@@ -32,6 +32,7 @@ fi
 
 # shellcheck source=scripts/deploy/ssh-common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/ssh-common.sh"
+ssh_check_login
 
 owner="$(printf '%s' "${GITHUB_REPOSITORY_OWNER:?}" | tr '[:upper:]' '[:lower:]')"
 repo_name="$(printf '%s' "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')"
@@ -42,12 +43,12 @@ if [[ "$SSH_LOGIN_USER" == "root" ]]; then
   as_app="runuser -u r2nette -- env HOME=/home/r2nette"
   ssh_remote "id r2nette >/dev/null 2>&1 || { echo 'The r2nette user does not exist. Run the Server setup workflow first.' >&2; exit 1; }"
   ssh_remote "install -d -m 0750 -o r2nette -g r2nette /opt/r2nette"
-  tar -czf - docker-compose.production.yml deploy/Caddyfile scripts/deploy \
+  tar -czf - docker-compose.production.yml docker-compose.coolify.yml deploy/Caddyfile scripts/deploy \
     | ssh_remote "${as_app} tar -xzf - --no-same-owner -C /opt/r2nette"
 else
   as_app=""
   ssh_remote "install -d -m 0750 /opt/r2nette"
-  tar -czf - docker-compose.production.yml deploy/Caddyfile scripts/deploy \
+  tar -czf - docker-compose.production.yml docker-compose.coolify.yml deploy/Caddyfile scripts/deploy \
     | ssh_remote "tar -xzf - -C /opt/r2nette"
 fi
 

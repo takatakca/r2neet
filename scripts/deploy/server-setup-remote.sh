@@ -18,15 +18,17 @@ fi
 # This script is running over SSH right now, so a second working login is
 # proven: let the bootstrap turn the firewall on. Allow the SSH port in use
 # first if it is not the standard one.
+# (On a Coolify server the bootstrap leaves the firewall alone.)
 install -d -m 0750 /etc/r2nette
 touch /etc/r2nette/second-ssh-confirmed
-if [[ "$SSH_PORT" != "22" ]] && command -v ufw >/dev/null 2>&1; then
-  ufw allow "${SSH_PORT}/tcp" >/dev/null
-fi
+allow_ssh_port() {
+  if [[ "$SSH_PORT" != "22" && ! -d /data/coolify ]] && command -v ufw >/dev/null 2>&1; then
+    ufw allow "${SSH_PORT}/tcp" >/dev/null
+  fi
+}
+allow_ssh_port
 R2NETTE_CONFIRM_FIREWALL=yes bash "${here}/bootstrap-ubuntu.sh"
-if [[ "$SSH_PORT" != "22" ]] && command -v ufw >/dev/null 2>&1; then
-  ufw allow "${SSH_PORT}/tcp" >/dev/null
-fi
+allow_ssh_port
 
 if [[ ! -f /opt/r2nette/.env ]]; then
   bash "${here}/make-env.sh" "$DOMAIN" "$ACME_EMAIL"

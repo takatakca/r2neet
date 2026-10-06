@@ -20,4 +20,19 @@ if [[ -z "$R2NETTE_IMAGE" ]]; then
 fi
 export R2NETTE_IMAGE
 
-exec docker compose -f docker-compose.production.yml "$@"
+# Which proxy serves the site: Coolify's (when Coolify runs on this server)
+# or the bundled Caddy. remote-deploy.sh records the choice in
+# state/proxy-mode; R2NETTE_PROXY_MODE overrides it.
+mode="${R2NETTE_PROXY_MODE:-$(cat state/proxy-mode 2>/dev/null || true)}"
+if [[ -z "$mode" ]]; then
+  mode="$(bash scripts/deploy/detect-proxy.sh)"
+fi
+
+files=(-f docker-compose.production.yml)
+if [[ "$mode" == "coolify" ]]; then
+  files+=(-f docker-compose.coolify.yml)
+else
+  export COMPOSE_PROFILES=own-proxy
+fi
+
+exec docker compose "${files[@]}" "$@"

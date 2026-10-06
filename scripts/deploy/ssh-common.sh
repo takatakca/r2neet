@@ -15,7 +15,8 @@
 #   SSH_ALLOW_FIRST_CONTACT=1  with no pinned key, trust the key the server
 #                            presents now (first setup only) and print it
 #
-# Provides: ssh_remote <command>, SSH_LOGIN_USER, ssh_cleanup.
+# Provides: ssh_remote <command>, ssh_check_login, SSH_LOGIN_USER,
+# SSH_HOST_KEY_SOURCE (secret, repo or first-contact), ssh_cleanup.
 
 set -euo pipefail
 umask 077
@@ -43,9 +44,12 @@ _pinned_file="${_repo_root}/deploy/known_hosts"
 
 if [[ -n "${CONTABO_SSH_KNOWN_HOSTS:-}" ]]; then
   printf '%s\n' "$CONTABO_SSH_KNOWN_HOSTS" > "$_known_hosts"
+  SSH_HOST_KEY_SOURCE=secret
 elif [[ -f "$_pinned_file" ]] && grep -qvE '^\s*(#|$)' "$_pinned_file"; then
   grep -vE '^\s*(#|$)' "$_pinned_file" > "$_known_hosts"
+  SSH_HOST_KEY_SOURCE=repo
 elif [[ "${SSH_ALLOW_FIRST_CONTACT:-}" == "1" ]]; then
+  SSH_HOST_KEY_SOURCE=first-contact
   ssh-keyscan -p "$SSH_PORT" -t ed25519,ecdsa,rsa "$CONTABO_SSH_HOST" 2>/dev/null \
     | awk '!/^#/ && NF >= 3 { $1 = "*"; print }' > "$_known_hosts" || true
   if [[ ! -s "$_known_hosts" ]]; then
@@ -102,11 +106,28 @@ else
   fi
   exit 1
 fi
-export SSH_LOGIN_USER
+export SSH_LOGIN_USER SSH_HOST_KEY_SOURCE
 
 # Run a command on the server. stdin is passed through.
 ssh_remote() {
   "${_ssh_prefix[@]}" ssh "${_ssh_opts[@]}" "${SSH_LOGIN_USER}@${CONTABO_SSH_HOST}" "$@"
+}
+
+# Log in once and explain the common failures in plain words.
+ssh_check_login() {
+  local err
+  if err="$(ssh_remote true </dev/null 2>&1)"; then
+    return 0
+  fi
+  printf '%s\n' "$err" >&2
+  if [[ "$err" == *"REMOTE HOST IDENTIFICATION HAS CHANGED"* || "$err" == *"Host key verification failed"* ]]; then
+    echo "The server's identity key does not match the pinned one (deploy/known_hosts or CONTABO_SSH_KNOWN_HOSTS). If the server was reinstalled, update the pin; otherwise do not continue." >&2
+  elif [[ "$err" == *"Permission denied (publickey)"* ]]; then
+    echo "The server accepts SSH keys only. Put a private key that the server's root account accepts into the CONTABO_ROOT_SSH_KEY secret (on a Coolify server: Keys & Tokens > Private Keys > localhost's key)." >&2
+  elif [[ "$err" == *"Permission denied"* ]]; then
+    echo "The server refused the login. Check the CONTABO_ROOT_SSH_KEY / CONTABO_ROOT_PASSWORD / CONTABO_SSH_KEY secret." >&2
+  fi
+  return 1
 }
 
 # The host keys this connection trusts, for pinning.
