@@ -2,7 +2,7 @@
 # GitHub Actions entrypoint for the 'Server admin' workflow.
 #
 #   TASK=status        containers, health, and the running revision
-#   TASK=restart-proxy restart Caddy so it requests certificates now (after DNS)
+#   TASK=restart-proxy make the proxy request certificates now (after DNS)
 #   TASK=create-owner  create the OWNER staff login. The password comes from
 #                      the OWNER_INITIAL_PASSWORD secret over stdin and is
 #                      never printed; change it at first sign-in.
@@ -16,6 +16,7 @@ TASK="${TASK:?TASK is required}"
 
 # shellcheck source=scripts/deploy/ssh-common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/ssh-common.sh"
+ssh_check_login
 
 if [[ "$SSH_LOGIN_USER" == "root" ]]; then
   as_app="runuser -u r2nette -- env HOME=/home/r2nette"
@@ -25,15 +26,24 @@ fi
 
 case "$TASK" in
   restart-proxy)
-    # Caddy backs off after failed certificate attempts (e.g. before DNS
-    # pointed here). Restarting makes it try again at once.
-    ssh_remote "cd /opt/r2nette && ${as_app} bash scripts/deploy/compose.sh restart caddy"
-    echo "Caddy restarted; it will request the HTTPS certificates now."
+    # The proxy backs off after failed certificate attempts (e.g. before DNS
+    # pointed here). Bundled Caddy: restart it. Coolify: recreate only the
+    # web container, which makes Coolify's proxy retry for this site without
+    # touching the other apps it serves.
+    ssh_remote "cd /opt/r2nette && mode=\$(cat state/proxy-mode 2>/dev/null || echo own) \
+      && if [ \"\$mode\" = coolify ]; then \
+           ${as_app} bash scripts/deploy/compose.sh up -d --force-recreate --no-deps web \
+           && echo 'Web container recreated; Coolify proxy will request the HTTPS certificate now.'; \
+         else \
+           ${as_app} bash scripts/deploy/compose.sh restart caddy \
+           && echo 'Caddy restarted; it will request the HTTPS certificates now.'; \
+         fi"
     ;;
   status)
     ssh_remote "cd /opt/r2nette && ${as_app} bash scripts/deploy/compose.sh ps --format 'table {{.Service}}\t{{.State}}\t{{.Status}}' \
       && ${as_app} bash scripts/deploy/healthcheck.sh \
-      && echo \"Running image: \$(cat state/current-image-ref 2>/dev/null || echo none)\""
+      && echo \"Running image: \$(cat state/current-image-ref 2>/dev/null || echo none)\" \
+      && echo \"Proxy: \$(cat state/proxy-mode 2>/dev/null || echo unknown)\""
     ;;
   create-owner)
     OWNER_EMAIL="${OWNER_EMAIL:-}"

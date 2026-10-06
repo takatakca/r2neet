@@ -18,9 +18,24 @@ export DEBIAN_FRONTEND=noninteractive
 # existing config files instead of stopping at a dpkg prompt.
 apt_opts=(-o DPkg::Lock::Timeout=600 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
 
+# A server that already runs Coolify hosts other apps: leave its packages,
+# Docker and firewall as Coolify set them. A full upgrade could restart
+# Docker (and every app on it), and the firewall must keep Coolify's own
+# ports open.
+coolify_host=0
+if [[ -d /data/coolify ]] \
+   || { command -v docker >/dev/null 2>&1 && docker network inspect coolify >/dev/null 2>&1; }; then
+  coolify_host=1
+  echo "Coolify runs on this server: skipping the package upgrade and the firewall."
+fi
+
 apt-get "${apt_opts[@]}" update
-apt-get "${apt_opts[@]}" upgrade -y
-apt-get "${apt_opts[@]}" install -y ca-certificates curl gnupg unattended-upgrades ufw
+if [[ "$coolify_host" -eq 0 ]]; then
+  apt-get "${apt_opts[@]}" upgrade -y
+  apt-get "${apt_opts[@]}" install -y ca-certificates curl gnupg unattended-upgrades ufw
+else
+  apt-get "${apt_opts[@]}" install -y --no-upgrade ca-certificates curl gnupg unattended-upgrades
+fi
 
 if ! command -v docker >/dev/null 2>&1; then
   install -m 0755 -d /etc/apt/keyrings
@@ -74,22 +89,26 @@ Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
 Unattended-Upgrade::Remove-Unused-Dependencies "true";
 EOF
 
-# Stage firewall rules without enabling them. Enabling UFW before a second
-# SSH session is confirmed can disconnect the only working login.
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow OpenSSH
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw allow 443/udp
-
-if [[ "${R2NETTE_CONFIRM_FIREWALL:-}" == "yes" && -f /etc/r2nette/second-ssh-confirmed ]]; then
-  ufw --force enable
-  echo "UFW is enabled for SSH, HTTP, and HTTPS."
+if [[ "$coolify_host" -eq 1 ]]; then
+  echo "Firewall left unchanged (Coolify server)."
 else
-  echo "UFW rules are staged and the firewall is not enabled."
-  echo "After a second SSH session works: touch /etc/r2nette/second-ssh-confirmed"
-  echo "Then re-run with R2NETTE_CONFIRM_FIREWALL=yes."
+  # Stage firewall rules without enabling them. Enabling UFW before a second
+  # SSH session is confirmed can disconnect the only working login.
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw allow OpenSSH
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw allow 443/udp
+
+  if [[ "${R2NETTE_CONFIRM_FIREWALL:-}" == "yes" && -f /etc/r2nette/second-ssh-confirmed ]]; then
+    ufw --force enable
+    echo "UFW is enabled for SSH, HTTP, and HTTPS."
+  else
+    echo "UFW rules are staged and the firewall is not enabled."
+    echo "After a second SSH session works: touch /etc/r2nette/second-ssh-confirmed"
+    echo "Then re-run with R2NETTE_CONFIRM_FIREWALL=yes."
+  fi
 fi
 
 echo "SSH password login was left unchanged."

@@ -21,9 +21,9 @@ export R2NETTE_IMAGE="$previous"
 # The deploy job's registry login expires when the job ends, so a manual
 # rollback cannot count on pulling. Pull only when the image is not on disk.
 if ! docker image inspect "$previous" >/dev/null 2>&1; then
-  docker compose -f docker-compose.production.yml pull
+  bash scripts/deploy/compose.sh pull
 fi
-docker compose -f docker-compose.production.yml up -d
+bash scripts/deploy/compose.sh up -d
 bash scripts/deploy/healthcheck.sh
 mkdir -p state
 chmod 700 state

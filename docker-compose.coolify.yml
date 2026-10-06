@@ -1,0 +1,43 @@
+# Overlay for a server where Coolify already runs the proxy on ports 80/443.
+#
+# scripts/deploy/compose.sh adds this file automatically when it finds
+# Coolify's proxy, and then does not start the bundled Caddy. The web
+# container joins Coolify's `coolify` network, and Coolify's proxy routes
+# PRODUCTION_DOMAIN and www to it and obtains the Let's Encrypt certificate.
+# Labels for both proxies Coolify can run (Traefik, the default, and Caddy)
+# are present; each ignores the other's. Nothing here publishes a port.
+
+services:
+  web:
+    networks:
+      - private
+      - edge
+      - coolify
+    labels:
+      # Traefik (Coolify's default proxy)
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.middlewares.r2nette-to-https.redirectscheme.scheme=https
+      - traefik.http.middlewares.r2nette-to-https.redirectscheme.permanent=true
+      - traefik.http.middlewares.r2nette-no-www.redirectregex.regex=^https://www\.(.+)
+      - traefik.http.middlewares.r2nette-no-www.redirectregex.replacement=https://$${1}
+      - traefik.http.middlewares.r2nette-no-www.redirectregex.permanent=true
+      - traefik.http.routers.r2nette-http.rule=Host(`${PRODUCTION_DOMAIN}`) || Host(`www.${PRODUCTION_DOMAIN}`)
+      - traefik.http.routers.r2nette-http.entrypoints=http
+      - traefik.http.routers.r2nette-http.middlewares=r2nette-to-https
+      - traefik.http.routers.r2nette-https.rule=Host(`${PRODUCTION_DOMAIN}`) || Host(`www.${PRODUCTION_DOMAIN}`)
+      - traefik.http.routers.r2nette-https.entrypoints=https
+      - traefik.http.routers.r2nette-https.tls=true
+      - traefik.http.routers.r2nette-https.tls.certresolver=letsencrypt
+      - traefik.http.routers.r2nette-https.middlewares=r2nette-no-www
+      - traefik.http.services.r2nette.loadbalancer.server.port=3000
+      # Caddy (Coolify's alternative proxy, caddy-docker-proxy)
+      - caddy_ingress_network=coolify
+      - caddy_0=${PRODUCTION_DOMAIN}
+      - caddy_0.reverse_proxy={{upstreams 3000}}
+      - caddy_1=www.${PRODUCTION_DOMAIN}
+      - caddy_1.redir=https://${PRODUCTION_DOMAIN}{uri} permanent
+
+networks:
+  coolify:
+    external: true

@@ -27,6 +27,7 @@ SSH_ALLOW_FIRST_CONTACT=1
 source "$(dirname "${BASH_SOURCE[0]}")/ssh-common.sh"
 
 echo "Connecting to ${CONTABO_SSH_HOST}:${SSH_PORT} as ${SSH_LOGIN_USER}."
+ssh_check_login
 ssh_remote "install -d -m 0700 /root/r2nette-setup && rm -rf /root/r2nette-setup/scripts"
 tar -czf - scripts/deploy | ssh_remote "tar -xzf - --no-same-owner -C /root/r2nette-setup"
 
@@ -66,8 +67,12 @@ else
 fi
 
 echo
-echo "Server host key (public, safe to share). Deploy and Server admin need it pinned:"
-echo "copy the line(s) below into a secret named CONTABO_SSH_KNOWN_HOSTS, or commit them to deploy/known_hosts."
-ssh_known_hosts_lines
-echo
-echo "Server setup complete. Next: pin the host key as above, then run the Deploy workflow."
+if [[ "$SSH_HOST_KEY_SOURCE" == "first-contact" ]]; then
+  echo "Server host key (public, safe to share). Deploy and Server admin need it pinned:"
+  echo "copy the line(s) below into a secret named CONTABO_SSH_KNOWN_HOSTS, or commit them to deploy/known_hosts."
+  ssh_known_hosts_lines
+  echo
+  echo "Server setup complete. Next: pin the host key as above, then run the Deploy workflow."
+else
+  echo "Server setup complete. Next: run the Deploy workflow."
+fi

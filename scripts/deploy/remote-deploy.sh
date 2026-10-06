@@ -30,6 +30,8 @@ if [[ "${1:-}" == "--preflight" ]]; then
   [[ -f scripts/deploy/healthcheck.sh ]]
   [[ -f scripts/deploy/rollback.sh ]]
   [[ -f scripts/deploy/check-production-env.ts ]]
+  [[ -f docker-compose.coolify.yml ]]
+  [[ -f scripts/deploy/detect-proxy.sh ]]
   echo "preflight ok for ${SHA}"
   exit 0
 fi
@@ -48,6 +50,17 @@ exec > >(bash scripts/deploy/redact-stream.sh | tee -a "$log") 2>&1
 echo "Deploying commit ${SHA}"
 
 export R2NETTE_IMAGE="$image"
+
+# Coolify already runs a proxy on 80/443: sit behind it rather than start a
+# second one. Recorded so compose.sh, rollback and manual commands agree.
+proxy_mode="$(bash scripts/deploy/detect-proxy.sh)"
+if [[ "$proxy_mode" == "coolify" ]]; then
+  echo "Coolify's proxy runs on this server: the site is served through it."
+fi
+printf '%s\n' "$proxy_mode" > state/proxy-mode
+chmod 600 state/proxy-mode
+export R2NETTE_PROXY_MODE="$proxy_mode"
+compose=(bash scripts/deploy/compose.sh)
 deploy_started=0
 rolled_back=0
 
@@ -64,8 +77,10 @@ finish() {
 }
 trap finish EXIT
 
-docker compose -f docker-compose.production.yml pull
-docker compose -f docker-compose.production.yml run --rm --no-deps \
+"${compose[@]}" pull
+# The one-off check container gets no proxy routing labels (own mode), so
+# Coolify's proxy never sends visitors to it.
+R2NETTE_PROXY_MODE=own "${compose[@]}" run --rm --no-deps \
   -v "${ROOT}/docker-compose.production.yml:/compose.yml:ro" \
   --entrypoint ./node_modules/vite-node/vite-node.mjs \
   web scripts/deploy/check-production-env.ts /compose.yml
@@ -78,9 +93,9 @@ docker compose -f docker-compose.production.yml run --rm --no-deps \
 caddyfile_hash="$(sha256sum deploy/Caddyfile | cut -d ' ' -f 1)"
 caddyfile_applied="$(cat state/caddyfile.sha256 2>/dev/null || true)"
 caddy_changed=0
-if [[ "$caddyfile_hash" != "$caddyfile_applied" ]]; then
+if [[ "$proxy_mode" == "own" && "$caddyfile_hash" != "$caddyfile_applied" ]]; then
   caddy_changed=1
-  docker compose -f docker-compose.production.yml run --rm --no-deps caddy \
+  "${compose[@]}" run --rm --no-deps caddy \
     caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 fi
 
@@ -93,14 +108,14 @@ if [[ -n "$current" && "$current" != "$image" ]]; then
 fi
 
 deploy_started=1
-docker compose -f docker-compose.production.yml up -d
+"${compose[@]}" up -d
 if [[ "$caddy_changed" -eq 1 ]]; then
   echo "deploy/Caddyfile changed. Recreating caddy so it reads the new file."
-  docker compose -f docker-compose.production.yml up -d --force-recreate --no-deps caddy
+  "${compose[@]}" up -d --force-recreate --no-deps caddy
 fi
 bash scripts/deploy/healthcheck.sh
 
-cid="$(docker compose -f docker-compose.production.yml ps -q web)"
+cid="$("${compose[@]}" ps -q web)"
 actual="$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$cid")"
 if [[ "$actual" != "$SHA" ]]; then
   echo "Running revision does not match the commit that was requested."
