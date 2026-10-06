@@ -104,7 +104,11 @@ SSH_AS_ROOT=1
 
 if [[ -n "${CONTABO_SSH_KEY:-}" && "${SSH_REQUIRE_ROOT:-}" != "1" ]]; then
   SSH_LOGIN_USER="${CONTABO_SSH_USER:-r2nette}"
-  SSH_AS_ROOT=0
+  # Normally the r2nette account; a root login here still runs the deploy
+  # steps as r2nette, like every other root session.
+  if [[ "$SSH_LOGIN_USER" != "root" ]]; then
+    SSH_AS_ROOT=0
+  fi
   _write_key CONTABO_SSH_KEY "${_ssh_dir}/key"
   _ssh_opts+=(-i "${_ssh_dir}/key" -o BatchMode=yes -o IdentitiesOnly=yes)
 elif [[ -n "${CONTABO_ROOT_SSH_KEY:-}" ]]; then
