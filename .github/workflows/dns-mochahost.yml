@@ -57,3 +57,11 @@ jobs:
           echo "www.$DOMAIN: $(dig +short "www.$DOMAIN" | tr '\n' ' ')"
           echo "mail.$DOMAIN: $(dig +short "mail.$DOMAIN" | tr '\n' ' ')"
           echo "Nameservers: $(dig +short NS "$DOMAIN" | tr '\n' ' ')"
+          # Which MochaHost server hosts the domain today, so the right cPanel
+          # account can be found: the address's reverse name and the name on
+          # the certificate cPanel's port presents. Both are public.
+          ip="$(dig +short "$DOMAIN" A | grep -E '^[0-9.]+$' | head -n 1)"
+          if [ -n "$ip" ]; then
+            echo "Server name of $ip: $(dig +short -x "$ip" | tr '\n' ' ')"
+            echo "Certificate on $ip:2083: $(echo | timeout 15 openssl s_client -connect "$ip:2083" 2>/dev/null | openssl x509 -noout -subject 2>/dev/null)"
+          fi
