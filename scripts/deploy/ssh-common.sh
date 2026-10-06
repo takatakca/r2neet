@@ -66,8 +66,10 @@ fi
 # Write the private key held in the secret named $1 to $2, repaired from
 # common copy-and-paste damage, and make sure ssh can read it. Prints what
 # is wrong with it, never the key itself.
+_key_secret=""
 _write_key() {
   local name="$1" dest="$2" err
+  _key_secret="$name"
   printf '%s\n' "${!name}" > "$dest"
   chmod 600 "$dest"
   python3 "${_repo_root}/scripts/deploy/repair-ssh-key.py" "$dest" "$name" || exit 1
@@ -138,6 +140,12 @@ ssh_check_login() {
   printf '%s\n' "$err" >&2
   if [[ "$err" == *"REMOTE HOST IDENTIFICATION HAS CHANGED"* || "$err" == *"Host key verification failed"* ]]; then
     echo "The server's identity key does not match the pinned one (deploy/known_hosts or CONTABO_SSH_KNOWN_HOSTS). If the server was reinstalled, update the pin; otherwise do not continue." >&2
+  elif [[ "$err" == *"Permission denied (publickey)"* && -n "$_key_secret" ]]; then
+    # The fingerprint identifies the public half of the key; it is safe to
+    # print and lets the owner compare it with the server's authorized_keys.
+    echo "The server did not accept the key in ${_key_secret} for ${SSH_LOGIN_USER}. Its public fingerprint is:" >&2
+    ssh-keygen -l -f "${_ssh_dir}/key" | awk '{print "  " $2 " " $NF}' >&2
+    echo "Compare it with the server's: ssh-keygen -lf /root/.ssh/authorized_keys (e.g. in Coolify's Terminal for this server)." >&2
   elif [[ "$err" == *"Permission denied (publickey)"* ]]; then
     echo "The server accepts SSH keys only. Put a private key that the server's root account accepts into the CONTABO_ROOT_SSH_KEY secret (on a Coolify server: Keys & Tokens > Private Keys > localhost's key)." >&2
   elif [[ "$err" == *"Permission denied"* ]]; then
