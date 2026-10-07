@@ -410,6 +410,30 @@ describe('no homemade wallet detection', () => {
   });
 });
 
+describe('landing page discovery metadata', () => {
+  const html = readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+
+  it('provides canonical and social preview metadata for ad shares', () => {
+    expect(html).toContain('<link rel="canonical" href="https://r2nette.ca/">');
+    expect(html).toContain('<meta property="og:url" content="https://r2nette.ca/">');
+    expect(html).toContain('<meta property="og:image" content="https://r2nette.ca/assets/hero.jpg">');
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
+  });
+
+  it('publishes structured cleaning-service details without invented ratings', () => {
+    const match = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+    expect(match).not.toBeNull();
+    const structuredData = JSON.parse(match![1]!) as Record<string, unknown>;
+    expect(structuredData['@type']).toBe('CleaningService');
+    expect(structuredData.telephone).toBe('+1-514-825-2825');
+    expect(structuredData.areaServed).toEqual([
+      { '@type': 'City', name: 'Montréal' },
+      { '@type': 'City', name: 'Laval' },
+    ]);
+    expect(structuredData.aggregateRating).toBeUndefined();
+  });
+});
+
 describe('backend confirmation wait', () => {
   const noSleep = async () => undefined;
 
