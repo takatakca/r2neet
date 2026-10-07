@@ -222,6 +222,12 @@ export class IdempotencyStore {
 
 const authIntentSchema = z.enum(['login', 'signup', 'google']);
 
+const callbackRequestSchema = z.object({
+  phoneE164: z.string().trim().min(1).max(40),
+  reason: z.string().trim().max(300).optional(),
+  delay: z.enum(['NOW', 'IN_FIVE_MINUTES']).default('NOW'),
+});
+
 const phoneSchema = z.object({
   phone: z.string().min(1),
   intent: authIntentSchema,
@@ -2578,19 +2584,17 @@ export function createApi(deps: ApiDeps) {
   app.post(
     '/api/v1/callbacks',
     wrap(async (req, res) => {
-      const body = req.body as { phoneE164?: string; reason?: string };
-      if (!body.phoneE164)
-        throw new ApiError(
-          400,
-          'VALIDATION_ERROR',
-          'A phone number is required.',
-        );
+      const body = callbackRequestSchema.parse(req.body);
       const svc = new CallbackService(prisma, null, now);
       const out = await svc.request({
         phoneE164: normalizePhone(body.phoneE164),
         customerId: req.customerId ?? null,
         reason: body.reason,
         source: 'BOOKING_FLOW',
+        requestedFor:
+          body.delay === 'IN_FIVE_MINUTES'
+            ? new Date(now().getTime() + 5 * 60_000)
+            : null,
       });
       res
         .status(201)

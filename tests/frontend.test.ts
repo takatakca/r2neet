@@ -20,6 +20,7 @@ import {
   emptyDraft,
   type Booking,
 } from '../web/src/lib/api.js';
+import { api } from '../web/src/lib/api.js';
 
 /** Minimal localStorage for the node test environment. */
 function installStorage() {
@@ -232,6 +233,29 @@ describe('draft persistence', () => {
     saveDraft(emptyDraft);
     clearDraft();
     expect(loadDraft()).toBeNull();
+  });
+});
+
+describe('callback requests', () => {
+  it('sends the customer-selected callback time', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ callbackId: 'callback-1', status: 'QUEUED' }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await api.requestCallback('+15145551234', 'IN_FIVE_MINUTES');
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(JSON.parse(init.body as string)).toEqual({
+        phoneE164: '+15145551234',
+        delay: 'IN_FIVE_MINUTES',
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

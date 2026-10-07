@@ -917,12 +917,12 @@ function openCallback(): void {
   p?.addEventListener('input', () => (p.value = formatPhoneInput(p.value)));
 }
 
-async function requestCallback(): Promise<void> {
+async function requestCallback(delay: 'NOW' | 'IN_FIVE_MINUTES'): Promise<void> {
   const input = $('cbPhone') as HTMLInputElement | null;
   const phone = ctx?.customer.verifiedPhone ?? input?.value ?? '';
   if (!phone) return;
   try {
-    await api.requestCallback(phone);
+    await api.requestCallback(phone, delay);
     openSheet(`<div class="ctr pad"><div class="ctick sm">✓</div>
       <h2>${esc(t('callback.received'))}</h2>
       <p class="s">${esc(t('callback.target'))}</p>
@@ -1570,11 +1570,11 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
   },
 
   'callback-now': () => {
-    void requestCallback();
+    void requestCallback('NOW');
   },
 
   'callback-5': () => {
-    void requestCallback();
+    void requestCallback('IN_FIVE_MINUTES');
   },
 
   'retry-boot': () => {

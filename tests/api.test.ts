@@ -54,6 +54,7 @@ d('HTTP API', () => {
   });
 
   beforeEach(async () => {
+    await prisma.callbackRequest.deleteMany();
     await prisma.promotionRedemption.deleteMany();
     await prisma.bookingStatusHistory.deleteMany();
     await prisma.bookingStaff.deleteMany();
@@ -108,6 +109,22 @@ d('HTTP API', () => {
   async function login(phone: string): Promise<string> {
     return (await signUp(app, phone)).cookie;
   }
+
+  it('schedules a callback five minutes from the server time when requested', async () => {
+    const beforeRequest = Date.now();
+    const response = await request(app)
+      .post('/api/v1/callbacks')
+      .send({ phoneE164: '+15145551234', delay: 'IN_FIVE_MINUTES' });
+    const afterRequest = Date.now();
+
+    expect(response.status).toBe(201);
+    const callback = await prisma.callbackRequest.findUniqueOrThrow({
+      where: { id: response.body.callbackId },
+    });
+    expect(callback.requestedFor).not.toBeNull();
+    expect(callback.requestedFor!.getTime()).toBeGreaterThanOrEqual(beforeRequest + 5 * 60_000);
+    expect(callback.requestedFor!.getTime()).toBeLessThanOrEqual(afterRequest + 5 * 60_000);
+  });
 
   async function addressFor(cookie: string): Promise<string> {
     const me = await request(app).get('/api/v1/customer/me').set('Cookie', cookie);

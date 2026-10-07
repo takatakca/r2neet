@@ -181,10 +181,10 @@ export const api = {
       `/api/v1/reviews?limit=${limit}`,
     ),
 
-  requestCallback: (phoneE164: string, reason?: string) =>
+  requestCallback: (phoneE164: string, delay: 'NOW' | 'IN_FIVE_MINUTES' = 'NOW') =>
     call<{ callbackId: string; status: string }>('/api/v1/callbacks', {
       method: 'POST',
-      body: JSON.stringify({ phoneE164, reason }),
+      body: JSON.stringify({ phoneE164, delay }),
     }),
 
   services: () => call<{ services: ServiceOption[] }>('/api/v1/services'),
