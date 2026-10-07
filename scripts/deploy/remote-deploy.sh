@@ -85,7 +85,17 @@ finish() {
 }
 trap finish EXIT
 
-"${compose[@]}" pull
+pull_attempt=1
+until "${compose[@]}" pull; do
+  if [[ "$pull_attempt" -ge 3 ]]; then
+    echo "Image pull failed after ${pull_attempt} attempts." >&2
+    exit 1
+  fi
+  delay=$((pull_attempt * 5))
+  echo "Image pull failed; retrying in ${delay}s (${pull_attempt}/3)."
+  sleep "$delay"
+  pull_attempt=$((pull_attempt + 1))
+done
 # The one-off check container gets no proxy routing labels (own mode), so
 # Coolify's proxy never sends visitors to it.
 R2NETTE_PROXY_MODE=own "${compose[@]}" run --rm --no-deps \
