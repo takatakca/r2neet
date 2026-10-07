@@ -412,12 +412,25 @@ describe('no homemade wallet detection', () => {
 
 describe('landing page discovery metadata', () => {
   const html = readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+  const robots = readFileSync(new URL('../web/public/robots.txt', import.meta.url), 'utf8');
+  const sitemap = readFileSync(new URL('../web/public/sitemap.xml', import.meta.url), 'utf8');
 
   it('provides canonical and social preview metadata for ad shares', () => {
     expect(html).toContain('<link rel="canonical" href="https://r2nette.ca/">');
     expect(html).toContain('<meta property="og:url" content="https://r2nette.ca/">');
     expect(html).toContain('<meta property="og:image" content="https://r2nette.ca/assets/hero.jpg">');
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
+  });
+
+  it('publishes the canonical public URL and excludes private paths from crawling', () => {
+    expect(robots).toContain('Sitemap: https://r2nette.ca/sitemap.xml');
+    expect(robots).toContain('Disallow: /api/');
+    expect(sitemap).toContain('<loc>https://r2nette.ca/</loc>');
+    expect(sitemap).not.toMatch(/\/(?:account|admin|crew|login|signup|verify|api)(?:\/|<)/);
+    for (const page of ['auth', 'verify', 'signup', 'account', 'admin', 'crew']) {
+      const source = readFileSync(new URL(`../web/${page}.html`, import.meta.url), 'utf8');
+      expect(source).toMatch(/<meta name="robots" content="noindex,follow"\s*\/?>/);
+    }
   });
 
   it('publishes structured cleaning-service details without invented ratings', () => {
