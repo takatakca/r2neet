@@ -90,6 +90,8 @@ describe('translation', () => {
   it('translates both languages', () => {
     expect(translate('en', 'checkout.dueToday')).toBe('Due today');
     expect(translate('fr', 'checkout.dueToday')).toBe("À payer aujourd'hui");
+    expect(translate('en', 'callback.phoneRequired')).toMatch(/phone number/i);
+    expect(translate('fr', 'callback.phoneRequired')).toMatch(/numéro de téléphone/i);
   });
 
   it('interpolates variables', () => {

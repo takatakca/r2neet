@@ -920,7 +920,17 @@ function openCallback(): void {
 async function requestCallback(delay: 'NOW' | 'IN_FIVE_MINUTES'): Promise<void> {
   const input = $('cbPhone') as HTMLInputElement | null;
   const phone = ctx?.customer.verifiedPhone ?? input?.value ?? '';
-  if (!phone) return;
+  if (!phone.trim()) {
+    const err = $('cbErr');
+    if (err) {
+      err.textContent = t('callback.phoneRequired');
+      err.hidden = false;
+    }
+    input?.focus();
+    return;
+  }
+  const err = $('cbErr');
+  if (err) err.hidden = true;
   try {
     await api.requestCallback(phone, delay);
     openSheet(`<div class="ctr pad"><div class="ctick sm">✓</div>
