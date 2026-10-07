@@ -45,6 +45,9 @@ try {
   const staffSessions = await prisma.staffSession.deleteMany({
     where: { expiresAt: { lt: new Date(Date.now() - 7 * 86400000) } },
   });
+  const googleAuthTransactions = await prisma.googleAuthTransaction.deleteMany({
+    where: { expiresAt: { lt: new Date(Date.now() - 7 * 86400000) } },
+  });
   const idem = await prisma.idempotencyRecord.deleteMany({
     where: { expiresAt: { lt: new Date() } },
   });
@@ -57,6 +60,7 @@ try {
       notificationsAbandoned: retry.abandoned,
       cardWarnings: expiry.warned,
       prunedSessions: sessions.count + staffSessions.count,
+      prunedGoogleAuthTransactions: googleAuthTransactions.count,
       prunedIdempotency: idem.count,
     }),
   );

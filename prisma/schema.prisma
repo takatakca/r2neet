@@ -33,6 +33,7 @@ model Customer {
   /// Deterministic id from a legacy system, so re-importing never duplicates.
   legacyExternalId          String?   @unique
   id                        String    @id @default(uuid())
+  googleAuthSubject         String?   @unique
   firstName                 String?
   lastName                  String?
   email                     String?   @unique
@@ -650,6 +651,22 @@ model RegistrationSession {
   ipHash                String?
 
   @@index([phoneE164])
+  @@index([expiresAt])
+}
+
+/// Short-lived, one-use state for TAKATAK Supabase Google OAuth and verified
+/// phone linking. Only hashes of browser tokens are stored.
+model GoogleAuthTransaction {
+  id                 String    @id @default(uuid())
+  stateHash          String    @unique
+  linkTokenHash      String?   @unique
+  googleAuthSubject  String?
+  verifiedPhone      String?
+  returnTo            String    @default("/account")
+  createdAt           DateTime  @default(now())
+  expiresAt           DateTime
+  completedAt         DateTime?
+
   @@index([expiresAt])
 }
 

@@ -185,6 +185,7 @@ export const RATE_RULES: Record<string, RateLimitRule> = {
 };
 
 export function classifyRoute(path: string, method: string): keyof typeof RATE_RULES {
+  if (path.includes('/auth/google')) return 'auth';
   if (path.includes('/auth/phone')) return 'otp';
   if (path.includes('/staff/login') || path.includes('/staff/password')) return 'auth';
   if (path.includes('/payments') || path.includes('/stripe')) return 'payment';
