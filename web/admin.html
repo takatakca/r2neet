@@ -1056,13 +1056,22 @@ async function operationsPage(){
 }
 
 /* ---------------- routing ---------------- */
-const PAGES = {dashboard, dispatch, roster:rosterPage, callbacks:callbacksPage, billing:billingPage, reviews:reviewsPage, integrations:integrationsPage, cutover:cutoverPage, security:securityPage, operations:operationsPage};
 function route(){
   const id = (location.hash || '#dashboard').slice(1);
   for(const el of document.querySelectorAll('.page')) el.classList.toggle('on', el.id === id);
   for(const a of document.querySelectorAll('nav.side a')) a.classList.toggle('on', a.dataset.nav === id);
-  const page = Object.prototype.hasOwnProperty.call(PAGES, id) ? PAGES[id] : dashboard;
-  page();
+  switch(id){
+    case 'dispatch': dispatch(); break;
+    case 'roster': rosterPage(); break;
+    case 'callbacks': callbacksPage(); break;
+    case 'billing': billingPage(); break;
+    case 'reviews': reviewsPage(); break;
+    case 'integrations': integrationsPage(); break;
+    case 'cutover': cutoverPage(); break;
+    case 'security': securityPage(); break;
+    case 'operations': operationsPage(); break;
+    default: dashboard();
+  }
 }
 window.addEventListener('hashchange', route);
 

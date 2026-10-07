@@ -469,12 +469,13 @@ describe('installable app shell', () => {
   });
 
   describe('admin page routing', () => {
-    it('only dispatches routes explicitly defined in the page map', () => {
+    it('dispatches only literal route names', () => {
       const admin = readFileSync(new URL('../web/admin.html', import.meta.url), 'utf8');
 
-      expect(admin).toContain('Object.prototype.hasOwnProperty.call(PAGES, id)');
-      expect(admin).toContain('const page = Object.prototype.hasOwnProperty.call(PAGES, id) ? PAGES[id] : dashboard;');
-      expect(admin).not.toContain('(PAGES[id] || dashboard)()');
+      expect(admin).toContain("case 'dispatch': dispatch(); break;");
+      expect(admin).toContain("case 'operations': operationsPage(); break;");
+      expect(admin).toContain('default: dashboard();');
+      expect(admin).not.toContain('PAGES[id]');
     });
   });
 
