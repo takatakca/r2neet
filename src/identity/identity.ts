@@ -4,9 +4,10 @@
  * Phone is the canonical customer identity. Social login links to it later;
  * it never replaces it.
  *
- * We never store OTP codes. Twilio Verify owns code generation, expiry and
- * checking. This module owns normalization, abuse limits, and — critically —
- * the rule that NOTHING about a customer is revealed before verification.
+ * We never store OTP codes. TAKATAK Supabase Auth owns code generation, expiry
+ * and checking (with Twilio configured as its SMS provider). This module owns
+ * normalization, abuse limits, and the rule that NOTHING about a customer is
+ * revealed before verification.
  */
 
 export class IdentityError extends Error {
@@ -86,84 +87,159 @@ export interface VerificationProvider {
 }
 
 /**
- * Twilio Verify v2. Requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and
- * TWILIO_VERIFY_SERVICE_SID. Without them `configured` is false and the
- * application surfaces NOT_CONFIGURED rather than pretending to send.
+ * TAKATAK's Supabase Auth project is the canonical phone-identity authority.
+ * Supabase sends SMS through the Twilio provider configured in its dashboard.
+ * Only the project's URL and anon key are used here; service-role keys never
+ * belong in this application.
  */
-export class TwilioVerifyProvider implements VerificationProvider {
-  readonly name = 'twilio_verify';
-  private readonly sid: string | undefined;
-  private readonly token: string | undefined;
-  private readonly service: string | undefined;
+export class SupabasePhoneAuthProvider implements VerificationProvider {
+  readonly name = 'takatak_supabase_phone';
+  private readonly url: string | undefined;
+  private readonly anonKey: string | undefined;
 
-  constructor(env: Record<string, string | undefined> = process.env) {
-    this.sid = env.TWILIO_ACCOUNT_SID;
-    this.token = env.TWILIO_AUTH_TOKEN;
-    this.service = env.TWILIO_VERIFY_SERVICE_SID;
+  constructor(
+    env: Record<string, string | undefined> = process.env,
+    private readonly fetcher: typeof fetch = fetch,
+  ) {
+    this.url = env.TAKATAK_SUPABASE_URL?.trim().replace(/\/+$/, '');
+    this.anonKey = env.TAKATAK_SUPABASE_ANON_KEY?.trim();
   }
 
   get configured(): boolean {
-    return Boolean(this.sid && this.token && this.service);
+    if (!this.url || !this.anonKey) return false;
+    try {
+      const endpoint = new URL(this.url);
+      return (
+        Boolean(endpoint.hostname) &&
+        (endpoint.protocol === 'https:' ||
+          (endpoint.protocol === 'http:' &&
+            ['localhost', '127.0.0.1'].includes(endpoint.hostname)))
+      );
+    } catch {
+      return false;
+    }
   }
 
-  private auth(): string {
-    return (
-      'Basic ' + Buffer.from(`${this.sid}:${this.token}`).toString('base64')
-    );
-  }
-
-  private assertConfigured(): void {
-    if (!this.configured) {
+  private async request(
+    operation: 'otp' | 'verify',
+    payload: Record<string, string | boolean>,
+  ): Promise<Response> {
+    if (!this.configured || !this.url || !this.anonKey) {
       throw new IdentityError(
-        'SMS verification is not configured. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID.',
+        'TAKATAK phone authentication is not configured.',
         'VERIFY_NOT_CONFIGURED',
+      );
+    }
+
+    try {
+      return await this.fetcher(`${this.url}/auth/v1/${operation}`, {
+        method: 'POST',
+        headers: {
+          apikey: this.anonKey,
+          Authorization: 'Bearer ' + this.anonKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch {
+      throw new IdentityError(
+        'TAKATAK phone authentication is temporarily unavailable.',
+        'VERIFY_PROVIDER_UNAVAILABLE',
       );
     }
   }
 
   async start(phoneE164: string): Promise<{ status: VerificationStatus }> {
-    this.assertConfigured();
-    const res = await fetch(
-      `https://verify.twilio.com/v2/Services/${this.service}/Verifications`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: this.auth(),
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ To: phoneE164, Channel: 'sms' }),
-      },
-    );
-    if (!res.ok)
-      throw new IdentityError('Could not send the code.', 'VERIFY_SEND_FAILED');
-    const json = (await res.json()) as { status: string };
-    return { status: json.status.toUpperCase() as VerificationStatus };
+    const response = await this.request('otp', {
+      phone: phoneE164,
+      // Keep the send response neutral for known and new customers. The
+      // application creates its own customer record only after verification
+      // and the registration form are complete.
+      create_user: true,
+    });
+
+    if (response.status === 429) {
+      throw new IdentityError(
+        'Too many codes requested. Try again later.',
+        'OTP_PROVIDER_LIMIT',
+      );
+    }
+    if (!response.ok) {
+      throw new IdentityError(
+        'TAKATAK could not send a verification code.',
+        'VERIFY_PROVIDER_UNAVAILABLE',
+      );
+    }
+    return { status: 'PENDING' };
   }
 
   async check(
     phoneE164: string,
     code: string,
   ): Promise<{ status: VerificationStatus }> {
-    this.assertConfigured();
-    const res = await fetch(
-      `https://verify.twilio.com/v2/Services/${this.service}/VerificationCheck`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: this.auth(),
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ To: phoneE164, Code: code }),
-      },
-    );
-    if (res.status === 404) return { status: 'EXPIRED' };
-    if (!res.ok)
+    const response = await this.request('verify', {
+      phone: phoneE164,
+      token: code,
+      type: 'sms',
+    });
+
+    if (response.status === 429) {
       throw new IdentityError(
-        'Could not check that code.',
-        'VERIFY_CHECK_FAILED',
+        'Too many verification attempts. Try again later.',
+        'OTP_PROVIDER_LIMIT',
       );
-    const json = (await res.json()) as { status: string };
-    return { status: json.status.toUpperCase() as VerificationStatus };
+    }
+    if (response.status >= 500) {
+      throw new IdentityError(
+        'TAKATAK phone authentication is temporarily unavailable.',
+        'VERIFY_PROVIDER_UNAVAILABLE',
+      );
+    }
+    if (!response.ok) return { status: 'DENIED' };
+
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      throw new IdentityError(
+        'TAKATAK returned an invalid verification response.',
+        'VERIFY_PROVIDER_UNAVAILABLE',
+      );
+    }
+
+    if (!body || typeof body !== 'object') {
+      throw new IdentityError(
+        'TAKATAK returned an invalid verification response.',
+        'VERIFY_PROVIDER_UNAVAILABLE',
+      );
+    }
+
+    const user = (body as { user?: unknown }).user;
+    if (!user || typeof user !== 'object') return { status: 'DENIED' };
+    const verifiedUser = user as {
+      id?: unknown;
+      phone?: unknown;
+      phone_confirmed_at?: unknown;
+    };
+    if (
+      typeof verifiedUser.id !== 'string' ||
+      !verifiedUser.id ||
+      typeof verifiedUser.phone !== 'string' ||
+      !verifiedUser.phone_confirmed_at
+    ) {
+      return { status: 'DENIED' };
+    }
+
+    try {
+      if (normalizePhone(verifiedUser.phone) !== phoneE164) {
+        return { status: 'DENIED' };
+      }
+    } catch {
+      return { status: 'DENIED' };
+    }
+
+    return { status: 'APPROVED' };
   }
 }
 

@@ -2243,8 +2243,11 @@ export function createApi(deps: ApiDeps) {
       return;
     }
     if (err instanceof IdentityError) {
-      const status =
-        err.code.includes('LIMIT') || err.code === 'OTP_COOLDOWN' ? 429 : 400;
+      const status = err.code.includes('LIMIT') || err.code === 'OTP_COOLDOWN'
+        ? 429
+        : err.code.includes('PROVIDER_UNAVAILABLE') || err.code === 'VERIFY_NOT_CONFIGURED'
+          ? 503
+          : 400;
       res
         .status(status)
         .json({ error: { code: err.code, message: err.message, requestId } });

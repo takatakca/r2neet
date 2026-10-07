@@ -26,6 +26,8 @@ function productionEnv(
     PRODUCTION_DOMAIN: 'book.example.test',
     ACME_EMAIL: 'ops@example.test',
     FIELD_ENCRYPTION_KEY: KEY,
+    TAKATAK_SUPABASE_URL: 'https://project.supabase.co',
+    TAKATAK_SUPABASE_ANON_KEY: 'anon-key',
     R2NETTE_IMAGE: `ghcr.io/takatakca/r2neet:${SHA}`,
     ...overrides,
   };
@@ -41,7 +43,7 @@ describe('production environment gate', () => {
   it('accepts a complete production environment and the production compose file', () => {
     const issues = validateProductionEnvironment(productionEnv(), compose);
     expect(issues.filter((issue) => issue.severity === 'FATAL')).toEqual([]);
-    expect(issues.some((issue) => issue.severity === 'WARN' && /Twilio Verify/.test(issue.message))).toBe(
+    expect(issues.some((issue) => issue.severity === 'WARN' && /Twilio Voice/.test(issue.message))).toBe(
       true,
     );
     expect(issues.some((issue) => issue.severity === 'WARN' && /Stripe is not configured/.test(issue.message))).toBe(
@@ -95,6 +97,24 @@ describe('production environment gate', () => {
     expect(
       fatals(productionEnv({ STRIPE_SECRET_KEY: 'sk_live_example' })).some((issue) =>
         /STRIPE_WEBHOOK_SECRET/.test(issue.message),
+      ),
+    ).toBe(true);
+  });
+
+  it('requires TAKATAK Supabase Auth and rejects an insecure project URL', () => {
+    expect(
+      fatals(productionEnv({ TAKATAK_SUPABASE_URL: undefined })).some((issue) =>
+        /TAKATAK_SUPABASE_URL is missing/.test(issue.message),
+      ),
+    ).toBe(true);
+    expect(
+      fatals(productionEnv({ TAKATAK_SUPABASE_URL: 'http://project.supabase.co' })).some((issue) =>
+        /valid HTTPS URL/.test(issue.message),
+      ),
+    ).toBe(true);
+    expect(
+      fatals(productionEnv({ TAKATAK_SUPABASE_ANON_KEY: undefined })).some((issue) =>
+        /TAKATAK_SUPABASE_ANON_KEY is missing/.test(issue.message),
       ),
     ).toBe(true);
   });
