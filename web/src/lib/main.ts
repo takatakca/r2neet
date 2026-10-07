@@ -1535,7 +1535,38 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
 
     closeSheet();
 
-    $('book')?.scrollIntoView({ behavior: 'smooth' });
+    if (helpAction === 'choose') {
+      goTo('service');
+      return;
+    }
+
+    if (helpAction === 'price') {
+      if (quote) {
+        document.querySelector('.ledger')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      } else {
+        goToPhase('HOME');
+      }
+      return;
+    }
+
+    if (helpAction === 'times') {
+      goToPhase('TIME');
+      return;
+    }
+
+    if (helpAction === 'usual') {
+      if (ctx?.usualClean) {
+        void ACTIONS['book-again'](el);
+      } else {
+        goTo('service');
+      }
+      return;
+    }
+
+    goTo('service');
   },
 
   'callback-now': () => {
