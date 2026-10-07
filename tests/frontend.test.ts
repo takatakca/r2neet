@@ -483,6 +483,7 @@ describe('installable app shell', () => {
     expect(worker).toContain('const NETWORK_ONLY_PATH = /^\\/(?:api\\/|auth');
     expect(worker).toContain("if (url.origin !== self.location.origin || NETWORK_ONLY_PATH.test(url.pathname)) return;");
     expect(worker).toContain(".catch(async () => (await caches.match(APP_SHELL_URL))");
+    expect(worker).toContain(".catch(() => new Response('', { status: 503, statusText: 'Offline' }))");
     expect(worker).toContain('OFFLINE_URL');
     expect(readFileSync(new URL('../web/public/offline.html', import.meta.url), 'utf8'))
       .toContain('Reconnect to the internet');
