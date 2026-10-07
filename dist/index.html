@@ -48,18 +48,6 @@ button{cursor:pointer}
 .eyebrow.light{color:rgba(255,255,255,.65)}
 .ctr{text-align:center}.pad{padding:14px 0}.mb{margin-bottom:16px}
 
-/* ---------- boot veil ---------- */
-#boot{position:fixed;inset:0;z-index:200;background:var(--ink);color:#fff;display:grid;place-items:center;padding:28px}
-.boot-in{text-align:center;max-width:340px}
-.boot-mark{width:56px;height:56px;border-radius:18px;background:linear-gradient(140deg,var(--aqua),var(--deep));
-display:grid;place-items:center;font-family:'Bricolage Grotesque';font-weight:800;font-size:21px;margin:0 auto 18px;
-animation:pulse 1.6s var(--e) infinite}
-@keyframes pulse{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.07);opacity:1}}
-.boot-txt{opacity:.7;font-size:15px}
-.boot-in h2{font-size:23px;margin-bottom:10px}
-.boot-in p{opacity:.75;font-size:15px;margin:0 0 20px}
-.boot-in .btn{width:100%;margin-bottom:9px}
-
 /* ---------- header ---------- */
 header{position:sticky;top:0;z-index:60;background:rgba(7,40,63,.92);backdrop-filter:saturate(1.5) blur(14px);color:#fff}
 .hd{display:flex;align-items:center;gap:12px;height:60px}
@@ -146,12 +134,47 @@ background-position:50%;background-size:200%;opacity:0;transition:background-siz
 .link.light{color:rgba(255,255,255,.8)}
 
 /* ---------- phases ---------- */
-.phases{display:flex;gap:6px;padding:18px 0 4px}
-.phase{position:relative;flex:1;text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
-color:var(--muted);padding-bottom:9px;border-bottom:3px solid var(--line);
-transition:color var(--t-base) var(--smooth),border-color var(--t-slow) var(--smooth)}
-.phase.on{color:var(--aqua-dk);border-bottom-color:var(--aqua)}
-.phase.done{color:var(--ink);border-bottom-color:var(--aqua-dk)}
+.phases {
+  display: flex;
+  gap: 6px;
+  padding: 18px 0 4px;
+}
+
+.phase {
+  position: relative;
+  flex: 1;
+  appearance: none;
+  margin: 0;
+  padding: 0 0 9px;
+  border: 0;
+  border-bottom: 3px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-align: center;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color var(--t-base) var(--smooth),
+    border-color var(--t-slow) var(--smooth);
+}
+
+.phase:hover {
+  color: var(--deep);
+}
+
+.phase.on {
+  color: var(--aqua-dk);
+  border-bottom-color: var(--aqua);
+}
+
+.phase.done {
+  color: var(--ink);
+  border-bottom-color: var(--aqua-dk);
+}
 
 /* ---------- booking ---------- */
 .booking{padding-top:8px;padding-bottom:60px;overflow-x:clip}
@@ -472,84 +495,803 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
     transition-duration:.01ms!important;scroll-behavior:auto!important}
   .btn:hover,.opt:hover,.fam:hover,.slot:hover{transform:none!important}
 }
+
+/* ================================================================
+   R2NETTE LANDING PAGE
+   ================================================================ */
+
+   .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 70;
+  background: #092f59;
+  color: #fff;
+  box-shadow: 0 2px 18px rgba(2, 24, 48, 0.16);
+}
+
+.landing-header {
+  width: min(100% - 40px, 1420px);
+  min-height: 72px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 34px;
+}
+
+.landing-logo {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  text-decoration: none;
+}
+
+.landing-logo-image {
+  display: block;
+  width: auto;
+  height: 39px;
+}
+
+.desktop-navigation {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: clamp(20px, 2.4vw, 42px);
+}
+
+.desktop-navigation a,
+.desktop-navigation button {
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.desktop-navigation a:hover,
+.desktop-navigation button:hover {
+  color: #55b9ff;
+}
+
+.landing-header-actions {
+  margin-left: auto;
+}
+
+.landing-language {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 40px;
+  padding: 0 11px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.landing-language button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.landing-language button[aria-pressed="true"] {
+  color: #55b9ff;
+}
+
+.landing-language span {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.landing-phone {
+  min-height: 40px;
+  padding: 0 13px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.11);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.landing-book-button {
+  min-height: 48px;
+  padding: 0 25px;
+  border: 0;
+  border-radius: 16px;
+  background: #178cf2;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 8px 20px rgba(23, 140, 242, 0.3);
+}
+
+.mobile-menu-button {
+  display: none;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 10px;
+  background: transparent;
+}
+
+.mobile-menu-button span {
+  display: block;
+  height: 2px;
+  margin: 5px 0;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.mobile-navigation {
+  padding: 8px 20px 18px;
+  background: #092f59;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.mobile-navigation a,
+.mobile-navigation button {
+  width: 100%;
+  display: block;
+  padding: 13px 4px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #fff;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+}
+
+/* Hero */
+
+.landing-hero {
+  position: relative;
+  min-height: 532px;
+  overflow: hidden;
+  background: #082b50;
+  color: #fff;
+}
+
+.landing-hero-photo {
+  position: absolute;
+  inset: 0;
+  background-color: #082b50;
+  background-image: url('/assets/hero.jpg');
+  background-position: 68% center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.landing-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(4, 30, 57, 0.99) 0%,
+      rgba(4, 30, 57, 0.96) 30%,
+      rgba(4, 30, 57, 0.67) 48%,
+      rgba(4, 30, 57, 0.08) 76%
+    );
+}
+
+.landing-hero-content {
+  position: relative;
+  z-index: 2;
+  width: min(100% - 40px, 1420px);
+  min-height: 532px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.landing-hero-copy {
+  width: min(620px, 52%);
+  padding: 48px 0;
+}
+
+.landing-eyebrow {
+  margin: 0 0 24px;
+  color: #b9d8ee;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.landing-eyebrow::after {
+  content: "";
+  display: block;
+  width: 48px;
+  height: 2px;
+  margin-top: 17px;
+  background: #35a9ff;
+}
+
+.landing-hero h1 {
+  max-width: 680px;
+  margin: 0;
+  color: #fff;
+  font-size: clamp(44px, 5vw, 72px);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+}
+
+.landing-hero h1 span,
+.landing-hero h1 strong {
+  display: block;
+}
+
+.landing-hero h1 strong {
+  color: #3aaaff;
+}
+
+.landing-hero-description {
+  margin: 22px 0 0;
+  color: rgba(255, 255, 255, 0.83);
+  font-size: clamp(18px, 1.8vw, 24px);
+}
+
+.landing-hero-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 27px;
+}
+
+.landing-primary-action,
+.landing-call-action {
+  min-height: 58px;
+  padding: 0 32px;
+  border-radius: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  font-size: 16px;
+  font-weight: 800;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.landing-primary-action {
+  border: 0;
+  background: #25a8ff;
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(37, 168, 255, 0.26);
+}
+
+.landing-call-action {
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  background: rgba(5, 35, 65, 0.28);
+  color: #fff;
+}
+
+.landing-promotion {
+  width: min(100%, 380px);
+  min-height: 80px;
+  margin-top: 22px;
+  padding: 14px 20px;
+  border: 2px solid #f5bf2f;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  background: rgba(6, 37, 68, 0.78);
+}
+
+.landing-promotion-icon {
+  color: #f5bf2f;
+  font-size: 30px;
+}
+
+.landing-promotion-label {
+  margin: 0 0 3px;
+  color: #f5bf2f;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.landing-promotion-value {
+  margin: 0;
+  color: #fff;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.landing-promotion-value strong {
+  font-size: 18px;
+}
+
+/* How it works */
+
+.landing-how {
+  padding: 36px 0;
+  background: #fff;
+  border-bottom: 1px solid #dceaf5;
+}
+
+.landing-section-width {
+  width: min(100% - 40px, 1420px);
+  margin: 0 auto;
+}
+
+.landing-how-grid {
+  display: grid;
+  grid-template-columns: 1.3fr repeat(3, 1fr);
+  align-items: center;
+  gap: 26px;
+}
+
+.landing-how-heading h2 {
+  font-size: 25px;
+  line-height: 1.1;
+}
+
+.landing-section-eyebrow {
+  margin: 0 0 7px;
+  color: #168de8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.landing-how-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+}
+
+.landing-how-step > span {
+  width: 39px;
+  height: 39px;
+  flex: 0 0 39px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #e0f2ff;
+  color: #082f5a;
+  font-weight: 800;
+}
+
+.landing-how-step h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.landing-how-step p {
+  margin: 0;
+  color: #637d95;
+  font-size: 13px;
+}
+
+/* Existing booking becomes the lower landing section */
+
+.booking {
+  width: min(100% - 40px, 1420px);
+  max-width: none;
+  padding-top: 37px;
+}
+
+.booking .phases {
+  margin-bottom: 22px;
+}
+
+.booking .grid {
+  gap: 22px;
+}
+
+@media (min-width: 1000px) {
+  .booking .grid {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+}
+
+.landing-service-card {
+  overflow: hidden;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid #dce8f1;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 5px 18px rgba(8, 47, 90, 0.07);
+  text-align: left;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.landing-service-card:hover {
+  transform: translateY(-3px);
+  border-color: #8bc8ef;
+  box-shadow: 0 12px 28px rgba(8, 47, 90, 0.13);
+}
+
+.landing-service-card[aria-pressed="true"] {
+  border-color: #168de8;
+  box-shadow: 0 0 0 3px rgba(22, 141, 232, 0.15);
+}
+
+.landing-service-photo {
+  display: block;
+  height: 128px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.landing-service-content {
+  min-height: 108px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.landing-service-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.landing-service-copy strong,
+.landing-service-copy span {
+  display: block;
+}
+
+.landing-service-copy strong {
+  color: #082f5a;
+  font-size: 18px;
+}
+
+.landing-service-copy span {
+  margin-top: 5px;
+  color: #637d95;
+  font-size: 14px;
+}
+
+.landing-service-arrow {
+  width: 43px;
+  height: 43px;
+  flex: 0 0 43px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #e0f2ff;
+  color: #0878d1;
+  font-size: 24px;
+}
+
+#families.fams {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ledger {
+  background: #fff;
+  color: #082f5a;
+  border: 1px solid #dce8f1;
+  box-shadow: 0 10px 30px rgba(8, 47, 90, 0.09);
+}
+
+.ledger .empty {
+  color: #637d95;
+}
+
+@media (max-width: 1100px) {
+  .desktop-navigation {
+    gap: 18px;
+  }
+
+  .landing-phone {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .desktop-navigation,
+  .landing-language,
+  .landing-book-button {
+    display: none;
+  }
+
+  .mobile-menu-button {
+    display: block;
+  }
+
+  .landing-header {
+    min-height: 64px;
+    justify-content: space-between;
+    gap: 16px;
+
+  }
+
+  .landing-hero {
+    min-height: 650px;
+  }
+
+  .landing-hero-photo {
+    background-position: 62% center;
+  }
+
+  .landing-hero-overlay {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(4, 30, 57, 0.35) 0%,
+        rgba(4, 30, 57, 0.88) 54%,
+        rgba(4, 30, 57, 0.99) 100%
+      );
+  }
+
+  .landing-hero-content {
+    min-height: 650px;
+    align-items: flex-end;
+  }
+
+  .landing-hero-copy {
+    width: 100%;
+    padding: 210px 0 38px;
+  }
+
+  .landing-how-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #families.fams {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .landing-header,
+  .landing-hero-content,
+  .landing-section-width,
+  .booking {
+    width: min(100% - 28px, 1420px);
+  }
+
+  .landing-logo-image {
+    height: 32px;
+  }
+
+  .landing-hero {
+    min-height: 610px;
+  }
+
+  .landing-hero-content {
+    min-height: 610px;
+  }
+
+  .landing-hero h1 {
+    font-size: 43px;
+  }
+
+  .landing-hero-buttons {
+    display: grid;
+  }
+
+  .landing-primary-action,
+  .landing-call-action {
+    width: 100%;
+  }
+
+  .landing-promotion {
+    width: 100%;
+  }
+}
 </style>
-  <script type="module" crossorigin src="/assets/index-CrI1-BYY.js"></script>
+  <script type="module" crossorigin src="/assets/index-CRceTmKy.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
-  <link rel="modulepreload" crossorigin href="/assets/api-D_jplgHH.js">
+  <link rel="modulepreload" crossorigin href="/assets/api-DQxDmp8n.js">
 </head>
 <body data-boot="BOOTING">
 
-<!-- Boot veil. Replaced by the app, or by a recovery screen if boot fails. -->
-<div id="boot"><div class="boot-in"><div class="boot-mark">R2</div><div class="boot-txt">Loading your booking…</div></div></div>
-
-<header>
-  <div class="wrap hd">
-    <a class="logo" href="#top" data-action="scroll-book" aria-label="R2NETTE">
-      <img src="/assets/brand/r2nette-logo-white.svg" alt="R2NETTE Cleaning Services" class="logo-img"
-        onerror="this.style.display='none';this.nextElementSibling.hidden=false">
-      <span class="logo-wm" hidden>R2<em>NETTE</em></span>
+<header class="site-header">
+  <div class="landing-header">
+    <a class="landing-logo" href="#top" aria-label="R2NETTE home">
+      <img
+        src="/assets/brand/r2nette-logo-white.svg"
+        alt="R2NETTE"
+        class="landing-logo-image"
+      >
     </a>
-    <div class="hd-r">
-      <div class="lang" role="group" aria-label="Language">
-        <button type="button" data-action="set-locale" data-locale="en">EN</button>
-        <button type="button" data-action="set-locale" data-locale="fr">FR</button>
+
+    <nav class="desktop-navigation" aria-label="Main navigation">
+      <a href="#book" data-t="nav.services">Services</a>
+      <a href="#howItWorks" data-t="nav.how">How it works</a>
+      <a href="#reviewsSection" data-t="nav.reviews">Reviews</a>
+      <button type="button" data-action="open-help" data-t="nav.help">
+        Help
+      </button>
+      <a href="/auth" data-t="nav.account">Account</a>
+    </nav>
+
+    <div class="landing-header-actions">
+      <div class="landing-language" role="group" aria-label="Language">
+        <button
+          type="button"
+          data-action="set-locale"
+          data-locale="en"
+        >
+          EN
+        </button>
+
+        <span aria-hidden="true">|</span>
+
+        <button
+          type="button"
+          data-action="set-locale"
+          data-locale="fr"
+        >
+          FR
+        </button>
       </div>
-      <a class="icall" href="tel:+15148252825" aria-label="Call R2NETTE at 514 825 2825">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"/></svg>
+
+      <a
+        class="landing-phone"
+        href="tel:+15148252825"
+        aria-label="Call R2NETTE at 514 825 2825"
+      >
+        <span aria-hidden="true">☎</span>
+        <span>(514) 825-2825</span>
       </a>
+
+      <button
+        type="button"
+        class="landing-book-button"
+        data-action="scroll-book"
+        data-t="nav.book"
+      >
+        Book now
+      </button>
+
+      <button
+        type="button"
+        class="mobile-menu-button"
+        id="mobileMenuButton"
+        aria-label="Open navigation"
+        aria-expanded="false"
+        data-action="toggle-mobile-menu"
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
     </div>
   </div>
+
+  <nav
+    class="mobile-navigation"
+    id="mobileNavigation"
+    aria-label="Mobile navigation"
+    hidden
+  >
+    <a href="#book" data-t="nav.services">Services</a>
+    <a href="#howItWorks" data-t="nav.how">How it works</a>
+    <a href="#reviewsSection" data-t="nav.reviews">Reviews</a>
+    <button type="button" data-action="open-help" data-t="nav.help">
+      Help
+    </button>
+    <a href="/auth" data-t="nav.account">Account</a>
+    <a href="tel:+15148252825">(514) 825-2825</a>
+  </nav>
 </header>
 
 <main id="top">
-<!-- Every string below is real copy. i18n replaces it after boot; a JS
-     failure leaves a readable page, never empty pills. -->
-<section class="hero">
-  <div class="hero-art">
-    <div class="hero-photo" id="heroPhoto"></div>
-    <span class="bub" style="width:96px;height:96px;top:12%;right:-18px;animation-delay:0s"></span>
-    <span class="bub" style="width:54px;height:54px;top:30%;right:16%;animation-delay:2.4s"></span>
-    <span class="bub" style="width:30px;height:30px;top:22%;right:34%;animation-delay:4.1s"></span>
-    <span class="bub" style="width:70px;height:70px;bottom:26%;left:-22px;animation-delay:1.3s"></span>
-    <span class="bub" style="width:22px;height:22px;bottom:40%;left:22%;animation-delay:3.2s"></span>
-    <div class="hero-sky" aria-hidden="true">
-      <svg viewBox="0 0 1200 150" preserveAspectRatio="none"><g fill="currentColor">
-        <rect x="20" y="86" width="34" height="64"/><rect x="62" y="62" width="26" height="88"/>
-        <rect x="96" y="98" width="40" height="52"/><rect x="146" y="44" width="30" height="106"/>
-        <rect x="184" y="76" width="22" height="74"/><rect x="216" y="92" width="46" height="58"/>
-        <rect x="272" y="30" width="26" height="120"/><rect x="306" y="70" width="34" height="80"/>
-        <rect x="350" y="100" width="28" height="50"/><rect x="388" y="56" width="38" height="94"/>
-        <rect x="436" y="84" width="24" height="66"/><rect x="470" y="40" width="30" height="110"/>
-        <rect x="510" y="94" width="42" height="56"/><rect x="562" y="66" width="26" height="84"/>
-        <rect x="598" y="88" width="36" height="62"/><rect x="644" y="50" width="28" height="100"/>
-        <rect x="682" y="96" width="30" height="54"/><rect x="722" y="72" width="40" height="78"/>
-        <rect x="772" y="34" width="24" height="116"/><rect x="806" y="90" width="34" height="60"/>
-        <rect x="850" y="64" width="28" height="86"/><rect x="888" y="100" width="44" height="50"/>
-        <rect x="942" y="58" width="26" height="92"/><rect x="978" y="86" width="36" height="64"/>
-        <rect x="1024" y="46" width="30" height="104"/><rect x="1064" y="94" width="38" height="56"/>
-        <rect x="1112" y="74" width="24" height="76"/><rect x="1146" y="98" width="40" height="52"/>
-      </g></svg>
+<section class="landing-hero" id="top">
+  <div class="landing-hero-photo" id="heroPhoto" aria-hidden="true"></div>
+  <div class="landing-hero-overlay" aria-hidden="true"></div>
+
+  <div class="landing-hero-content">
+    <div class="landing-hero-copy">
+      <p class="landing-eyebrow" data-t="hero.badge">
+        Cleaner spaces. Brighter days. Montréal.
+      </p>
+
+      <h1>
+        <span data-t="hero.titleLine1">Your clean home is</span>
+        <strong data-t="hero.titleLine2">a few taps away.</strong>
+      </h1>
+
+      <p class="landing-hero-description" data-t="hero.sub">
+        Book professional cleaning without the phone tag.
+      </p>
+
+      <div class="landing-hero-buttons">
+        <button
+          type="button"
+          class="landing-primary-action"
+          data-action="scroll-book"
+        >
+          <span data-t="hero.cta">Book my cleaning</span>
+          <span aria-hidden="true">→</span>
+        </button>
+
+        <a
+          class="landing-call-action"
+          href="tel:+15148252825"
+        >
+          <span aria-hidden="true">☎</span>
+          <span data-t="hero.call">Call R2NETTE</span>
+        </a>
+      </div>
+
+      <div class="landing-promotion" id="promoCard" hidden>
+        <div class="landing-promotion-icon" aria-hidden="true">🎁</div>
+
+        <div>
+          <p class="landing-promotion-label" data-t="hero.offerLabel">
+            New client offer
+          </p>
+
+          <p class="landing-promotion-value">
+            <span data-t="hero.offerPrefix">Up to</span>
+            <strong id="promoValue">—</strong>
+            <span data-t="hero.offerSuffix">off your first clean</span>
+          </p>
+        </div>
+      </div>
+
+      <span id="ratingChip" hidden></span>
     </div>
   </div>
-  <div class="hero-in">
-    <span class="hero-badge"><span class="dot"></span><span data-t="hero.badge">Professional cleaning · Montréal</span></span>
-    <h1><span data-t="hero.title">A spotless home. Without the phone tag.</span></h1>
-    <p class="lede" data-t="hero.sub">Book your cleaning in minutes. See your exact price, taxes included, before you confirm.</p>
-    <div class="hero-cta">
-      <button class="btn btn-primary" data-action="scroll-book" data-t="hero.cta">Book my cleaning</button>
-      <a class="btn btn-ghost" href="tel:+15148252825" data-t="hero.call">Call (514) 825-2825</a>
-    </div>
-    <div class="promo" id="promoCard" hidden>
-      <span class="promo-tag">New client offer</span>
-      <div class="promo-amt"><span class="promo-up">Up to</span><b id="promoValue">—</b><span>off</span></div>
-      <div class="promo-sub">your first clean</div>
-      <span class="bub" style="width:56px;height:56px;top:-14px;right:-12px;animation-delay:.6s"></span>
-    </div>
-    <span id="ratingChip" hidden></span>
-    <div class="trust-row">
-      <span class="trust-chip" data-t="hero.trust1">Secure booking</span>
-      <span class="trust-chip" data-t="hero.trust2">Professional team</span>
-      <span class="trust-chip" data-t="hero.trust3">Transparent pricing</span>
+</section>
+
+<section class="landing-how" id="howItWorks">
+  <div class="landing-section-width">
+    <div class="landing-how-grid">
+      <div class="landing-how-heading">
+        <p class="landing-section-eyebrow" data-t="how.eyebrow">
+          How it works
+        </p>
+
+        <h2 data-t="how.title">
+          A professional cleaning in three simple steps.
+        </h2>
+      </div>
+
+      <article class="landing-how-step">
+        <span>1</span>
+        <div>
+          <h3 data-t="how.step1Title">Choose your clean</h3>
+          <p data-t="how.step1Body">
+            Select the service that fits your home.
+          </p>
+        </div>
+      </article>
+
+      <article class="landing-how-step">
+        <span>2</span>
+        <div>
+          <h3 data-t="how.step2Title">Pick a real time</h3>
+          <p data-t="how.step2Body">
+            See times that our cleaning team can actually work.
+          </p>
+        </div>
+      </article>
+
+      <article class="landing-how-step">
+        <span>3</span>
+        <div>
+          <h3 data-t="how.step3Title">We take care of it</h3>
+          <p data-t="how.step3Body">
+            Your professional cleaning team handles the rest.
+          </p>
+        </div>
+      </article>
     </div>
   </div>
 </section>
@@ -560,12 +1302,47 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
 </section>
 
 <section class="booking wrap" id="book">
-  <div class="phases">
-    <div class="phase on" data-phase="CLEAN" data-t="phase.clean">Clean</div>
-    <div class="phase" data-phase="HOME" data-t="phase.home">Home</div>
-    <div class="phase" data-phase="TIME" data-t="phase.time">Time</div>
-    <div class="phase" data-phase="CONFIRM" data-t="phase.confirm">Confirm</div>
-  </div>
+  <nav class="phases" aria-label="Booking progress">
+    <button
+      type="button"
+      class="phase on"
+      data-phase="CLEAN"
+      data-action="go-phase"
+      data-t="phase.clean"
+    >
+      Clean
+    </button>
+  
+    <button
+      type="button"
+      class="phase"
+      data-phase="HOME"
+      data-action="go-phase"
+      data-t="phase.home"
+    >
+      Home
+    </button>
+  
+    <button
+      type="button"
+      class="phase"
+      data-phase="TIME"
+      data-action="go-phase"
+      data-t="phase.time"
+    >
+      Time
+    </button>
+  
+    <button
+      type="button"
+      class="phase"
+      data-phase="CONFIRM"
+      data-action="go-phase"
+      data-t="phase.confirm"
+    >
+      Confirm
+    </button>
+  </nav>
   <div class="grid">
     <div>
       <div class="step on" data-step="service">
