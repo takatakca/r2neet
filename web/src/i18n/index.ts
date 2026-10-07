@@ -53,6 +53,9 @@ const en: Dict = {
   'nav.call': 'Call',
   'nav.account': 'Account',
   'nav.book': 'Book now',
+  'pwa.install': 'Install app',
+  'pwa.iosTitle': 'Add R2NETTE to your Home Screen',
+  'pwa.iosInstructions': 'In Safari, tap Share, then choose Add to Home Screen.',
 
   'hero.badge': 'Cleaner spaces. Brighter days. Montréal.',
   'hero.title': 'Your clean home is a few taps away.',
@@ -377,6 +380,9 @@ const fr: Dict = {
   'nav.call': 'Appeler',
   'nav.account': 'Compte',
   'nav.book': 'Réserver',
+  'pwa.install': 'Installer l’application',
+  'pwa.iosTitle': 'Ajouter R2NETTE à votre écran d’accueil',
+  'pwa.iosInstructions': 'Dans Safari, touchez Partager, puis Ajouter à l’écran d’accueil.',
 
   'hero.badge': 'Des espaces propres. Des jours plus lumineux. Montréal.',
   'hero.title': 'Votre maison propre est à quelques clics.',

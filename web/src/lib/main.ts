@@ -96,6 +96,70 @@ const $ = (id: string) => document.getElementById(id);
 
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
+
+let pendingInstallPrompt: InstallPromptEvent | null = null;
+
+function isStandalone(): boolean {
+  return (
+    matchMedia('(display-mode: standalone)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+}
+
+function showInstallButtons(show: boolean): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-action="install-app"]').forEach((button) => {
+    button.hidden = !show;
+  });
+}
+
+function setupInstallExperience(): void {
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    void navigator.serviceWorker.register('/sw.js').catch((error: unknown) => {
+      console.warn('[r2nette] app-shell caching is unavailable', error);
+    });
+  }
+
+  if (isStandalone()) return;
+
+  const isIos =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  showInstallButtons(isIos);
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    pendingInstallPrompt = event as InstallPromptEvent;
+    showInstallButtons(true);
+  });
+
+  window.addEventListener('appinstalled', () => {
+    pendingInstallPrompt = null;
+    showInstallButtons(false);
+  });
+}
+
+async function installApp(): Promise<void> {
+  if (pendingInstallPrompt) {
+    const prompt = pendingInstallPrompt;
+    pendingInstallPrompt = null;
+    await prompt.prompt();
+    const result = await prompt.userChoice;
+    showInstallButtons(result.outcome !== 'accepted');
+    return;
+  }
+
+  if (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  ) {
+    openSheet(`<h2>${esc(t('pwa.iosTitle'))}</h2><p class="s">${esc(t('pwa.iosInstructions'))}</p>`);
+  }
+}
+
 /**
  * Roll a money value from its previous number to the new one.
  *
@@ -1185,6 +1249,8 @@ function render(): void {
 /* ------------------------------------------------------------------ */
 
 const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
+  'install-app': () => installApp(),
+
   'set-locale': (el) => {
     locale = el.dataset.locale as Locale;
     persistLocale(locale);
@@ -1664,6 +1730,7 @@ async function onAddressType(value: string): Promise<void> {
 export async function boot(): Promise<void> {
   installErrorBoundary();
   installDelegation();
+  setupInstallExperience();
   setBoot('BOOTING');
   applyLocale();
 
