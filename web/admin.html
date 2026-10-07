@@ -1061,7 +1061,8 @@ function route(){
   const id = (location.hash || '#dashboard').slice(1);
   for(const el of document.querySelectorAll('.page')) el.classList.toggle('on', el.id === id);
   for(const a of document.querySelectorAll('nav.side a')) a.classList.toggle('on', a.dataset.nav === id);
-  (PAGES[id] || dashboard)();
+  const page = Object.prototype.hasOwnProperty.call(PAGES, id) ? PAGES[id] : dashboard;
+  page();
 }
 window.addEventListener('hashchange', route);
 

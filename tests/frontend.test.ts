@@ -468,6 +468,16 @@ describe('installable app shell', () => {
     }
   });
 
+  describe('admin page routing', () => {
+    it('only dispatches routes explicitly defined in the page map', () => {
+      const admin = readFileSync(new URL('../web/admin.html', import.meta.url), 'utf8');
+
+      expect(admin).toContain('Object.prototype.hasOwnProperty.call(PAGES, id)');
+      expect(admin).toContain('const page = Object.prototype.hasOwnProperty.call(PAGES, id) ? PAGES[id] : dashboard;');
+      expect(admin).not.toContain('(PAGES[id] || dashboard)()');
+    });
+  });
+
   it('keeps API and identity routes network-only in the service worker', () => {
     expect(worker).toContain('const NETWORK_ONLY_PATH = /^\\/(?:api\\/|auth');
     expect(worker).toContain("if (url.origin !== self.location.origin || NETWORK_ONLY_PATH.test(url.pathname)) return;");
