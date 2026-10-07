@@ -52,7 +52,6 @@ describe('TAKATAK Supabase Google auth provider', () => {
     const authorize = new URL(
       provider.authorizationUrl(
         'https://r2nette.ca',
-        'opaque-state',
         'pkce-challenge',
       ),
     );
@@ -65,7 +64,7 @@ describe('TAKATAK Supabase Google auth provider', () => {
     expect(authorize.searchParams.get('code_challenge_method')).toBe('s256');
     expect(callback.origin).toBe('https://r2nette.ca');
     expect(callback.pathname).toBe('/api/v1/auth/google/callback');
-    expect(callback.searchParams.get('state')).toBe('opaque-state');
+    expect(callback.search).toBe('');
   });
 
   it('exchanges PKCE codes using only the Supabase anon key', async () => {
@@ -131,8 +130,8 @@ describe('TAKATAK Supabase Google auth provider', () => {
 
     await expect(provider.exchangeCode('code', 'verifier')).rejects.toEqual(
       expect.objectContaining({
-        code: 'GOOGLE_AUTH_DENIED',
-        message: 'Google sign-in could not be completed.',
+        code: 'GOOGLE_AUTH_PROVIDER_UNAVAILABLE',
+        message: 'TAKATAK Google authentication is temporarily unavailable.',
       }),
     );
 

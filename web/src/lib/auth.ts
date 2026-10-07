@@ -348,7 +348,10 @@ function initializeLoginPage(): void {
 
       sessionStorage.setItem('r2nette.authPhone', phone);
 
-      sessionStorage.setItem('r2nette.authIntent', intent);
+      sessionStorage.setItem(
+        'r2nette.authIntent',
+        googleLinkFlow ? 'google' : intent,
+      );
 
       sessionStorage.setItem('r2nette.maskedPhone', result.maskedPhone);
 

@@ -8,7 +8,6 @@ export interface GoogleAuthProvider {
   readonly configured: boolean;
   authorizationUrl(
     publicUrl: string,
-    state: string,
     codeChallenge: string,
   ): string;
   exchangeCode(code: string, codeVerifier: string): Promise<GoogleAuthIdentity>;
@@ -48,7 +47,6 @@ export class SupabaseGoogleAuthProvider implements GoogleAuthProvider {
 
   authorizationUrl(
     publicUrl: string,
-    state: string,
     codeChallenge: string,
   ): string {
     if (!this.configured || !this.url) {
@@ -57,9 +55,7 @@ export class SupabaseGoogleAuthProvider implements GoogleAuthProvider {
         'GOOGLE_AUTH_NOT_CONFIGURED',
       );
     }
-
     const callback = new URL('/api/v1/auth/google/callback', publicUrl);
-    callback.searchParams.set('state', state);
     const authorize = new URL(`${this.url}/auth/v1/authorize`);
     authorize.searchParams.set('provider', 'google');
     authorize.searchParams.set('redirect_to', callback.toString());
@@ -104,6 +100,12 @@ export class SupabaseGoogleAuthProvider implements GoogleAuthProvider {
       );
     }
 
+    if (response.status >= 500) {
+      throw new IdentityError(
+        'TAKATAK Google authentication is temporarily unavailable.',
+        'GOOGLE_AUTH_PROVIDER_UNAVAILABLE',
+      );
+    }
     if (!response.ok) {
       throw new IdentityError(
         'Google sign-in could not be completed.',

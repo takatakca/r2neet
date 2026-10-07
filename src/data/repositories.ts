@@ -150,9 +150,9 @@ export const INTEGRATIONS: IntegrationDescriptor[] = [
   },
   {
     key: 'takatak_auth',
-    label: 'TAKATAK Auth (Supabase Phone Auth / Twilio SMS)',
+    label: 'TAKATAK Auth (Supabase Phone/Twilio + Google)',
     requiredEnv: ['TAKATAK_SUPABASE_URL', 'TAKATAK_SUPABASE_ANON_KEY'],
-    blocks: 'Customer phone verification and returning-customer recognition',
+    blocks: 'Customer phone verification and Google account sign-in',
   },
   {
     key: 'twilio_voice',

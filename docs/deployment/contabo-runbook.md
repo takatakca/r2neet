@@ -68,8 +68,20 @@ Customer phone OTP is verified by TAKATAK's Supabase Auth project. Configure
 Phone Auth and its Twilio SMS provider in that Supabase project's
 **Authentication → Providers → Phone** settings. R2NETTE only receives the
 project URL and anon key; do not add a Supabase service-role key to R2NETTE.
-The customer session and booking data remain in R2NETTE. Staff sign-in remains
-separate and is not delegated to customer phone Auth.
+For Google sign-in, enable **Authentication → Providers → Google** in the same
+TAKATAK Supabase project and configure its Google OAuth client there. Add
+`https://r2nette.ca/api/v1/auth/google/callback` (or the production URL from
+`PUBLIC_URL`) to Supabase's allowed redirect URLs. In Google Cloud, the
+authorized redirect URI is Supabase's provider callback
+`https://<project-ref>.supabase.co/auth/v1/callback`, not the R2NETTE callback.
+No Google client secret or Supabase service-role key belongs in R2NETTE.
+
+R2NETTE links a Google subject only after the customer verifies their R2NETTE
+phone by OTP the first time. Later Google sign-ins use that verified link to
+issue an R2NETTE customer session. Existing customers are never matched by
+email. Google provides sign-in identity only; it does not grant access to
+TAKATAK's other products or tenant data. The customer session, profile, and
+booking data remain in R2NETTE. Staff sign-in remains separate.
 
 **2. Run the workflows.** For each, open **Actions → (workflow) → Run
 workflow**, keep the branch on `main`, and run them in this order:
@@ -646,6 +658,7 @@ Run this against the live HTTPS domain. Do not send a real charge or a mass SMS.
 - [ ] The homepage loads over HTTPS, and `www.` redirects to the bare domain.
 - [ ] `/login` shows Login and Sign-up.
 - [ ] A real phone receives and verifies a sign-in code through TAKATAK Supabase Auth and its Twilio SMS provider.
+- [ ] Google sign-in returns to the exact R2NETTE callback, then requires OTP verification of the R2NETTE phone before linking or creating a customer.
 - [ ] Sending a code says the same thing whether or not the number has an account.
 - [ ] After the code, an unknown number on Login gets the sign-up guidance, and an existing number on Sign-up gets the login guidance.
 - [ ] Completing sign-up creates the customer and signs them in.
@@ -671,8 +684,13 @@ These need your accounts. They are not in this repository and nobody has done th
 6. Create the owner account interactively (step 8).
 7. Set `TAKATAK_SUPABASE_URL` and `TAKATAK_SUPABASE_ANON_KEY` in the GitHub
    `production` environment, and configure Phone Auth with Twilio in the same
-   TAKATAK Supabase project. Run **Server setup**, then **Deploy**. Do not use a
-   Supabase service-role key.
+   TAKATAK Supabase project. To enable Google sign-in, configure the Google
+   provider in that project's Supabase Auth settings and allow
+   `https://r2nette.ca/api/v1/auth/google/callback` as a redirect URL. Google
+   Cloud must authorize the Supabase provider callback
+   `https://<project-ref>.supabase.co/auth/v1/callback`. Run **Server setup**,
+   then **Deploy**. Do not use a Supabase service-role key or put Google OAuth
+   credentials in R2NETTE.
 8. Publish the **Terms of Service and Privacy Policy** at `/terms` and `/privacy`
    before launch. The sign-up form links to both pages and records that each
    customer accepted version `2026-09-16` of them, but those pages are not in this

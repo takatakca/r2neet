@@ -634,7 +634,7 @@ export function createApi(deps: ApiDeps) {
         .digest('base64url');
       const expiresAt = new Date(now().getTime() + GOOGLE_OAUTH_TTL_MS);
 
-      const authorizeUrl = googleAuth.authorizationUrl(origin, state, challenge);
+      const authorizeUrl = googleAuth.authorizationUrl(origin, challenge);
       await prisma.googleAuthTransaction.create({
         data: {
           stateHash: tokenHash(state),
@@ -644,6 +644,7 @@ export function createApi(deps: ApiDeps) {
       });
 
       const secure = process.env.NODE_ENV === 'production';
+      res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
       res.cookie(GOOGLE_STATE_COOKIE, state, {
         httpOnly: true,
         secure,
@@ -669,8 +670,6 @@ export function createApi(deps: ApiDeps) {
         res.clearCookie(GOOGLE_STATE_COOKIE, { path: '/api/v1/auth/google' });
         res.clearCookie(GOOGLE_VERIFIER_COOKIE, { path: '/api/v1/auth/google' });
       };
-      const state =
-        typeof req.query.state === 'string' ? req.query.state : undefined;
       const code = typeof req.query.code === 'string' ? req.query.code : undefined;
       const stateCookie = req.cookies?.[GOOGLE_STATE_COOKIE] as
         | string
@@ -679,15 +678,16 @@ export function createApi(deps: ApiDeps) {
         | string
         | undefined;
 
-      if (req.query.error || !state || !code || !stateCookie || !verifier || state !== stateCookie) {
+      if (req.query.error || !stateCookie || !code || !verifier) {
         clearOAuthCookies();
+        res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
         res.redirect('/login?google=error');
         return;
       }
 
       try {
         const transaction = await prisma.googleAuthTransaction.findUnique({
-          where: { stateHash: tokenHash(state) },
+          where: { stateHash: tokenHash(stateCookie) },
         });
         const stateStillFresh =
           transaction &&
@@ -702,6 +702,49 @@ export function createApi(deps: ApiDeps) {
         }
 
         const identity = await googleAuth.exchangeCode(code, verifier);
+        const origin = oauthOrigin();
+        const existingCustomer = await prisma.customer.findUnique({
+          where: { googleAuthSubject: identity.subject },
+          select: { id: true },
+        });
+        if (existingCustomer) {
+          const at = now();
+          const claimed = await prisma.googleAuthTransaction.updateMany({
+            where: {
+              id: transaction.id,
+              googleAuthSubject: null,
+              linkTokenHash: null,
+              completedAt: null,
+              expiresAt: { gt: at },
+            },
+            data: {
+              googleAuthSubject: identity.subject,
+              completedAt: at,
+            },
+          });
+          if (claimed.count !== 1) {
+            clearOAuthCookies();
+            res.redirect('/login?google=error');
+            return;
+          }
+
+          const session = await sessions.create(existingCustomer.id, {
+            userAgent: req.header('user-agent') ?? undefined,
+            ip: req.ip ?? undefined,
+          });
+          clearOAuthCookies();
+          res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+          res.cookie(SESSION_COOKIE, session.token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
+            expires: session.expiresAt,
+          });
+          res.redirect(new URL(transaction.returnTo, origin).toString());
+          return;
+        }
+
         const linkToken = randomBytes(32).toString('base64url');
         const claimed = await prisma.googleAuthTransaction.updateMany({
           where: {
@@ -731,7 +774,6 @@ export function createApi(deps: ApiDeps) {
           expires: transaction.expiresAt,
         });
 
-        const origin = oauthOrigin();
         const loginUrl = new URL('/login', origin);
         loginUrl.searchParams.set('google', 'phone');
         loginUrl.searchParams.set('returnTo', transaction.returnTo);
@@ -748,6 +790,11 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/auth/phone/send',
     wrap(async (req, res) => {
       const { phone, intent } = phoneSchema.parse(req.body);
+      if (intent === 'google') {
+        await pendingGoogleLink(
+          req.cookies?.[GOOGLE_LINK_COOKIE] as string | undefined,
+        );
+      }
       const phoneE164 = normalizePhone(phone);
 
       // Deliberately no account lookup here. Answering "no account" or
