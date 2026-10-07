@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+
+    <meta name="theme-color" content="#082f5a" />
+
+    <title>Login or Sign up — R2NETTE</title>
+
+    <link rel="icon" href="/assets/brand/icon.svg" type="image/svg+xml" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Instrument+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <script type="module" crossorigin src="/assets/modulepreload-polyfill-B5Qt9EMX.js"></script>
+    <script type="module" crossorigin src="/assets/auth-DkMsATYD.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/auth-wxq1PqDH.css">
+  </head>
+
+  <body data-auth-page="login">
+    <main class="auth-layout">
+      <aside class="auth-scene auth-scene-left">
+        <div class="auth-scene-copy">
+          <p class="auth-scene-title">
+            A cleaner Montréal<br />
+            for brighter<br />
+            tomorrows.
+          </p>
+
+          <span class="gold-line"></span>
+
+          <p>
+            Residential &amp; commercial<br />
+            cleaning services.
+          </p>
+        </div>
+      </aside>
+
+      <section class="auth-card">
+        <div class="language">
+          <button id="languageEnglish" type="button" aria-pressed="true">
+            EN
+          </button>
+
+          <span aria-hidden="true">|</span>
+
+          <button id="languageFrench" type="button" aria-pressed="false">
+            FR
+          </button>
+        </div>
+
+        <a class="brand" href="/" aria-label="R2NETTE home">
+          <img src="/assets/brand/r2nette-logo.svg" alt="R2NETTE" />
+        </a>
+
+        <div class="auth-toggle" role="tablist" aria-label="Account access">
+          <button
+            class="auth-toggle-option"
+            id="loginToggle"
+            type="button"
+            role="tab"
+            aria-controls="authPanel"
+            aria-selected="true"
+            tabindex="0"
+          >
+            LOGIN
+          </button>
+
+          <button
+            class="auth-toggle-option"
+            id="signupToggle"
+            type="button"
+            role="tab"
+            aria-controls="authPanel"
+            aria-selected="false"
+            tabindex="-1"
+          >
+            SIGN UP
+          </button>
+        </div>
+
+        <div
+          class="auth-content"
+          id="authPanel"
+          role="tabpanel"
+          aria-labelledby="loginToggle"
+        >
+          <h1 id="authTitle">Welcome back</h1>
+
+          <p class="lead" id="authDescription">
+            Enter your mobile number to access your account.
+          </p>
+
+          <form id="phoneForm" novalidate>
+            <div class="field">
+              <label id="phoneLabel" for="phone"> Mobile number </label>
+
+              <input
+                class="input"
+                id="phone"
+                name="phone"
+                type="tel"
+                inputmode="tel"
+                autocomplete="tel"
+                placeholder="(514) 825-2825"
+                aria-describedby="error"
+                required
+              />
+            </div>
+
+            <div
+              class="error"
+              id="error"
+              role="alert"
+              aria-live="polite"
+              hidden
+            ></div>
+
+            <button
+              class="mode-suggestion"
+              id="suggestedModeButton"
+              type="button"
+              hidden
+            >
+              Go to Sign up
+            </button>
+
+            <button class="primary-button" id="submitButton" type="submit">
+              <span id="submitLabel"> Send login code </span>
+
+              <span aria-hidden="true">→</span>
+            </button>
+          </form>
+
+          <p class="auth-divider" id="googleLinkNotice" role="status" hidden>
+            Google is verified. Verify your mobile number to connect it to your
+            R2NETTE account.
+          </p>
+
+          <a
+            class="secondary-button"
+            id="googleSignInButton"
+            href="/api/v1/auth/google/start"
+          >
+            <span aria-hidden="true">G</span>
+            Continue with Google
+          </a>
+        </div>
+
+        <div class="footer-links">
+          <a href="/privacy"> Privacy </a>
+
+          <a href="tel:+15148252825"> Need help? </a>
+        </div>
+
+        <div class="skyline" aria-hidden="true"></div>
+
+        <p class="tagline">
+          A CLEANER MONTRÉAL<br />
+          BRIGHTER DAYS
+        </p>
+      </section>
+
+      <aside class="auth-scene auth-scene-right">
+        <div class="auth-scene-copy">
+          <p class="auth-scene-title">
+            Cleaner spaces.<br />
+            Brighter days.
+          </p>
+
+          <span class="gold-line"></span>
+
+          <p>
+            Trusted professional cleaning<br />
+            across Montréal.
+          </p>
+        </div>
+      </aside>
+
+      <section class="trust-bar">
+        <article>
+          <strong>Verified mobile identity</strong>
+          <span>Safe. Simple. Secure.</span>
+        </article>
+
+        <article>
+          <strong>Trusted professional cleaners</strong>
+          <span>For a healthier home.</span>
+        </article>
+
+        <article>
+          <strong>Proudly local</strong>
+          <span>Montréal.</span>
+        </article>
+
+        <article>
+          <strong>More time for what matters</strong>
+          <span>A cleaner, brighter you.</span>
+        </article>
+      </section>
+    </main>
+
+  </body>
+</html>
