@@ -419,7 +419,10 @@ describe('landing page discovery metadata', () => {
     expect(html).toContain('<link rel="canonical" href="https://r2nette.ca/">');
     expect(html).toContain('<meta property="og:url" content="https://r2nette.ca/">');
     expect(html).toContain('<meta property="og:image" content="https://r2nette.ca/assets/hero.jpg">');
+    expect(html).toContain('<meta property="og:image:width" content="1774">');
+    expect(html).toContain('<meta property="og:image:height" content="887">');
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
+    expect(html).toContain('<link rel="preload" as="image" href="/assets/hero.jpg" fetchpriority="high">');
   });
 
   it('publishes the canonical public URL and excludes private paths from crawling', () => {
