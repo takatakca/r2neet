@@ -434,6 +434,50 @@ describe('landing page discovery metadata', () => {
   });
 });
 
+describe('installable app shell', () => {
+  const html = readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+  const manifest = JSON.parse(
+    readFileSync(new URL('../web/public/manifest.webmanifest', import.meta.url), 'utf8'),
+  ) as {
+    display: string;
+    start_url: string;
+    icons: { sizes: string; purpose: string; src: string }[];
+  };
+  const worker = readFileSync(new URL('../web/public/sw.js', import.meta.url), 'utf8');
+
+  it('links the install manifest and platform home-screen icon', () => {
+    expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest">');
+    expect(html).toContain('<link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png">');
+    expect(manifest.display).toBe('standalone');
+    expect(manifest.start_url).toBe('/?source=installed-app');
+    expect(manifest.icons).toContainEqual(
+      expect.objectContaining({ sizes: '192x192', purpose: 'any', src: '/assets/brand/pwa-icon-192.png' }),
+    );
+    expect(manifest.icons).toContainEqual(
+      expect.objectContaining({
+        sizes: '512x512',
+        purpose: 'maskable',
+        src: '/assets/brand/pwa-icon-maskable-512.png',
+      }),
+    );
+    for (const icon of manifest.icons) {
+      if (icon.src.endsWith('.png')) {
+        expect(readFileSync(new URL(`../web/public${icon.src}`, import.meta.url)).subarray(0, 8))
+          .toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      }
+    }
+  });
+
+  it('keeps API and identity routes network-only in the service worker', () => {
+    expect(worker).toContain('const NETWORK_ONLY_PATH = /^\\/(?:api\\/|auth');
+    expect(worker).toContain("if (url.origin !== self.location.origin || NETWORK_ONLY_PATH.test(url.pathname)) return;");
+    expect(worker).toContain("fetch(request).catch(async () => (await caches.match(APP_SHELL_URL))");
+    expect(worker).toContain('OFFLINE_URL');
+    expect(readFileSync(new URL('../web/public/offline.html', import.meta.url), 'utf8'))
+      .toContain('Reconnect to the internet');
+  });
+});
+
 describe('backend confirmation wait', () => {
   const noSleep = async () => undefined;
 
