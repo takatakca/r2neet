@@ -4,9 +4,49 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#07283F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="R2NETTE">
 <title>Book a cleaning — R2NETTE Montréal</title>
 <meta name="description" content="Book professional home cleaning in Montréal. See your exact price with tax before you confirm.">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://r2nette.ca/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="R2NETTE">
+<meta property="og:locale" content="en_CA">
+<meta property="og:locale:alternate" content="fr_CA">
+<meta property="og:title" content="Book a cleaning — R2NETTE Montréal">
+<meta property="og:description" content="Book professional home cleaning in Montréal. See your exact price with tax before you confirm.">
+<meta property="og:url" content="https://r2nette.ca/">
+<meta property="og:image" content="https://r2nette.ca/assets/hero.jpg">
+<meta property="og:image:width" content="1774">
+<meta property="og:image:height" content="887">
+<meta property="og:image:alt" content="R2NETTE professional home cleaning in Montréal">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Book a cleaning — R2NETTE Montréal">
+<meta name="twitter:description" content="Book professional home cleaning in Montréal. See your exact price with tax before you confirm.">
+<meta name="twitter:image" content="https://r2nette.ca/assets/hero.jpg">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CleaningService",
+  "name": "R2NETTE",
+  "url": "https://r2nette.ca/",
+  "image": "https://r2nette.ca/assets/hero.jpg",
+  "logo": "https://r2nette.ca/assets/brand/r2nette-logo.svg",
+  "telephone": "+1-514-825-2825",
+  "description": "Professional home cleaning in Montréal, Laval and surrounding areas.",
+  "areaServed": [
+    { "@type": "City", "name": "Montréal" },
+    { "@type": "City", "name": "Laval" }
+  ],
+  "serviceType": "Home cleaning"
+}
+</script>
 <link rel="icon" href="/assets/brand/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="preload" as="image" href="/assets/hero.jpg" fetchpriority="high">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -650,6 +690,10 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
   text-decoration: none;
 }
 
+.pwa-install[hidden] {
+  display: none;
+}
+
 /* Hero */
 
 .landing-hero {
@@ -1113,6 +1157,7 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
       <button type="button" data-action="open-help" data-t="nav.help">
         Help
       </button>
+      <button type="button" data-action="install-app" class="pwa-install" hidden data-t="pwa.install">Install app</button>
       <a href="/auth" data-t="nav.account">Account</a>
     </nav>
 
@@ -1182,6 +1227,7 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
     <button type="button" data-action="open-help" data-t="nav.help">
       Help
     </button>
+    <button type="button" data-action="install-app" class="pwa-install" hidden data-t="pwa.install">Install app</button>
     <a href="/auth" data-t="nav.account">Account</a>
     <a href="tel:+15148252825">(514) 825-2825</a>
   </nav>

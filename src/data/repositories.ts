@@ -149,10 +149,10 @@ export const INTEGRATIONS: IntegrationDescriptor[] = [
     blocks: 'Card payment, Apple Pay, Google Pay, Link, saved cards, recurring charges',
   },
   {
-    key: 'twilio_verify',
-    label: 'Twilio Verify (SMS codes)',
-    requiredEnv: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_VERIFY_SERVICE_SID'],
-    blocks: 'Phone verification and returning-customer recognition',
+    key: 'takatak_auth',
+    label: 'TAKATAK Auth (Supabase Phone/Twilio + Google)',
+    requiredEnv: ['TAKATAK_SUPABASE_URL', 'TAKATAK_SUPABASE_ANON_KEY'],
+    blocks: 'Customer phone verification and Google account sign-in',
   },
   {
     key: 'twilio_voice',

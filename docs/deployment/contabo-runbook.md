@@ -53,13 +53,35 @@ secrets**, choose **Add environment secret** once per name:
 | `MOCHAHOST_CPANEL_TOKEN` | cPanel → **Security → Manage API Tokens → Create**. Name it `r2nette-dns` and copy the token it shows once | DNS |
 | `CONTABO_SSH_ADMIN_USER` | Only when the server refuses root logins (`PermitRootLogin no`): the account `CONTABO_ROOT_SSH_KEY` logs in as, which must be able to use `sudo` without a password. On a Coolify server it is the account Coolify uses; its **Terminal** prompt shows it as `user@server` | when root login is off |
 | `CONTABO_SSH_PORT` | Only if SSH is not on port 22 | optional |
+| `TAKATAK_SUPABASE_URL` | The HTTPS project URL for the same Supabase project used by TAKATAK V1 | customer sign-in |
+| `TAKATAK_SUPABASE_ANON_KEY` | That project's anon/publishable key only; never use its service-role/secret key | customer sign-in |
 
 Provider keys can be added the same way whenever you have them, and **Server
-setup** copies each one it finds into the server's `.env`: `TWILIO_ACCOUNT_SID`,
-`TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID`, `STRIPE_SECRET_KEY`,
+setup** copies each one it finds into the server's `.env`: `TAKATAK_SUPABASE_URL`,
+`TAKATAK_SUPABASE_ANON_KEY`, `TWILIO_ACCOUNT_SID`,
+`TWILIO_AUTH_TOKEN`, `STRIPE_SECRET_KEY`,
 `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `GOOGLE_MAPS_API_KEY`,
 `EMAIL_API_URL`, `EMAIL_API_KEY`, `EMAIL_FROM`, `BACKUP_S3_*`, `ALERT_WEBHOOK_*`.
 After adding one, run **Server setup** again, then **Deploy**.
+
+Customer phone OTP is verified by TAKATAK's Supabase Auth project. Configure
+Phone Auth and its Twilio SMS provider in that Supabase project's
+**Authentication → Providers → Phone** settings. R2NETTE only receives the
+project URL and anon key; do not add a Supabase service-role key to R2NETTE.
+For Google sign-in, enable **Authentication → Providers → Google** in the same
+TAKATAK Supabase project and configure its Google OAuth client there. Add
+`https://r2nette.ca/api/v1/auth/google/callback` (or the production URL from
+`PUBLIC_URL`) to Supabase's allowed redirect URLs. In Google Cloud, the
+authorized redirect URI is Supabase's provider callback
+`https://<project-ref>.supabase.co/auth/v1/callback`, not the R2NETTE callback.
+No Google client secret or Supabase service-role key belongs in R2NETTE.
+
+R2NETTE links a Google subject only after the customer verifies their R2NETTE
+phone by OTP the first time. Later Google sign-ins use that verified link to
+issue an R2NETTE customer session. Existing customers are never matched by
+email. Google provides sign-in identity only; it does not grant access to
+TAKATAK's other products or tenant data. The customer session, profile, and
+booking data remain in R2NETTE. Staff sign-in remains separate.
 
 **2. Run the workflows.** For each, open **Actions → (workflow) → Run
 workflow**, keep the branch on `main`, and run them in this order:
@@ -557,11 +579,11 @@ until the provider accepts the URL and a real callback has been verified.
 | Stripe | `https://yourdomain.com/api/v1/stripe/webhook` | Required before any live secret key. Put the signing secret in `STRIPE_WEBHOOK_SECRET`; a Stripe key without it is refused. |
 | Twilio Voice, staff leg | `https://yourdomain.com/api/v1/voice/staff/{callbackId}` | The dialler builds this URL. |
 | Twilio Voice, customer leg | `https://yourdomain.com/api/v1/voice/customer/{callbackId}` | The dialler builds this URL. |
-| Twilio Verify | none | The app calls Twilio; Verify does not call back. |
+| TAKATAK Supabase Auth | none | R2NETTE calls the shared Supabase Auth OTP API; Supabase delivers messages through its configured Twilio provider. |
 
-Customer sign-in needs **Twilio Verify** (`TWILIO_ACCOUNT_SID`,
-`TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID`). Without it, nobody can
-receive a code, so set it up before you announce the site.
+Customer sign-in needs the production TAKATAK Supabase URL and anon key, plus
+working Phone Auth/Twilio settings in the TAKATAK Supabase project. Production
+startup refuses to serve with these credentials missing.
 
 ## Database and backups
 
@@ -635,7 +657,8 @@ Run this against the live HTTPS domain. Do not send a real charge or a mass SMS.
 
 - [ ] The homepage loads over HTTPS, and `www.` redirects to the bare domain.
 - [ ] `/login` shows Login and Sign-up.
-- [ ] A real phone receives a sign-in code, so Twilio Verify is set up.
+- [ ] A real phone receives and verifies a sign-in code through TAKATAK Supabase Auth and its Twilio SMS provider.
+- [ ] Google sign-in returns to the exact R2NETTE callback, then requires OTP verification of the R2NETTE phone before linking or creating a customer.
 - [ ] Sending a code says the same thing whether or not the number has an account.
 - [ ] After the code, an unknown number on Login gets the sign-up guidance, and an existing number on Sign-up gets the login guidance.
 - [ ] Completing sign-up creates the customer and signs them in.
@@ -659,9 +682,15 @@ These need your accounts. They are not in this repository and nobody has done th
 4. Create the deploy key, the `production` environment and its secrets in GitHub (step 5).
 5. Change the DNS records in MochaHost's Zone Editor, email records first (step 6).
 6. Create the owner account interactively (step 8).
-7. Set up **Twilio Verify** and enter `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and
-   `TWILIO_VERIFY_SERVICE_SID` in `/opt/r2nette/.env`. Sign-in codes need it;
-   without it nobody can sign in.
+7. Set `TAKATAK_SUPABASE_URL` and `TAKATAK_SUPABASE_ANON_KEY` in the GitHub
+   `production` environment, and configure Phone Auth with Twilio in the same
+   TAKATAK Supabase project. To enable Google sign-in, configure the Google
+   provider in that project's Supabase Auth settings and allow
+   `https://r2nette.ca/api/v1/auth/google/callback` as a redirect URL. Google
+   Cloud must authorize the Supabase provider callback
+   `https://<project-ref>.supabase.co/auth/v1/callback`. Run **Server setup**,
+   then **Deploy**. Do not use a Supabase service-role key or put Google OAuth
+   credentials in R2NETTE.
 8. Publish the **Terms of Service and Privacy Policy** at `/terms` and `/privacy`
    before launch. The sign-up form links to both pages and records that each
    customer accepted version `2026-09-16` of them, but those pages are not in this

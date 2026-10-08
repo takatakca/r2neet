@@ -32,7 +32,8 @@ type VerifyCodeResponse =
   | { outcome: 'PROFILE_REQUIRED'; intent: AuthIntent };
 
 type AuthPage = 'login' | 'verify' | 'signup';
-type AuthIntent = 'login' | 'signup';
+type AuthMode = 'login' | 'signup';
+type AuthIntent = AuthMode | 'google';
 
 const page = document.body.dataset.authPage as AuthPage | undefined;
 
@@ -71,7 +72,8 @@ function showErrorWithLink(message: string, href: string, linkText: string): voi
 
 /** The mode chosen on the login page, carried to /verify and the resend button. */
 function storedIntent(): AuthIntent {
-  return sessionStorage.getItem('r2nette.authIntent') === 'signup' ? 'signup' : 'login';
+  const intent = sessionStorage.getItem('r2nette.authIntent');
+  return intent === 'signup' || intent === 'google' ? intent : 'login';
 }
 
 function safeReturnPath(): string {
@@ -200,12 +202,16 @@ function initializeLoginPage(): void {
   const authDescription = element<HTMLElement>('authDescription');
 
   const suggestedModeButton = element<HTMLButtonElement>('suggestedModeButton');
+  const googleSignInButton = element<HTMLAnchorElement>('googleSignInButton');
+  const googleLinkNotice = element<HTMLElement>('googleLinkNotice');
 
-  const requestedMode = new URLSearchParams(window.location.search).get('mode');
+  const query = new URLSearchParams(window.location.search);
+  const requestedMode = query.get('mode');
+  const googleLinkFlow = query.get('google') === 'phone';
 
-  let intent: AuthIntent = requestedMode === 'signup' ? 'signup' : 'login';
+  let intent: AuthMode = requestedMode === 'signup' ? 'signup' : 'login';
 
-  function copyForMode(mode: AuthIntent): {
+  function copyForMode(mode: AuthMode): {
     title: string;
     description: string;
     submit: string;
@@ -235,7 +241,7 @@ function initializeLoginPage(): void {
     };
   }
 
-  function setMode(mode: AuthIntent): void {
+  function setMode(mode: AuthMode): void {
     intent = mode;
 
     const loginActive = mode === 'login';
@@ -301,7 +307,7 @@ function initializeLoginPage(): void {
   });
 
   suggestedModeButton.addEventListener('click', () => {
-    const suggestedMode: AuthIntent = intent === 'login' ? 'signup' : 'login';
+    const suggestedMode: AuthMode = intent === 'login' ? 'signup' : 'login';
 
     setMode(suggestedMode);
 
@@ -335,14 +341,17 @@ function initializeLoginPage(): void {
           method: 'POST',
           body: JSON.stringify({
             phone,
-            intent,
+            intent: googleLinkFlow ? 'google' : intent,
           }),
         },
       );
 
       sessionStorage.setItem('r2nette.authPhone', phone);
 
-      sessionStorage.setItem('r2nette.authIntent', intent);
+      sessionStorage.setItem(
+        'r2nette.authIntent',
+        googleLinkFlow ? 'google' : intent,
+      );
 
       sessionStorage.setItem('r2nette.maskedPhone', result.maskedPhone);
 
@@ -383,6 +392,21 @@ function initializeLoginPage(): void {
   });
 
   setMode(intent);
+  googleSignInButton.href =
+    `/api/v1/auth/google/start?returnTo=${encodeURIComponent(safeReturnPath())}`;
+
+  if (googleLinkFlow) {
+    loginToggle.parentElement?.setAttribute('hidden', '');
+    googleSignInButton.hidden = true;
+    googleLinkNotice.hidden = false;
+    authTitle.textContent = 'Link your Google account';
+    authDescription.textContent =
+      'Enter the mobile number on your R2NETTE account to continue.';
+    label.textContent = 'Send verification code';
+    document.title = 'Link Google — R2NETTE';
+  } else if (query.get('google') === 'error') {
+    showError('Google sign-in could not be completed. Please try again.');
+  }
 }
 
 function initializeVerifyPage(): void {

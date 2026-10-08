@@ -4,7 +4,7 @@ import express, {
   type NextFunction,
 } from 'express';
 import cookieParser from 'cookie-parser';
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 
@@ -32,6 +32,10 @@ import {
   RateLimiter,
   type VerificationProvider,
 } from '../identity/identity.js';
+import {
+  SupabaseGoogleAuthProvider,
+  type GoogleAuthProvider,
+} from '../identity/google-auth.js';
 import { integrationStatus } from '../data/repositories.js';
 import {
   PrismaSessionStore,
@@ -89,9 +93,14 @@ import {
 
 export const SESSION_COOKIE = 'r2n_session';
 export const REGISTRATION_COOKIE = 'r2n_registration';
+export const GOOGLE_LINK_COOKIE = 'r2n_google_link';
+const GOOGLE_STATE_COOKIE = 'r2n_google_state';
+const GOOGLE_VERIFIER_COOKIE = 'r2n_google_verifier';
 const TERMS_VERSION = '2026-09-16';
 const PRIVACY_VERSION = '2026-09-16';
 const SESSION_TTL_MS = 60 * 60 * 1000;
+const GOOGLE_OAUTH_TTL_MS = 60 * 60 * 1000;
+const GOOGLE_STATE_TTL_MS = 10 * 60 * 1000;
 
 export class ApiError extends Error {
   constructor(
@@ -211,7 +220,13 @@ export class IdempotencyStore {
 /* validation                                                          */
 /* ------------------------------------------------------------------ */
 
-const authIntentSchema = z.enum(['login', 'signup']);
+const authIntentSchema = z.enum(['login', 'signup', 'google']);
+
+const callbackRequestSchema = z.object({
+  phoneE164: z.string().trim().min(1).max(40),
+  reason: z.string().trim().max(300).optional(),
+  delay: z.enum(['NOW', 'IN_FIVE_MINUTES']).default('NOW'),
+});
 
 const phoneSchema = z.object({
   phone: z.string().min(1),
@@ -305,6 +320,9 @@ export interface ApiDeps {
   };
   /** R2NETTE dispatch origin. Never sent to the browser. */
   origin?: { latitude: number; longitude: number };
+  /** Canonical HTTPS origin used for OAuth callbacks. */
+  publicUrl?: string;
+  googleAuth?: GoogleAuthProvider;
   now?: () => Date;
   /** Twilio Voice for the callback dialler. Unset = queue for a manual call. */
   voice?: VoiceProvider | null;
@@ -324,6 +342,8 @@ declare global {
 export function createApi(deps: ApiDeps) {
   const { prisma, verification } = deps;
   const now = deps.now ?? (() => new Date());
+  const googleAuth = deps.googleAuth ?? new SupabaseGoogleAuthProvider();
+  const publicUrl = deps.publicUrl ?? process.env.PUBLIC_URL;
   // Both stores are Postgres-backed: sessions and payment idempotency must
   // survive a restart and be shared across instances.
   const sessions = new PrismaSessionStore(prisma, now);
@@ -424,10 +444,363 @@ export function createApi(deps: ApiDeps) {
 
   /* ---------------- auth ---------------- */
 
+  function oauthOrigin(): string {
+    if (!publicUrl) {
+      throw new ApiError(
+        503,
+        'GOOGLE_AUTH_NOT_CONFIGURED',
+        'Google sign-in is not configured.',
+      );
+    }
+    try {
+      const url = new URL(publicUrl);
+      if (
+        !url.hostname ||
+        url.username ||
+        url.password ||
+        url.search ||
+        url.hash ||
+        (url.protocol !== 'https:' &&
+          !(url.protocol === 'http:' &&
+            ['localhost', '127.0.0.1'].includes(url.hostname)))
+      ) {
+        throw new Error('invalid');
+      }
+      return url.origin;
+    } catch {
+      throw new ApiError(
+        503,
+        'GOOGLE_AUTH_NOT_CONFIGURED',
+        'Google sign-in is not configured.',
+      );
+    }
+  }
+
+  const tokenHash = (token: string) =>
+    createHash('sha256').update(token).digest('hex');
+
+  const safeReturnTo = (requested: unknown, origin: string): string => {
+    if (typeof requested !== 'string' || requested.length > 2048) {
+      return '/account';
+    }
+    try {
+      const url = new URL(requested, origin);
+      if (url.origin === origin) {
+        return url.pathname + url.search + url.hash;
+      }
+    } catch {
+      // Invalid paths return to the account page.
+    }
+    return '/account';
+  };
+
+  async function pendingGoogleLink(linkToken: string | undefined) {
+    if (!linkToken) {
+      throw new ApiError(
+        401,
+        'GOOGLE_LINK_REQUIRED',
+        'Restart Google sign-in before verifying your phone.',
+      );
+    }
+    const transaction = await prisma.googleAuthTransaction.findUnique({
+      where: { linkTokenHash: tokenHash(linkToken) },
+    });
+    if (
+      !transaction ||
+      transaction.completedAt ||
+      transaction.expiresAt <= now() ||
+      !transaction.googleAuthSubject
+    ) {
+      throw new ApiError(
+        401,
+        'GOOGLE_LINK_EXPIRED',
+        'Your Google sign-in expired. Please start again.',
+      );
+    }
+    return transaction;
+  }
+
+  async function markGooglePhoneVerified(
+    linkToken: string,
+    phoneE164: string,
+  ): Promise<void> {
+    const result = await prisma.googleAuthTransaction.updateMany({
+      where: {
+        linkTokenHash: tokenHash(linkToken),
+        googleAuthSubject: { not: null },
+        completedAt: null,
+        expiresAt: { gt: now() },
+        OR: [{ verifiedPhone: null }, { verifiedPhone: phoneE164 }],
+      },
+      data: { verifiedPhone: phoneE164 },
+    });
+    if (result.count !== 1) {
+      throw new ApiError(
+        401,
+        'GOOGLE_LINK_EXPIRED',
+        'Your Google sign-in expired. Please start again.',
+      );
+    }
+  }
+
+  async function completeGoogleLink(
+    transaction: Prisma.TransactionClient,
+    linkToken: string,
+    phoneE164: string,
+    customerId: string,
+  ): Promise<void> {
+    const at = now();
+    const pending = await transaction.googleAuthTransaction.findUnique({
+      where: { linkTokenHash: tokenHash(linkToken) },
+    });
+    if (
+      !pending ||
+      !pending.googleAuthSubject ||
+      pending.verifiedPhone !== phoneE164 ||
+      pending.completedAt ||
+      pending.expiresAt <= at
+    ) {
+      throw new ApiError(
+        401,
+        'GOOGLE_PHONE_NOT_VERIFIED',
+        'Verify the same mobile number before linking Google.',
+      );
+    }
+
+    const customer = await transaction.customer.findUnique({
+      where: { id: customerId },
+      select: { googleAuthSubject: true },
+    });
+    if (!customer) {
+      throw new ApiError(404, 'ACCOUNT_NOT_FOUND', 'Account not found.');
+    }
+    if (
+      customer.googleAuthSubject &&
+      customer.googleAuthSubject !== pending.googleAuthSubject
+    ) {
+      throw new ApiError(
+        409,
+        'GOOGLE_ACCOUNT_ALREADY_LINKED',
+        'A different Google account is already linked to this customer.',
+      );
+    }
+
+    const claimed = await transaction.googleAuthTransaction.updateMany({
+      where: {
+        id: pending.id,
+        completedAt: null,
+        expiresAt: { gt: at },
+        verifiedPhone: phoneE164,
+      },
+      data: { completedAt: at },
+    });
+    if (claimed.count !== 1) {
+      throw new ApiError(
+        409,
+        'GOOGLE_LINK_ALREADY_USED',
+        'This Google sign-in has already been used.',
+      );
+    }
+
+    try {
+      await transaction.customer.update({
+        where: { id: customerId },
+        data: { googleAuthSubject: pending.googleAuthSubject },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ApiError(
+          409,
+          'GOOGLE_ACCOUNT_ALREADY_LINKED',
+          'This Google account is already linked to another R2NETTE customer.',
+        );
+      }
+      throw error;
+    }
+  }
+
+  app.get(
+    '/api/v1/auth/google/start',
+    wrap(async (req, res) => {
+      if (!googleAuth.configured) {
+        throw new ApiError(
+          503,
+          'GOOGLE_AUTH_NOT_CONFIGURED',
+          'Google sign-in is not configured.',
+        );
+      }
+      const origin = oauthOrigin();
+      const state = randomBytes(32).toString('base64url');
+      const verifier = randomBytes(32).toString('base64url');
+      const challenge = createHash('sha256')
+        .update(verifier)
+        .digest('base64url');
+      const expiresAt = new Date(now().getTime() + GOOGLE_OAUTH_TTL_MS);
+
+      const authorizeUrl = googleAuth.authorizationUrl(origin, challenge);
+      await prisma.googleAuthTransaction.create({
+        data: {
+          stateHash: tokenHash(state),
+          returnTo: safeReturnTo(req.query.returnTo, origin),
+          expiresAt,
+        },
+      });
+
+      const secure = process.env.NODE_ENV === 'production';
+      res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+      res.cookie(GOOGLE_STATE_COOKIE, state, {
+        httpOnly: true,
+        secure,
+        sameSite: 'lax',
+        path: '/api/v1/auth/google',
+        maxAge: GOOGLE_STATE_TTL_MS,
+      });
+      res.cookie(GOOGLE_VERIFIER_COOKIE, verifier, {
+        httpOnly: true,
+        secure,
+        sameSite: 'lax',
+        path: '/api/v1/auth/google',
+        maxAge: GOOGLE_STATE_TTL_MS,
+      });
+      res.redirect(authorizeUrl);
+    }),
+  );
+
+  app.get(
+    '/api/v1/auth/google/callback',
+    wrap(async (req, res) => {
+      const clearOAuthCookies = () => {
+        res.clearCookie(GOOGLE_STATE_COOKIE, { path: '/api/v1/auth/google' });
+        res.clearCookie(GOOGLE_VERIFIER_COOKIE, { path: '/api/v1/auth/google' });
+      };
+      const code = typeof req.query.code === 'string' ? req.query.code : undefined;
+      const stateCookie = req.cookies?.[GOOGLE_STATE_COOKIE] as
+        | string
+        | undefined;
+      const verifier = req.cookies?.[GOOGLE_VERIFIER_COOKIE] as
+        | string
+        | undefined;
+
+      if (req.query.error || !stateCookie || !code || !verifier) {
+        clearOAuthCookies();
+        res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+        res.redirect('/login?google=error');
+        return;
+      }
+
+      try {
+        const transaction = await prisma.googleAuthTransaction.findUnique({
+          where: { stateHash: tokenHash(stateCookie) },
+        });
+        const stateStillFresh =
+          transaction &&
+          now().getTime() - transaction.createdAt.getTime() <= GOOGLE_STATE_TTL_MS &&
+          transaction.expiresAt > now() &&
+          !transaction.completedAt &&
+          !transaction.googleAuthSubject;
+        if (!stateStillFresh) {
+          clearOAuthCookies();
+          res.redirect('/login?google=error');
+          return;
+        }
+
+        const identity = await googleAuth.exchangeCode(code, verifier);
+        const origin = oauthOrigin();
+        const existingCustomer = await prisma.customer.findUnique({
+          where: { googleAuthSubject: identity.subject },
+          select: { id: true },
+        });
+        if (existingCustomer) {
+          const at = now();
+          const claimed = await prisma.googleAuthTransaction.updateMany({
+            where: {
+              id: transaction.id,
+              googleAuthSubject: null,
+              linkTokenHash: null,
+              completedAt: null,
+              expiresAt: { gt: at },
+            },
+            data: {
+              googleAuthSubject: identity.subject,
+              completedAt: at,
+            },
+          });
+          if (claimed.count !== 1) {
+            clearOAuthCookies();
+            res.redirect('/login?google=error');
+            return;
+          }
+
+          const session = await sessions.create(existingCustomer.id, {
+            userAgent: req.header('user-agent') ?? undefined,
+            ip: req.ip ?? undefined,
+          });
+          clearOAuthCookies();
+          res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+          res.cookie(SESSION_COOKIE, session.token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
+            expires: session.expiresAt,
+          });
+          res.redirect(new URL(transaction.returnTo, origin).toString());
+          return;
+        }
+
+        const linkToken = randomBytes(32).toString('base64url');
+        const claimed = await prisma.googleAuthTransaction.updateMany({
+          where: {
+            id: transaction.id,
+            googleAuthSubject: null,
+            linkTokenHash: null,
+            completedAt: null,
+            expiresAt: { gt: now() },
+          },
+          data: {
+            googleAuthSubject: identity.subject,
+            linkTokenHash: tokenHash(linkToken),
+          },
+        });
+        if (claimed.count !== 1) {
+          clearOAuthCookies();
+          res.redirect('/login?google=error');
+          return;
+        }
+
+        clearOAuthCookies();
+        res.cookie(GOOGLE_LINK_COOKIE, linkToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          expires: transaction.expiresAt,
+        });
+
+        const loginUrl = new URL('/login', origin);
+        loginUrl.searchParams.set('google', 'phone');
+        loginUrl.searchParams.set('returnTo', transaction.returnTo);
+        res.redirect(loginUrl.toString());
+      } catch {
+        clearOAuthCookies();
+        res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+        res.redirect('/login?google=error');
+      }
+    }),
+  );
+
   app.post(
     '/api/v1/auth/phone/send',
     wrap(async (req, res) => {
       const { phone, intent } = phoneSchema.parse(req.body);
+      if (intent === 'google') {
+        await pendingGoogleLink(
+          req.cookies?.[GOOGLE_LINK_COOKIE] as string | undefined,
+        );
+      }
       const phoneE164 = normalizePhone(phone);
 
       // Deliberately no account lookup here. Answering "no account" or
@@ -452,6 +825,15 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/auth/phone/verify',
     wrap(async (req, res) => {
       const { phone, code, intent } = verifySchema.parse(req.body);
+      const googleLinkToken = req.cookies?.[GOOGLE_LINK_COOKIE] as
+        | string
+        | undefined;
+
+      if (intent === 'google') {
+        await pendingGoogleLink(googleLinkToken);
+      } else if (googleLinkToken) {
+        res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+      }
 
       const verified = await identity.verifyPhone(phone, code);
 
@@ -485,6 +867,60 @@ export function createApi(deps: ApiDeps) {
         });
         return registration;
       };
+
+      if (intent === 'google' && googleLinkToken) {
+        if (existingPhone && hasCompleteAccount) {
+          // The OTP has just proved this phone. Persist that proof before
+          // completeGoogleLink requires a matching verifiedPhone on the
+          // pending OAuth transaction. Never link on Google identity alone.
+          await markGooglePhoneVerified(googleLinkToken, verified.phoneE164);
+          await prisma.$transaction((transaction) =>
+            completeGoogleLink(
+              transaction,
+              googleLinkToken,
+              verified.phoneE164,
+              existingPhone.customerId,
+            ),
+          );
+          const created = await sessions.create(existingPhone.customerId, {
+            userAgent: req.header('user-agent') ?? undefined,
+            ip: req.ip ?? undefined,
+          });
+          res.cookie(SESSION_COOKIE, created.token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
+            expires: created.expiresAt,
+          });
+          res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+          res.clearCookie(REGISTRATION_COOKIE, { path: '/' });
+          res.json({
+            outcome: 'AUTHENTICATED',
+            intent,
+            customer: {
+              id: existingPhone.customer.id,
+              firstName: existingPhone.customer.firstName,
+              lastName: existingPhone.customer.lastName,
+              email: existingPhone.customer.email,
+              verifiedPhone: verified.phoneE164,
+            },
+          });
+          return;
+        }
+
+        await markGooglePhoneVerified(googleLinkToken, verified.phoneE164);
+        const registration = await issueRegistration();
+        res.json({
+          outcome: 'PROFILE_REQUIRED',
+          intent: 'signup',
+          registration: {
+            verifiedPhone: verified.phoneE164,
+            expiresAt: registration.expiresAt.toISOString(),
+          },
+        });
+        return;
+      }
 
       if (intent === 'login') {
         if (!existingPhone || !hasCompleteAccount) {
@@ -727,6 +1163,18 @@ export function createApi(deps: ApiDeps) {
             });
           }
 
+          const googleLinkToken = req.cookies?.[GOOGLE_LINK_COOKIE] as
+            | string
+            | undefined;
+          if (googleLinkToken) {
+            await completeGoogleLink(
+              transaction,
+              googleLinkToken,
+              registration.phoneE164,
+              savedCustomer.id,
+            );
+          }
+
           return {
             id: savedCustomer.id,
             firstName: savedCustomer.firstName,
@@ -766,6 +1214,9 @@ export function createApi(deps: ApiDeps) {
       res.clearCookie(REGISTRATION_COOKIE, {
         path: '/',
       });
+      if (req.cookies?.[GOOGLE_LINK_COOKIE]) {
+        res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+      }
 
       res.status(201).json({
         customer: {
@@ -781,6 +1232,7 @@ export function createApi(deps: ApiDeps) {
     wrap(async (req, res) => {
       await sessions.destroy(req.sessionId);
       res.clearCookie(SESSION_COOKIE, { path: '/' });
+      res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
       res.json({ ok: true });
     }),
   );
@@ -2136,19 +2588,17 @@ export function createApi(deps: ApiDeps) {
   app.post(
     '/api/v1/callbacks',
     wrap(async (req, res) => {
-      const body = req.body as { phoneE164?: string; reason?: string };
-      if (!body.phoneE164)
-        throw new ApiError(
-          400,
-          'VALIDATION_ERROR',
-          'A phone number is required.',
-        );
+      const body = callbackRequestSchema.parse(req.body);
       const svc = new CallbackService(prisma, null, now);
       const out = await svc.request({
         phoneE164: normalizePhone(body.phoneE164),
         customerId: req.customerId ?? null,
         reason: body.reason,
         source: 'BOOKING_FLOW',
+        requestedFor:
+          body.delay === 'IN_FIVE_MINUTES'
+            ? new Date(now().getTime() + 5 * 60_000)
+            : null,
       });
       res
         .status(201)
@@ -2243,8 +2693,11 @@ export function createApi(deps: ApiDeps) {
       return;
     }
     if (err instanceof IdentityError) {
-      const status =
-        err.code.includes('LIMIT') || err.code === 'OTP_COOLDOWN' ? 429 : 400;
+      const status = err.code.includes('LIMIT') || err.code === 'OTP_COOLDOWN'
+        ? 429
+        : err.code.includes('PROVIDER_UNAVAILABLE') || err.code === 'VERIFY_NOT_CONFIGURED'
+          ? 503
+          : 400;
       res
         .status(status)
         .json({ error: { code: err.code, message: err.message, requestId } });

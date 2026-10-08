@@ -163,6 +163,37 @@ export function validateProductionEnvironment(
       message: 'PRISMA_DATABASE_URL does not match DATABASE_URL.',
     });
   }
+  if (!present(env, 'TAKATAK_SUPABASE_URL')) {
+    issues.push({
+      severity: 'FATAL',
+      message: 'TAKATAK_SUPABASE_URL is missing; customer authentication must use TAKATAK.',
+    });
+  } else {
+    try {
+      const supabaseUrl = new URL(env.TAKATAK_SUPABASE_URL!.trim());
+      if (
+        supabaseUrl.protocol !== 'https:' ||
+        !supabaseUrl.hostname ||
+        supabaseUrl.username ||
+        supabaseUrl.password ||
+        supabaseUrl.search ||
+        supabaseUrl.hash
+      ) {
+        throw new Error('invalid');
+      }
+    } catch {
+      issues.push({
+        severity: 'FATAL',
+        message: 'TAKATAK_SUPABASE_URL must be a valid HTTPS URL.',
+      });
+    }
+  }
+  if (!present(env, 'TAKATAK_SUPABASE_ANON_KEY')) {
+    issues.push({
+      severity: 'FATAL',
+      message: 'TAKATAK_SUPABASE_ANON_KEY is missing.',
+    });
+  }
 
   if (present(env, 'TEST_DATABASE_URL') && present(env, 'DATABASE_URL')) {
     if (env.TEST_DATABASE_URL!.trim() === env.DATABASE_URL!.trim()) {
@@ -248,11 +279,6 @@ export function validateProductionEnvironment(
     });
   }
 
-  warnIfOptional(issues, env, 'Twilio Verify', [
-    'TWILIO_ACCOUNT_SID',
-    'TWILIO_AUTH_TOKEN',
-    'TWILIO_VERIFY_SERVICE_SID',
-  ]);
   warnIfOptional(issues, env, 'Twilio Voice', [
     'TWILIO_ACCOUNT_SID',
     'TWILIO_AUTH_TOKEN',

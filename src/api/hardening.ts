@@ -185,6 +185,7 @@ export const RATE_RULES: Record<string, RateLimitRule> = {
 };
 
 export function classifyRoute(path: string, method: string): keyof typeof RATE_RULES {
+  if (path.includes('/auth/google')) return 'auth';
   if (path.includes('/auth/phone')) return 'otp';
   if (path.includes('/staff/login') || path.includes('/staff/password')) return 'auth';
   if (path.includes('/payments') || path.includes('/stripe')) return 'payment';
@@ -442,6 +443,37 @@ export function validateProductionConfig(
 
   if (!env.DATABASE_URL) {
     problems.push({ severity: 'FATAL', message: 'DATABASE_URL is not set.' });
+  }
+  if (!env.TAKATAK_SUPABASE_URL?.trim()) {
+    problems.push({
+      severity: 'FATAL',
+      message: 'TAKATAK_SUPABASE_URL is not set; customer authentication must use TAKATAK.',
+    });
+  } else {
+    try {
+      const supabaseUrl = new URL(env.TAKATAK_SUPABASE_URL);
+      if (
+        supabaseUrl.protocol !== 'https:' ||
+        !supabaseUrl.hostname ||
+        supabaseUrl.username ||
+        supabaseUrl.password ||
+        supabaseUrl.search ||
+        supabaseUrl.hash
+      ) {
+        throw new Error('invalid');
+      }
+    } catch {
+      problems.push({
+        severity: 'FATAL',
+        message: 'TAKATAK_SUPABASE_URL must be a valid HTTPS URL.',
+      });
+    }
+  }
+  if (!env.TAKATAK_SUPABASE_ANON_KEY?.trim()) {
+    problems.push({
+      severity: 'FATAL',
+      message: 'TAKATAK_SUPABASE_ANON_KEY is not set.',
+    });
   }
   if (env.TEST_DATABASE_URL && env.TEST_DATABASE_URL === env.DATABASE_URL) {
     problems.push({

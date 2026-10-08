@@ -23,6 +23,12 @@ customers. Never returns or logs the code.
 returns the customer. The cookie carries a random id only; no customer data
 rides in the browser.
 
+`GET /auth/google/start` and `GET /auth/google/callback` — begin Supabase
+Google OAuth using PKCE. Google is linked to an R2NETTE customer only after
+that customer verifies the same mobile number through TAKATAK phone OTP.
+Subsequent Google sign-ins resolve through that stored subject; email is never
+used to link accounts.
+
 `POST /auth/logout` — destroys the session.
 
 ## Customer (session required)

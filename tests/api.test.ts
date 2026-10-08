@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
-import { createApi, REGISTRATION_COOKIE, SESSION_COOKIE } from '../src/api/app.js';
+import {
+  createApi,
+  GOOGLE_LINK_COOKIE,
+  REGISTRATION_COOKIE,
+  SESSION_COOKIE,
+} from '../src/api/app.js';
 import { FakeVerificationProvider } from '../src/identity/identity.js';
 import { seed } from '../prisma/seed.js';
 import { localToUtc } from '../src/scheduling/availability.js';
@@ -49,6 +54,7 @@ d('HTTP API', () => {
   });
 
   beforeEach(async () => {
+    await prisma.callbackRequest.deleteMany();
     await prisma.promotionRedemption.deleteMany();
     await prisma.bookingStatusHistory.deleteMany();
     await prisma.bookingStaff.deleteMany();
@@ -58,6 +64,7 @@ d('HTTP API', () => {
     await prisma.quote.deleteMany();
     await prisma.recurrenceSeries.deleteMany();
     await prisma.customerAddress.deleteMany();
+    await prisma.googleAuthTransaction.deleteMany();
     await prisma.customerPhone.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.staffAvailability.deleteMany();
@@ -69,7 +76,30 @@ d('HTTP API', () => {
     await prisma.staff.create({ data: { displayName: 'Alice', availability: { create: ALL_WEEK } } });
     await prisma.staff.create({ data: { displayName: 'Bruno', availability: { create: ALL_WEEK } } });
 
-    app = createApi({ prisma, verification: new FakeVerificationProvider('123456') });
+    app = createApi({
+      prisma,
+      verification: new FakeVerificationProvider('123456'),
+      publicUrl: 'https://r2nette.ca',
+      googleAuth: {
+        configured: true,
+        authorizationUrl(publicUrl, codeChallenge) {
+          const callback = new globalThis.URL(
+            '/api/v1/auth/google/callback',
+            publicUrl,
+          );
+          const authorize = new globalThis.URL(
+            'https://supabase.example.test/auth/v1/authorize',
+          );
+          authorize.searchParams.set('redirect_to', callback.toString());
+          authorize.searchParams.set('code_challenge', codeChallenge);
+          authorize.searchParams.set('code_challenge_method', 's256');
+          return authorize.toString();
+        },
+        async exchangeCode() {
+          return { subject: 'test-google-subject' };
+        },
+      },
+    });
   });
 
   /**
@@ -79,6 +109,22 @@ d('HTTP API', () => {
   async function login(phone: string): Promise<string> {
     return (await signUp(app, phone)).cookie;
   }
+
+  it('schedules a callback five minutes from the server time when requested', async () => {
+    const beforeRequest = Date.now();
+    const response = await request(app)
+      .post('/api/v1/callbacks')
+      .send({ phoneE164: '+15145551234', delay: 'IN_FIVE_MINUTES' });
+    const afterRequest = Date.now();
+
+    expect(response.status).toBe(201);
+    const callback = await prisma.callbackRequest.findUniqueOrThrow({
+      where: { id: response.body.callbackId },
+    });
+    expect(callback.requestedFor).not.toBeNull();
+    expect(callback.requestedFor!.getTime()).toBeGreaterThanOrEqual(beforeRequest + 5 * 60_000);
+    expect(callback.requestedFor!.getTime()).toBeLessThanOrEqual(afterRequest + 5 * 60_000);
+  });
 
   async function addressFor(cookie: string): Promise<string> {
     const me = await request(app).get('/api/v1/customer/me').set('Cookie', cookie);
@@ -91,6 +137,25 @@ d('HTTP API', () => {
       },
     });
     return a.id;
+  }
+
+  async function startGoogleLink(): Promise<string> {
+    const start = await request(app).get('/api/v1/auth/google/start');
+    expect(start.status).toBe(302);
+    const cookieHeader = [
+      setCookie(start, 'r2n_google_state')?.split(';')[0],
+      setCookie(start, 'r2n_google_verifier')?.split(';')[0],
+    ]
+      .filter(Boolean)
+      .join('; ');
+
+    const callback = await request(app)
+      .get('/api/v1/auth/google/callback')
+      .query({ code: 'one-time-code' })
+      .set('Cookie', cookieHeader);
+    expect(callback.status).toBe(302);
+    expect(callback.headers.location).toContain('google=phone');
+    return setCookie(callback, GOOGLE_LINK_COOKIE)!.split(';')[0]!;
   }
 
   async function makeQuote(cookie: string, body: Record<string, unknown> = {}) {
@@ -108,6 +173,132 @@ d('HTTP API', () => {
   }
 
   /* ---------------- auth & session ---------------- */
+
+  it('requires same-browser OAuth state before accepting a Google callback', async () => {
+    const start = await request(app).get('/api/v1/auth/google/start');
+    const stateCookie = setCookie(start, 'r2n_google_state')?.split(';')[0];
+    const cookieHeader = [
+      stateCookie?.replace(/=.*/, '=attacker-state'),
+      setCookie(start, 'r2n_google_verifier')?.split(';')[0],
+    ]
+      .filter(Boolean)
+      .join('; ');
+    const callback = await request(app)
+      .get('/api/v1/auth/google/callback')
+      .query({ code: 'one-time-code' })
+      .set('Cookie', cookieHeader);
+
+    expect(callback.status).toBe(302);
+    expect(callback.headers.location).toBe('/login?google=error');
+    expect(await prisma.googleAuthTransaction.count({
+      where: { googleAuthSubject: { not: null } },
+    })).toBe(0);
+  });
+
+  it('links Google to an existing customer only after verifying that customer phone', async () => {
+    const customer = await signUp(app, '514 825 2825');
+    const linkCookie = await startGoogleLink();
+
+    const sent = await request(app)
+      .post('/api/v1/auth/phone/send')
+      .set('Cookie', linkCookie)
+      .send({ phone: '514 825 2825', intent: 'google' });
+    expect(sent.status).toBe(200);
+
+    const verified = await request(app)
+      .post('/api/v1/auth/phone/verify')
+      .set('Cookie', linkCookie)
+      .send({ phone: '514 825 2825', code: TEST_OTP, intent: 'google' });
+
+    expect(verified.status).toBe(200);
+    expect(verified.body.outcome).toBe('AUTHENTICATED');
+    expect(setCookie(verified, SESSION_COOKIE)).toBeTruthy();
+    expect(
+      await prisma.customer.findUnique({
+        where: { id: customer.customerId },
+        select: { googleAuthSubject: true },
+      }),
+    ).toEqual({ googleAuthSubject: 'test-google-subject' });
+  });
+
+  it('uses a previously phone-linked Google identity for later sign-ins', async () => {
+    const customer = await signUp(app, '514 825 2825');
+    const linkCookie = await startGoogleLink();
+    await request(app)
+      .post('/api/v1/auth/phone/send')
+      .set('Cookie', linkCookie)
+      .send({ phone: '514 825 2825', intent: 'google' })
+      .expect(200);
+    await request(app)
+      .post('/api/v1/auth/phone/verify')
+      .set('Cookie', linkCookie)
+      .send({ phone: '514 825 2825', code: TEST_OTP, intent: 'google' })
+      .expect(200);
+
+    const start = await request(app).get('/api/v1/auth/google/start');
+    const cookieHeader = [
+      setCookie(start, 'r2n_google_state')?.split(';')[0],
+      setCookie(start, 'r2n_google_verifier')?.split(';')[0],
+    ]
+      .filter(Boolean)
+      .join('; ');
+    const callback = await request(app)
+      .get('/api/v1/auth/google/callback')
+      .query({
+        code: 'one-time-code',
+      })
+      .set('Cookie', cookieHeader);
+
+    expect(callback.status).toBe(302);
+    expect(callback.headers.location).toBe('https://r2nette.ca/account');
+    expect(setCookie(callback, SESSION_COOKIE)).toBeTruthy();
+    // Clearing a short-lived OAuth link intentionally sends an expired
+    // Set-Cookie header. Prove that the browser discards the link token,
+    // rather than mistakenly expecting the header to be absent.
+    expect(setCookie(callback, GOOGLE_LINK_COOKIE)).toMatch(
+      /^r2n_google_link=; Path=\/; Expires=Thu, 01 Jan 1970 00:00:00 GMT/,
+    );
+    expect(
+      await prisma.customer.findUnique({
+        where: { id: customer.customerId },
+        select: { googleAuthSubject: true },
+      }),
+    ).toEqual({ googleAuthSubject: 'test-google-subject' });
+  });
+
+  it('does not create a customer for Google until phone verification and registration complete', async () => {
+    const linkCookie = await startGoogleLink();
+    await request(app)
+      .post('/api/v1/auth/phone/send')
+      .set('Cookie', linkCookie)
+      .send({ phone: '514 825 2825', intent: 'google' })
+      .expect(200);
+
+    const verified = await request(app)
+      .post('/api/v1/auth/phone/verify')
+      .set('Cookie', linkCookie)
+      .send({ phone: '514 825 2825', code: TEST_OTP, intent: 'google' });
+
+    expect(verified.status).toBe(200);
+    expect(verified.body.outcome).toBe('PROFILE_REQUIRED');
+    expect(setCookie(verified, SESSION_COOKIE)).toBeUndefined();
+    const registrationCookie = setCookie(verified, REGISTRATION_COOKIE)!.split(';')[0]!;
+    expect(await prisma.customer.count()).toBe(0);
+
+    const completed = await request(app)
+      .post('/api/v1/auth/registration/complete')
+      .set('Cookie', `${registrationCookie}; ${linkCookie}`)
+      .send(registrationProfile('514 825 2825'));
+
+    expect(completed.status).toBe(201);
+    expect(
+      await prisma.customer.findUnique({
+        where: { id: completed.body.customer.id },
+        select: { googleAuthSubject: true },
+      }),
+    ).toEqual({ googleAuthSubject: 'test-google-subject' });
+    expect(setCookie(completed, SESSION_COOKIE)).toBeTruthy();
+  });
 
   it('OTP send is neutral for known and unknown numbers alike', async () => {
     // Both numbers now have a completed account.

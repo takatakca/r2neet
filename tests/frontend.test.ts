@@ -20,6 +20,7 @@ import {
   emptyDraft,
   type Booking,
 } from '../web/src/lib/api.js';
+import { api } from '../web/src/lib/api.js';
 
 /** Minimal localStorage for the node test environment. */
 function installStorage() {
@@ -89,6 +90,8 @@ describe('translation', () => {
   it('translates both languages', () => {
     expect(translate('en', 'checkout.dueToday')).toBe('Due today');
     expect(translate('fr', 'checkout.dueToday')).toBe("À payer aujourd'hui");
+    expect(translate('en', 'callback.phoneRequired')).toMatch(/phone number/i);
+    expect(translate('fr', 'callback.phoneRequired')).toMatch(/numéro de téléphone/i);
   });
 
   it('interpolates variables', () => {
@@ -232,6 +235,29 @@ describe('draft persistence', () => {
     saveDraft(emptyDraft);
     clearDraft();
     expect(loadDraft()).toBeNull();
+  });
+});
+
+describe('callback requests', () => {
+  it('sends the customer-selected callback time', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ callbackId: 'callback-1', status: 'QUEUED' }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await api.requestCallback('+15145551234', 'IN_FIVE_MINUTES');
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(JSON.parse(init.body as string)).toEqual({
+        phoneE164: '+15145551234',
+        delay: 'IN_FIVE_MINUTES',
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
@@ -381,6 +407,102 @@ describe('no homemade wallet detection', () => {
 
   it('never hardcodes a review aggregate', () => {
     expect(sources).not.toMatch(/5\.0 from 21|5\.0 · 21/);
+  });
+});
+
+describe('landing page discovery metadata', () => {
+  const html = readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+  const robots = readFileSync(new URL('../web/public/robots.txt', import.meta.url), 'utf8');
+  const sitemap = readFileSync(new URL('../web/public/sitemap.xml', import.meta.url), 'utf8');
+
+  it('provides canonical and social preview metadata for ad shares', () => {
+    expect(html).toContain('<link rel="canonical" href="https://r2nette.ca/">');
+    expect(html).toContain('<meta property="og:url" content="https://r2nette.ca/">');
+    expect(html).toContain('<meta property="og:image" content="https://r2nette.ca/assets/hero.jpg">');
+    expect(html).toContain('<meta property="og:image:width" content="1774">');
+    expect(html).toContain('<meta property="og:image:height" content="887">');
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
+    expect(html).toContain('<link rel="preload" as="image" href="/assets/hero.jpg" fetchpriority="high">');
+  });
+
+  it('publishes the canonical public URL and excludes private paths from crawling', () => {
+    expect(robots).toContain('Sitemap: https://r2nette.ca/sitemap.xml');
+    expect(robots).toContain('Disallow: /api/');
+    expect(sitemap).toContain('<loc>https://r2nette.ca/</loc>');
+    expect(sitemap).not.toMatch(/\/(?:account|admin|crew|login|signup|verify|api)(?:\/|<)/);
+    for (const page of ['auth', 'verify', 'signup', 'account', 'admin', 'crew']) {
+      const source = readFileSync(new URL(`../web/${page}.html`, import.meta.url), 'utf8');
+      expect(source).toMatch(/<meta name="robots" content="noindex,follow"\s*\/?>/);
+    }
+  });
+
+  it('publishes structured cleaning-service details without invented ratings', () => {
+    const match = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+    expect(match).not.toBeNull();
+    const structuredData = JSON.parse(match![1]!) as Record<string, unknown>;
+    expect(structuredData['@type']).toBe('CleaningService');
+    expect(structuredData.telephone).toBe('+1-514-825-2825');
+    expect(structuredData.areaServed).toEqual([
+      { '@type': 'City', name: 'Montréal' },
+      { '@type': 'City', name: 'Laval' },
+    ]);
+    expect(structuredData.aggregateRating).toBeUndefined();
+  });
+});
+
+describe('installable app shell', () => {
+  const html = readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+  const manifest = JSON.parse(
+    readFileSync(new URL('../web/public/manifest.webmanifest', import.meta.url), 'utf8'),
+  ) as {
+    display: string;
+    start_url: string;
+    icons: { sizes: string; purpose: string; src: string }[];
+  };
+  const worker = readFileSync(new URL('../web/public/sw.js', import.meta.url), 'utf8');
+
+  it('links the install manifest and platform home-screen icon', () => {
+    expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest">');
+    expect(html).toContain('<link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png">');
+    expect(manifest.display).toBe('standalone');
+    expect(manifest.start_url).toBe('/?source=installed-app');
+    expect(manifest.icons).toContainEqual(
+      expect.objectContaining({ sizes: '192x192', purpose: 'any', src: '/assets/brand/pwa-icon-192.png' }),
+    );
+    expect(manifest.icons).toContainEqual(
+      expect.objectContaining({
+        sizes: '512x512',
+        purpose: 'maskable',
+        src: '/assets/brand/pwa-icon-maskable-512.png',
+      }),
+    );
+    for (const icon of manifest.icons) {
+      if (icon.src.endsWith('.png')) {
+        expect(readFileSync(new URL(`../web/public${icon.src}`, import.meta.url)).subarray(0, 8))
+          .toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      }
+    }
+  });
+
+  describe('admin page routing', () => {
+    it('dispatches only literal route names', () => {
+      const admin = readFileSync(new URL('../web/admin.html', import.meta.url), 'utf8');
+
+      expect(admin).toContain("case 'dispatch': dispatch(); break;");
+      expect(admin).toContain("case 'operations': operationsPage(); break;");
+      expect(admin).toContain('default: dashboard();');
+      expect(admin).not.toContain('PAGES[id]');
+    });
+  });
+
+  it('keeps API and identity routes network-only in the service worker', () => {
+    expect(worker).toContain('const NETWORK_ONLY_PATH = /^\\/(?:api\\/|auth');
+    expect(worker).toContain("if (url.origin !== self.location.origin || NETWORK_ONLY_PATH.test(url.pathname)) return;");
+    expect(worker).toContain(".catch(async () => (await caches.match(APP_SHELL_URL))");
+    expect(worker).toContain(".catch(() => new Response('', { status: 503, statusText: 'Offline' }))");
+    expect(worker).toContain('OFFLINE_URL');
+    expect(readFileSync(new URL('../web/public/offline.html', import.meta.url), 'utf8'))
+      .toContain('Reconnect to the internet');
   });
 });
 

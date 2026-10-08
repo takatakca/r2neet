@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { createApi } from './app.js';
-import { TwilioVerifyProvider } from '../identity/identity.js';
+import { SupabasePhoneAuthProvider } from '../identity/identity.js';
 import { LiveStripeProvider } from '../payments/stripe-provider.js';
 import { GooglePlacesProvider } from '../integrations/places.js';
 import { resolveDatabase } from '../db/safety.js';
@@ -30,7 +30,7 @@ const app = createApi({
     rateLimit: process.env.RATE_LIMIT !== 'false',
     isShuttingDown: () => shuttingDown,
   },
-  verification: new TwilioVerifyProvider(),
+  verification: new SupabasePhoneAuthProvider(),
   stripe: stripe.configured ? stripe : undefined,
   places: places.configured ? places : undefined,
   origin:

@@ -325,6 +325,25 @@ describe('production config validation', () => {
     expect(problems.some((p) => p.severity === 'FATAL' && /ADMIN_TOKEN/.test(p.message))).toBe(true);
   });
 
+  it('requires the HTTPS TAKATAK Supabase project and anon key in production', () => {
+    const missing = validateProductionConfig({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://u@db/live',
+      TRUST_PROXY: 'true',
+    });
+    expect(missing.some((p) => p.severity === 'FATAL' && /TAKATAK_SUPABASE_URL/.test(p.message))).toBe(true);
+    expect(missing.some((p) => p.severity === 'FATAL' && /TAKATAK_SUPABASE_ANON_KEY/.test(p.message))).toBe(true);
+
+    const insecure = validateProductionConfig({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://u@db/live',
+      TAKATAK_SUPABASE_URL: 'http://project.supabase.co',
+      TAKATAK_SUPABASE_ANON_KEY: 'anon-key',
+      TRUST_PROXY: 'true',
+    });
+    expect(insecure.some((p) => p.severity === 'FATAL' && /HTTPS URL/.test(p.message))).toBe(true);
+  });
+
   it('refuses if the test database points at production', () => {
     const same = 'postgresql://u@db/live';
     const problems = validateProductionConfig({
@@ -350,6 +369,8 @@ describe('production config validation', () => {
     const problems = validateProductionConfig({
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://u@db/live',
+      TAKATAK_SUPABASE_URL: 'https://project.supabase.co',
+      TAKATAK_SUPABASE_ANON_KEY: 'anon-key',
       STRIPE_SECRET_KEY: 'sk_test_x',
       STRIPE_WEBHOOK_SECRET: 'whsec_x',
       TRUST_PROXY: 'true',
@@ -362,6 +383,8 @@ describe('production config validation', () => {
     const problems = validateProductionConfig({
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://u@db/live',
+      TAKATAK_SUPABASE_URL: 'https://project.supabase.co',
+      TAKATAK_SUPABASE_ANON_KEY: 'anon-key',
       STRIPE_SECRET_KEY: 'sk_live_x',
       STRIPE_WEBHOOK_SECRET: 'whsec_x',
       TRUST_PROXY: 'true',
@@ -375,6 +398,8 @@ describe('production config validation', () => {
     const problems = validateProductionConfig({
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://u@db/live',
+      TAKATAK_SUPABASE_URL: 'https://project.supabase.co',
+      TAKATAK_SUPABASE_ANON_KEY: 'anon-key',
       STRIPE_SECRET_KEY: 'sk_live_x',
       STRIPE_WEBHOOK_SECRET: 'whsec_x',
       TRUST_PROXY: 'true',

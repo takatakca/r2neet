@@ -660,14 +660,13 @@ describe('integration status', () => {
 
   it('reports CONNECTED only when every required variable is present', () => {
     const partial = integrationStatus({ TWILIO_ACCOUNT_SID: 'x', TWILIO_AUTH_TOKEN: 'y' });
-    expect(partial.find((s) => s.key === 'twilio_verify')!.status).toBe('NOT_CONFIGURED');
+    expect(partial.find((s) => s.key === 'takatak_auth')!.status).toBe('NOT_CONFIGURED');
 
     const full = integrationStatus({
-      TWILIO_ACCOUNT_SID: 'x',
-      TWILIO_AUTH_TOKEN: 'y',
-      TWILIO_VERIFY_SERVICE_SID: 'z',
+      TAKATAK_SUPABASE_URL: 'https://project.supabase.co',
+      TAKATAK_SUPABASE_ANON_KEY: 'anon-key',
     });
-    expect(full.find((s) => s.key === 'twilio_verify')!.status).toBe('CONNECTED');
+    expect(full.find((s) => s.key === 'takatak_auth')!.status).toBe('CONNECTED');
   });
 
   it('treats a blank string as missing', () => {

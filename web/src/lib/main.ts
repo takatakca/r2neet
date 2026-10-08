@@ -96,6 +96,70 @@ const $ = (id: string) => document.getElementById(id);
 
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
+
+let pendingInstallPrompt: InstallPromptEvent | null = null;
+
+function isStandalone(): boolean {
+  return (
+    matchMedia('(display-mode: standalone)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+}
+
+function showInstallButtons(show: boolean): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-action="install-app"]').forEach((button) => {
+    button.hidden = !show;
+  });
+}
+
+function setupInstallExperience(): void {
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    void navigator.serviceWorker.register('/sw.js').catch((error: unknown) => {
+      console.warn('[r2nette] app-shell caching is unavailable', error);
+    });
+  }
+
+  if (isStandalone()) return;
+
+  const isIos =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  showInstallButtons(isIos);
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    pendingInstallPrompt = event as InstallPromptEvent;
+    showInstallButtons(true);
+  });
+
+  window.addEventListener('appinstalled', () => {
+    pendingInstallPrompt = null;
+    showInstallButtons(false);
+  });
+}
+
+async function installApp(): Promise<void> {
+  if (pendingInstallPrompt) {
+    const prompt = pendingInstallPrompt;
+    pendingInstallPrompt = null;
+    await prompt.prompt();
+    const result = await prompt.userChoice;
+    showInstallButtons(result.outcome !== 'accepted');
+    return;
+  }
+
+  if (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  ) {
+    openSheet(`<h2>${esc(t('pwa.iosTitle'))}</h2><p class="s">${esc(t('pwa.iosInstructions'))}</p>`);
+  }
+}
+
 /**
  * Roll a money value from its previous number to the new one.
  *
@@ -917,12 +981,22 @@ function openCallback(): void {
   p?.addEventListener('input', () => (p.value = formatPhoneInput(p.value)));
 }
 
-async function requestCallback(): Promise<void> {
+async function requestCallback(delay: 'NOW' | 'IN_FIVE_MINUTES'): Promise<void> {
   const input = $('cbPhone') as HTMLInputElement | null;
   const phone = ctx?.customer.verifiedPhone ?? input?.value ?? '';
-  if (!phone) return;
+  if (!phone.trim()) {
+    const err = $('cbErr');
+    if (err) {
+      err.textContent = t('callback.phoneRequired');
+      err.hidden = false;
+    }
+    input?.focus();
+    return;
+  }
+  const err = $('cbErr');
+  if (err) err.hidden = true;
   try {
-    await api.requestCallback(phone);
+    await api.requestCallback(phone, delay);
     openSheet(`<div class="ctr pad"><div class="ctick sm">✓</div>
       <h2>${esc(t('callback.received'))}</h2>
       <p class="s">${esc(t('callback.target'))}</p>
@@ -1175,6 +1249,8 @@ function render(): void {
 /* ------------------------------------------------------------------ */
 
 const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
+  'install-app': () => installApp(),
+
   'set-locale': (el) => {
     locale = el.dataset.locale as Locale;
     persistLocale(locale);
@@ -1535,15 +1611,46 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
 
     closeSheet();
 
-    $('book')?.scrollIntoView({ behavior: 'smooth' });
+    if (helpAction === 'choose') {
+      goTo('service');
+      return;
+    }
+
+    if (helpAction === 'price') {
+      if (quote) {
+        document.querySelector('.ledger')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      } else {
+        goToPhase('HOME');
+      }
+      return;
+    }
+
+    if (helpAction === 'times') {
+      goToPhase('TIME');
+      return;
+    }
+
+    if (helpAction === 'usual') {
+      if (ctx?.usualClean) {
+        void ACTIONS['book-again'](el);
+      } else {
+        goTo('service');
+      }
+      return;
+    }
+
+    goTo('service');
   },
 
   'callback-now': () => {
-    void requestCallback();
+    void requestCallback('NOW');
   },
 
   'callback-5': () => {
-    void requestCallback();
+    void requestCallback('IN_FIVE_MINUTES');
   },
 
   'retry-boot': () => {
@@ -1623,6 +1730,7 @@ async function onAddressType(value: string): Promise<void> {
 export async function boot(): Promise<void> {
   installErrorBoundary();
   installDelegation();
+  setupInstallExperience();
   setBoot('BOOTING');
   applyLocale();
 

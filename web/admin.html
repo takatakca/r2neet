@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="robots" content="noindex,follow">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>R2NETTE Operations</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -1056,12 +1057,22 @@ async function operationsPage(){
 }
 
 /* ---------------- routing ---------------- */
-const PAGES = {dashboard, dispatch, roster:rosterPage, callbacks:callbacksPage, billing:billingPage, reviews:reviewsPage, integrations:integrationsPage, cutover:cutoverPage, security:securityPage, operations:operationsPage};
 function route(){
   const id = (location.hash || '#dashboard').slice(1);
   for(const el of document.querySelectorAll('.page')) el.classList.toggle('on', el.id === id);
   for(const a of document.querySelectorAll('nav.side a')) a.classList.toggle('on', a.dataset.nav === id);
-  (PAGES[id] || dashboard)();
+  switch(id){
+    case 'dispatch': dispatch(); break;
+    case 'roster': rosterPage(); break;
+    case 'callbacks': callbacksPage(); break;
+    case 'billing': billingPage(); break;
+    case 'reviews': reviewsPage(); break;
+    case 'integrations': integrationsPage(); break;
+    case 'cutover': cutoverPage(); break;
+    case 'security': securityPage(); break;
+    case 'operations': operationsPage(); break;
+    default: dashboard();
+  }
 }
 window.addEventListener('hashchange', route);
 
