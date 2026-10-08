@@ -121,7 +121,14 @@ jobs:
             }
 
       - name: Run tests with coverage
-        run: npx vitest run --coverage --reporter=json --outputFile=/tmp/results.json
+        id: vitest
+        # Human-readable failures must appear in the Actions log. The JSON
+        # report is still written for the business-invariant proof step.
+        run: |
+          npx vitest run --coverage \
+            --reporter=default \
+            --reporter=json \
+            --outputFile.json=/tmp/results.json
 
       # Replaces a global minimum test count.
       #
@@ -143,7 +150,10 @@ jobs:
       # Per-directory thresholds, enforced by vitest.config.ts. A single
       # global number would let well-covered helpers mask a gap in pricing.
       - name: Report coverage on critical paths
-        if: always()
+        # Coverage may not be generated when Vitest fails. Do not obscure
+        # the primary test error with a secondary MODULE_NOT_FOUND.
+        # If tests do pass, missing coverage must still fail the job.
+        if: ${{ steps.vitest.outcome == 'success' }}
         run: |
           node -e "
             const s = require('./coverage/coverage-summary.json');
