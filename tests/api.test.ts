@@ -252,7 +252,12 @@ d('HTTP API', () => {
     expect(callback.status).toBe(302);
     expect(callback.headers.location).toBe('https://r2nette.ca/account');
     expect(setCookie(callback, SESSION_COOKIE)).toBeTruthy();
-    expect(setCookie(callback, GOOGLE_LINK_COOKIE)).toBeUndefined();
+    // Clearing a short-lived OAuth link intentionally sends an expired
+    // Set-Cookie header. Prove that the browser discards the link token,
+    // rather than mistakenly expecting the header to be absent.
+    expect(setCookie(callback, GOOGLE_LINK_COOKIE)).toMatch(
+      /^r2n_google_link=; Path=\/; Expires=Thu, 01 Jan 1970 00:00:00 GMT/,
+    );
     expect(
       await prisma.customer.findUnique({
         where: { id: customer.customerId },
