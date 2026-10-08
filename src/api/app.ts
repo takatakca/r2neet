@@ -870,6 +870,10 @@ export function createApi(deps: ApiDeps) {
 
       if (intent === 'google' && googleLinkToken) {
         if (existingPhone && hasCompleteAccount) {
+          // The OTP has just proved this phone. Persist that proof before
+          // completeGoogleLink requires a matching verifiedPhone on the
+          // pending OAuth transaction. Never link on Google identity alone.
+          await markGooglePhoneVerified(googleLinkToken, verified.phoneE164);
           await prisma.$transaction((transaction) =>
             completeGoogleLink(
               transaction,
