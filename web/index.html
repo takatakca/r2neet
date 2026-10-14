@@ -1991,6 +1991,63 @@ button.addon-card{cursor:pointer}
   }
 }
 
+
+/* ----- property context ----- */
+.property-size-grid{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+}
+.property-numbers{
+  margin-top:14px;
+}
+.rental-question{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  margin-top:18px;
+  padding:17px;
+  border:1px solid #dce8f1;
+  border-radius:17px;
+  background:linear-gradient(145deg,#f8fbfd,#fff);
+}
+.rental-question strong{
+  display:block;
+  color:#173f60;
+  font-size:14px;
+}
+.rental-question span{
+  display:block;
+  margin-top:4px;
+  color:#70869a;
+  font-size:12px;
+}
+.rental-options{
+  display:flex;
+  flex:none;
+  gap:6px;
+}
+.rental-options button{
+  min-width:68px;
+  padding:9px 12px;
+  border:1px solid #cedee9;
+  border-radius:11px;
+  background:#fff;
+  color:#496982;
+  font-weight:750;
+}
+.rental-options button[aria-pressed="true"]{
+  border-color:#12a79b;
+  background:#e8f8f5;
+  color:#0b766d;
+  box-shadow:0 0 0 3px rgba(18,167,155,.08);
+}
+@media(max-width:700px){
+  .property-size-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rental-question{align-items:flex-start;flex-direction:column}
+  .rental-options{width:100%}
+  .rental-options button{flex:1}
+}
+
 </style>
 </head>
 <body data-boot="BOOTING">
@@ -2330,8 +2387,9 @@ button.addon-card{cursor:pointer}
           <div class="note" id="verifiedPhone"></div>
           <div class="booking-field"><label class="fl" for="nm" data-t="details.name">Full name</label><input class="inp" id="nm" autocomplete="name"></div>
           <div class="booking-field"><label class="fl" for="em" data-t="details.email">Email</label><input class="inp" id="em" type="email" autocomplete="email"><div class="opt-d" data-t="details.emailNote">Your confirmation will be sent here.</div></div>
-          <div class="booking-field"><label class="fl" for="notes" data-t="details.access">Entry instructions, parking, pets (optional)</label>
-            <textarea class="inp" id="notes" rows="3"></textarea></div>
+          <div class="booking-field"><label class="fl" for="notes" data-t="details.access">Parking, pets or service notes (optional)</label>
+            <textarea class="inp" id="notes" rows="3" maxlength="1000" data-t-placeholder="details.notesPlaceholder" placeholder="Anything that helps the team prepare. Please do not enter alarm or door codes here."></textarea>
+            <div class="opt-d" data-t="details.notesSafety">For security, share access codes directly with the team when needed.</div></div>
           <div class="booking-privacy" data-t="details.privacy">Your booking details stay with R2NETTE and are only used to provide your service.</div>
         </div>
       </div>
