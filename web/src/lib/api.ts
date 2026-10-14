@@ -124,6 +124,7 @@ export interface CustomerContext {
   customer: {
     id: string;
     firstName: string | null;
+    lastName: string | null;
     email: string | null;
     verifiedPhone: string | null;
     isReturningCustomer: boolean;
@@ -135,8 +136,15 @@ export interface CustomerContext {
     requiredStaffCount: number;
     appointmentDurationMinutes: number | null;
     frequency: string;
-    addressId: string;
-    addressSummary: string;
+    addressId: string | null;
+    addressSummary: string | null;
+    property: {
+      propertyType: string;
+      propertySize: string | null;
+      isShortTermRental: boolean;
+      bedrooms: number;
+      bathrooms: number;
+    } | null;
   } | null;
 }
 
