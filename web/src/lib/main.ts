@@ -1212,6 +1212,88 @@ function backToSlots(): void {
   void loadSlots();
 }
 
+function renderLiveBookingSummary(): void {
+  const desktop = $('bookingSummary');
+  const mobile = $('bookingSummaryMobile');
+  if (!desktop || !mobile) return;
+
+  const service = svc();
+  const rows: Array<{ icon: string; title: string; detail?: string; step: string }> = [];
+
+  if (service) {
+    rows.push({
+      icon: '01',
+      title: service.name[locale] ?? service.name.en,
+      detail: `${service.requiredStaffCount} ${service.requiredStaffCount === 1 ? t('service.cleaner') : t('service.cleaners')}`,
+      step: 'service',
+    });
+  }
+
+  if (S.propertyType) {
+    rows.push({
+      icon: '02',
+      title: t(`property.${S.propertyType}`),
+      detail: S.propertySize ?? undefined,
+      step: 'property',
+    });
+  }
+
+  if (S.frequency) {
+    rows.push({
+      icon: '03',
+      title: t(`frequency.${S.frequency}`),
+      detail: S.productSupplyOption
+        ? (S.productSupplyOption === 'CLIENT_SUPPLIED' ? t('products.client') : t('products.r2nette'))
+        : undefined,
+      step: service?.productSupplyMode === 'NOT_APPLICABLE' ? 'frequency' : 'products',
+    });
+  }
+
+  if (S.addressSummary) {
+    rows.push({
+      icon: '04',
+      title: S.addressSummary,
+      step: 'address',
+    });
+  }
+
+  if (S.slotStartAt) {
+    rows.push({
+      icon: '05',
+      title: formatSlotDate(S.slotStartAt, locale),
+      detail: formatSlotTime(S.slotStartAt, locale),
+      step: 'slots',
+    });
+  }
+
+  if (!rows.length) {
+    desktop.hidden = true;
+    mobile.hidden = true;
+    desktop.innerHTML = '';
+    mobile.innerHTML = '';
+    return;
+  }
+
+  desktop.hidden = false;
+  mobile.hidden = false;
+  desktop.innerHTML =
+    `<div class="booking-summary-title">${esc(locale === 'fr' ? 'Votre réservation' : 'Your booking')}</div>` +
+    rows.map((row) => `<div class="booking-summary-row">
+      <div class="booking-summary-icon">${esc(row.icon)}</div>
+      <div class="booking-summary-copy">
+        <strong>${esc(row.title)}</strong>
+        ${row.detail ? `<span>${esc(row.detail)}</span>` : ''}
+        <button type="button" class="booking-summary-edit" data-action="goto" data-step="${esc(row.step)}">
+          ${esc(locale === 'fr' ? 'Modifier' : 'Edit')}
+        </button>
+      </div>
+    </div>`).join('');
+
+  mobile.innerHTML = rows.map((row) =>
+    `<button type="button" class="booking-pill" data-action="goto" data-step="${esc(row.step)}">${esc(row.title)}${row.detail ? ` · ${esc(row.detail)}` : ''}</button>`,
+  ).join('');
+}
+
 function renderBookingJourney(): void {
   const order = visibleSteps();
   const current = Math.max(0, order.indexOf(S.step));
@@ -1272,6 +1354,7 @@ function renderBookingJourney(): void {
 
 function render(): void {
   renderBookingJourney();
+  renderLiveBookingSummary();
   document.querySelectorAll<HTMLElement>('.step').forEach((el) => {
     el.classList.toggle('on', el.dataset.step === S.step);
   });

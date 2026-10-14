@@ -1749,6 +1749,96 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
   .freq{min-height:82px}
 }
 
+
+/* ----- live booking summary ----- */
+.booking-summary{
+  display:grid;
+  gap:10px;
+  margin:0 18px 16px;
+  padding:14px;
+  border:1px solid #e1ebf2;
+  border-radius:16px;
+  background:linear-gradient(145deg,#f8fbfd,#fff);
+}
+.booking-summary[hidden]{display:none}
+.booking-summary-title{
+  color:#70869a;
+  font-size:10.5px;
+  font-weight:800;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+}
+.booking-summary-row{
+  display:grid;
+  grid-template-columns:24px minmax(0,1fr);
+  gap:9px;
+  align-items:start;
+}
+.booking-summary-icon{
+  display:grid;
+  place-items:center;
+  width:24px;
+  height:24px;
+  border-radius:8px;
+  background:#eaf5fb;
+  color:#0b4da2;
+  font-size:12px;
+  font-weight:900;
+}
+.booking-summary-copy strong{
+  display:block;
+  overflow:hidden;
+  color:#173f60;
+  font-size:12.5px;
+  font-weight:750;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.booking-summary-copy span{
+  display:block;
+  overflow:hidden;
+  margin-top:1px;
+  color:#70869a;
+  font-size:11.5px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.booking-summary-edit{
+  margin-top:2px;
+  border:0;
+  background:transparent;
+  color:#0b4da2;
+  font-size:11.5px;
+  font-weight:750;
+  text-align:left;
+  padding:0;
+}
+@media(max-width:999px){
+  .booking-summary-mobile{
+    display:flex;
+    gap:8px;
+    overflow-x:auto;
+    margin:0 0 14px;
+    padding:2px 0 6px;
+    scrollbar-width:none;
+  }
+  .booking-summary-mobile::-webkit-scrollbar{display:none}
+  .booking-summary-mobile .booking-pill{
+    flex:none;
+    max-width:250px;
+    padding:8px 11px;
+    border:1px solid #dce8f1;
+    border-radius:999px;
+    background:#fff;
+    color:#47657f;
+    font-size:11.5px;
+    font-weight:650;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+}
+
 </style>
 </head>
 <body data-boot="BOOTING">
@@ -2025,6 +2115,7 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
         </div>
         <div class="booking-step-count" id="bookingStepCount">1 / 7</div>
       </div>
+      <div class="booking-summary-mobile" id="bookingSummaryMobile" hidden></div>
       <div class="step on" data-step="service">
         <h2 data-t="service.title">What kind of cleaning?</h2>
         <p class="sub" data-t="service.sub">Basic keeps a home maintained. Deep goes after what builds up.</p>
@@ -2110,6 +2201,7 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
     <aside>
       <div class="ledger">
         <div class="lh"><h3 data-t="ledger.title">Your price</h3><span class="mono" style="font-size:11.5px;opacity:.6">CAD</span></div>
+        <div class="booking-summary" id="bookingSummary" hidden></div>
         <div id="ledgerBody"><div class="empty" data-t="ledger.empty">Pick a service and your price appears here, tax included.</div></div>
         <div class="ledger-trust">
           <span data-t="booking.noHiddenFees">No hidden fees</span>

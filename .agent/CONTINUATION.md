@@ -67,7 +67,7 @@ The newest UI commits should continue through the normal repository CI after pus
 
 ## Current active task
 
-Continue polishing the customer booking flow section-by-section, then merge PR #18 to `main` when repository protections permit so automatic R2NETTE deployment can run.
+Booking UX phase 2 is now active after PR #18 merged to main. Live booking summary surfaces were added on desktop and mobile so customers can always see and edit the service, property, frequency/products, address and time they selected.
 
 Priority order:
 1. Service selection clarity and premium presentation.
@@ -77,6 +77,7 @@ Priority order:
 5. Customer details and payment/confirmation trust.
 6. Responsive/mobile pass.
 7. Production deploy verification on `r2nette.ca`.
+8. Continue visual/UX refinement from real production observations without replacing the working booking state machine.
 
 ## After merge/deploy
 
