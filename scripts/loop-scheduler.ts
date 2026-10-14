@@ -17,6 +17,7 @@ import { CardExpiryService } from '../src/payments/dunning-service.js';
 import { CallbackService, TwilioVoiceProvider } from '../src/callbacks/callback-service.js';
 import { WorkerHealthService, AlertService, WebhookAlertSink } from '../src/workers/health.js';
 import { workerExpectations } from '../src/workers/expectations.js';
+import { TakatakSyncDispatcher } from '../src/integrations/takatak-sync.js';
 
 if (existsSync('.env')) {
   for (const line of readFileSync('.env', 'utf8').split('\n')) {
@@ -39,6 +40,7 @@ const callbacks = new CallbackService(prisma, voice.configured ? voice : null);
 
 const health = new WorkerHealthService(prisma, workerExpectations());
 const alerts = new AlertService(prisma, new WebhookAlertSink());
+const takatakSync = new TakatakSyncDispatcher(prisma);
 
 const scheduler = new Scheduler(
   [
@@ -75,6 +77,14 @@ const scheduler = new Scheduler(
       everySeconds: 300,
       expectedWithinSeconds: 1800,
       run: async () => notifications.retryFailed(),
+    },
+    {
+      // Deliver the durable R2NETTE -> TAKATAK outbox. Disabled configuration
+      // is a harmless no-op; once enabled, failures are retained for retry.
+      name: 'takatak-sync',
+      everySeconds: 60,
+      expectedWithinSeconds: 600,
+      run: async () => takatakSync.runBatch(`scheduler-${process.pid}`),
     },
     {
       // Idempotent, so frequent runs are harmless and a missed hour is
