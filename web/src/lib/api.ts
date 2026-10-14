@@ -72,6 +72,16 @@ export interface ServiceOption {
   productSupplyMode: string;
 }
 
+export interface AddOnOption {
+  id: string;
+  slug: string;
+  name: { en: string; fr: string };
+  unitAmountCents: number;
+  unitLabel: { en: string; fr: string };
+  quantityEnabled: boolean;
+  maxQuantity: number;
+}
+
 export interface QuoteLine {
   type: string;
   description: string;
@@ -187,7 +197,7 @@ export const api = {
       body: JSON.stringify({ phoneE164, delay }),
     }),
 
-  services: () => call<{ services: ServiceOption[] }>('/api/v1/services'),
+  services: () => call<{ services: ServiceOption[]; addOns: AddOnOption[] }>('/api/v1/services'),
 
   sendCode: (phone: string) =>
     call<{ sent: boolean; message: string; maskedPhone: string }>('/api/v1/auth/phone/send', {
@@ -315,6 +325,7 @@ export interface BookingDraft {
   bathrooms: number;
   productSupplyOption: string | null;
   frequency: string | null;
+  addOns: Record<string, number>;
   addressId: string | null;
   addressSummary: string | null;
   slotStartAt: string | null;
@@ -333,6 +344,7 @@ export const emptyDraft: BookingDraft = {
   bathrooms: 1,
   productSupplyOption: null,
   frequency: null,
+  addOns: {},
   addressId: null,
   addressSummary: null,
   slotStartAt: null,
