@@ -188,6 +188,8 @@ describe('calendar file', () => {
     paymentStatus: 'NOT_COLLECTED',
     paymentPolicy: 'PAY_LATER',
     crewSize: 2,
+    // Older bookings may have no service context; the API always returns the nullable field.
+    serviceDetails: null,
   };
 
   it('builds an ICS from the persisted booking', () => {
