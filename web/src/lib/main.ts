@@ -38,6 +38,8 @@ import {
   buildIcs,
   type ServiceOption,
   type AddOnOption,
+  type ProductSupplyOption,
+  type FrequencyRule,
   type Quote,
   type CustomerContext,
   type Hold,
@@ -60,6 +62,8 @@ if (S.propertyType === 'airbnb') {
 }
 let services: ServiceOption[] = [];
 let addOns: AddOnOption[] = [];
+let productSupplyOptions: ProductSupplyOption[] = [];
+let frequencyRules: FrequencyRule[] = [];
 let ctx: CustomerContext | null = null;
 let quote: Quote | null = null;
 let hold: Hold | null = null;
@@ -584,6 +588,10 @@ function renderProperty(): void {
   d.innerHTML = details + rental;
 }
 
+function productOption(type: string): ProductSupplyOption | undefined {
+  return productSupplyOptions.find((option) => option.type === type);
+}
+
 function renderProducts(): void {
   const box = $('products');
   const s = svc();
@@ -592,22 +600,42 @@ function renderProducts(): void {
     box.innerHTML = `<div class="note">${esc(t('products.na'))}</div>`;
     return;
   }
-  const deep = s.categoryId === 'cat_deep' || s.id === 'svc_move';
-  const cents = deep ? 1500 : 1200;
-  const code = deep ? 'R2NETTE_DEEP' : 'R2NETTE_BASIC';
-  box.innerHTML = `
-    <button type="button" class="kit" data-action="pick-product" data-product="CLIENT_SUPPLIED"
-      aria-pressed="${S.productSupplyOption === 'CLIENT_SUPPLIED'}">
-      <span class="kit-art own"></span>
-      <span class="kit-b"><span class="kit-t">${esc(t('products.client'))}</span>
-      <span class="kit-d">${esc(t('products.clientSub'))}</span>
-      <span class="kit-p">${formatMoney(0, locale)}</span></span></button>
-    <button type="button" class="kit" data-action="pick-product" data-product="${code}"
-      aria-pressed="${S.productSupplyOption === code}">
-      <span class="kit-art r2"></span>
-      <span class="kit-b"><span class="kit-t">${esc(t('products.r2nette'))}</span>
-      <span class="kit-d">${esc(t('products.r2netteSub'))}</span>
-      <span class="kit-p save">+${formatMoney(cents, locale)} <small>${esc(t('products.plusTax'))}</small></span></span></button>`;
+
+  const allowed = (s.allowedProductOptions ?? [])
+    .map((type) => productOption(type))
+    .filter((option): option is ProductSupplyOption => Boolean(option));
+
+  // Fail visibly instead of inventing a product/price if the catalogue is incomplete.
+  if (!allowed.length) {
+    box.innerHTML = `<div class="note">${esc(t('products.unavailable'))}</div>`;
+    return;
+  }
+
+  // A stale draft from another service must never submit an option the
+  // currently selected service does not allow.
+  if (S.productSupplyOption && !allowed.some((option) => option.type === S.productSupplyOption)) {
+    S.productSupplyOption = null;
+    saveDraft(S);
+  }
+
+  box.innerHTML = allowed.map((option) => {
+    const clientSupplied = option.type === 'CLIENT_SUPPLIED';
+    const title = clientSupplied
+      ? t('products.client')
+      : t('products.r2nette');
+    const detail = clientSupplied
+      ? t('products.clientSub')
+      : (option.type === 'R2NETTE_DEEP' ? t('products.deepSub') : t('products.r2netteSub'));
+    const price = option.amountCents === 0
+      ? t('products.free')
+      : `+${formatMoney(option.amountCents, locale)} <small>${esc(t('products.plusTax'))}</small>`;
+    return `<button type="button" class="kit" data-action="pick-product" data-product="${esc(option.type)}"
+      aria-pressed="${S.productSupplyOption === option.type}">
+      <span class="kit-art ${clientSupplied ? 'own' : 'r2'}"></span>
+      <span class="kit-b"><span class="kit-t">${esc(title)}</span>
+      <span class="kit-d">${esc(detail)}</span>
+      <span class="kit-p${clientSupplied ? '' : ' save'}">${price}</span></span></button>`;
+  }).join('');
 }
 
 function renderFrequency(): void {
@@ -615,13 +643,21 @@ function renderFrequency(): void {
   if (!box) return;
   const s = svc();
   const allowed = s ? s.allowedFrequencies : [];
-  const pct: Record<string, number> = { ONE_TIME: 0, MONTHLY: 10, BIWEEKLY: 15, WEEKLY: 25 };
-  box.innerHTML = ['ONE_TIME', 'MONTHLY', 'BIWEEKLY', 'WEEKLY']
-    .map((f) => {
+  const rules = frequencyRules.length
+    ? frequencyRules
+    : allowed.map((frequency) => ({
+        frequency,
+        label: { en: t('frequency.' + frequency), fr: t('frequency.' + frequency) },
+        discountPercent: 0,
+      }));
+  const maxDiscount = Math.max(0, ...rules.map((rule) => rule.discountPercent));
+  box.innerHTML = rules
+    .map((rule) => {
+      const f = rule.frequency;
       const ok = allowed.includes(f);
-      const hero = f === 'WEEKLY' && ok;
-      const save = pct[f]
-        ? `<span class="freq-save">${esc(t('frequency.save', { p: pct[f]! }))}</span>`
+      const hero = ok && rule.discountPercent > 0 && rule.discountPercent === maxDiscount;
+      const save = rule.discountPercent > 0
+        ? `<span class="freq-save">${esc(t('frequency.save', { p: rule.discountPercent }))}</span>`
         : '';
       // The badge lives INSIDE the card: a <button> clips overflow, so
       // anything hanging off its edge gets cut.
@@ -1418,7 +1454,7 @@ function renderLiveBookingSummary(): void {
       icon: '03',
       title: t(`frequency.${S.frequency}`),
       detail: S.productSupplyOption
-        ? (S.productSupplyOption === 'CLIENT_SUPPLIED' ? t('products.client') : t('products.r2nette'))
+        ? (productOption(S.productSupplyOption)?.name[locale] ?? productOption(S.productSupplyOption)?.name.en ?? undefined)
         : undefined,
       step: service?.productSupplyMode === 'NOT_APPLICABLE' ? 'frequency' : 'products',
     });
@@ -2146,6 +2182,8 @@ export async function boot(): Promise<void> {
     const catalogue = await api.services();
     services = catalogue.services;
     addOns = catalogue.addOns;
+    productSupplyOptions = catalogue.productSupplyOptions;
+    frequencyRules = catalogue.frequencyRules;
   } catch (e) {
     setBoot('API_UNAVAILABLE', String(e));
     return;

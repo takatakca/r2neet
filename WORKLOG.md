@@ -3,6 +3,7 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-10-14 | codex | codex/booking-product-catalogue-20261014 → PR pending | ready to merge | Product options/prices and frequency savings are now server-driven; stale incompatible product drafts clear automatically | merge to main, continue auditing booking for client/backend drift
 - 2026-10-14 | codex | codex/booking-service-context-20261014 → PR pending | ready to merge | Made property/contact fields operational: correct rental model, additive booking serviceDetails, real profile save, safe usual-clean reuse, crew context | review diff then merge to main and continue booking UX
 - 2026-10-14 | codex | codex/booking-extras-20261014 → PR pending | ready to merge | Connected active backend add-ons to booking catalogue, draft, quote payload, live summary and bilingual premium quantity UI | merge to main and continue property/short-term-rental booking polish
 - 2026-10-14 | codex | codex/booking-experience-phase2-20261014 → PR pending | ready to merge | Booking UX phase 2: live desktop/mobile booking summary with direct edit links and stronger continuity across the flow | open/merge PR to main; production stays protected by existing CI/deploy gate; TAKATAK sync remains disabled

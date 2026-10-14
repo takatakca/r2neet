@@ -70,6 +70,19 @@ export interface ServiceOption {
   labourMinutes: number | null;
   allowedFrequencies: string[];
   productSupplyMode: string;
+  allowedProductOptions: string[];
+}
+
+export interface ProductSupplyOption {
+  type: string;
+  name: { en: string; fr: string };
+  amountCents: number;
+}
+
+export interface FrequencyRule {
+  frequency: string;
+  label: { en: string; fr: string };
+  discountPercent: number;
 }
 
 export interface AddOnOption {
@@ -213,7 +226,13 @@ export const api = {
       body: JSON.stringify({ phoneE164, delay }),
     }),
 
-  services: () => call<{ services: ServiceOption[]; addOns: AddOnOption[] }>('/api/v1/services'),
+  services: () =>
+    call<{
+      services: ServiceOption[];
+      addOns: AddOnOption[];
+      productSupplyOptions: ProductSupplyOption[];
+      frequencyRules: FrequencyRule[];
+    }>('/api/v1/services'),
 
   sendCode: (phone: string) =>
     call<{ sent: boolean; message: string; maskedPhone: string }>('/api/v1/auth/phone/send', {
