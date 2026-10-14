@@ -910,7 +910,10 @@ function renderDetails(): void {
   }
   const nm = $('nm') as HTMLInputElement | null;
   const em = $('em') as HTMLInputElement | null;
-  if (nm && !nm.value) nm.value = S.name || c?.firstName || '';
+  if (nm && !nm.value) {
+    const profileName = [c?.firstName, c?.lastName].filter(Boolean).join(' ');
+    nm.value = S.name || profileName;
+  }
   if (em && !em.value) em.value = S.email || c?.email || '';
   const notes = $('notes') as HTMLTextAreaElement | null;
   if (notes && !notes.value && S.notes) notes.value = S.notes;
@@ -1736,6 +1739,14 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
     S.addressSummary = usual.addressSummary;
     S.productSupplyOption =
       S.productSupplyOption ?? 'CLIENT_SUPPLIED';
+
+    if (usual.property) {
+      S.propertyType = usual.property.propertyType;
+      S.propertySize = usual.property.propertySize;
+      S.isShortTermRental = usual.property.isShortTermRental;
+      S.bedrooms = usual.property.bedrooms;
+      S.bathrooms = usual.property.bathrooms;
+    }
 
     saveDraft(S);
 
