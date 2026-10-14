@@ -76,6 +76,17 @@ The newest UI commits should continue through the normal repository CI after pus
 - Assigned crew receives the property context/service notes through its scoped jobs endpoint.
 - Confirmation shows the persisted property context.
 
+## Server-driven booking catalogue completion
+
+- Removed hardcoded $12/$15 product pricing from the browser.
+- Public booking catalogue now exposes each service's allowed product options and the authoritative product amounts from server configuration.
+- Product selection only shows options the selected service actually permits.
+- Stale product selections are cleared when incompatible with a newly selected service.
+- Removed hardcoded 10%/15%/25% frequency display values from the browser.
+- Frequency savings now come from server `FREQUENCY_RULES`; the highest allowed discount is highlighted automatically.
+- Live booking summary uses the selected server product name.
+- Final quote/taxes remain server-authoritative as before.
+
 ## Latest booking completion
 
 - Connected the existing ADD_ONS backend catalogue to the public booking catalogue.
