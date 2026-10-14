@@ -129,7 +129,9 @@ const en: Dict = {
   'products.client': 'I have my products',
   'products.clientSub': "We'll use what you already have.",
   'products.r2nette': 'R2NETTE brings everything',
-  'products.r2netteSub': 'Professional products, restocked every visit.',
+  'products.r2netteSub': 'Professional everyday products, restocked every visit.',
+  'products.deepSub': 'Professional deep-clean products for tougher buildup.',
+  'products.unavailable': 'Product options are temporarily unavailable for this service. Please choose another service or call us.',
   'products.free': 'No charge',
   'products.plusTax': 'per visit + tax',
 
@@ -492,7 +494,9 @@ const fr: Dict = {
   'products.client': "J'ai mes produits",
   'products.clientSub': 'Nous utiliserons ce que vous avez déjà.',
   'products.r2nette': 'R2NETTE apporte tout',
-  'products.r2netteSub': 'Produits professionnels, réapprovisionnés chaque visite.',
+  'products.r2netteSub': 'Produits professionnels courants, réapprovisionnés à chaque visite.',
+  'products.deepSub': 'Produits professionnels de grand ménage pour les accumulations tenaces.',
+  'products.unavailable': 'Les options de produits sont temporairement indisponibles pour ce service. Choisissez un autre service ou appelez-nous.',
   'products.free': 'Sans frais',
   'products.plusTax': 'par visite + taxes',
 
