@@ -338,7 +338,7 @@ function renderServiceOptions(): void {
           aria-pressed="${S.serviceOptionId === s.id}">
           <span class="chk">${TICK}</span>
           <span class="opt-b"><span class="opt-t">${esc(s.name[locale] ?? s.name.en)}</span>
-          <span class="opt-d">${esc(crew + dur)}</span></span>
+          <span class="service-choice-meta"><span>${esc(crew)}</span>${hrs ? `<span>${esc(`${hrs} ${t('service.hours')}`)}</span>` : ''}</span></span>
           <span class="opt-p">${price}</span></button>`;
       })
       .join('') +
@@ -514,6 +514,7 @@ const PROPS = [
 function renderProperty(): void {
   const box = $('propTypes');
   if (!box) return;
+  box.classList.add('property-grid');
   box.innerHTML = PROPS.map(
     (p) => `<button type="button" class="opt tile" data-action="pick-prop" data-prop="${p.id}"
       aria-pressed="${S.propertyType === p.id}"><span class="ic">${p.ic}</span>
