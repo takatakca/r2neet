@@ -1136,6 +1136,352 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
     width: 100%;
   }
 }
+
+/* ==================================================================
+   Booking experience 2026 — premium guided flow
+   Keeps the existing booking state machine; this layer makes the
+   experience feel calm, obvious and trustworthy on every screen size.
+   ================================================================== */
+.booking{
+  position:relative;
+  max-width:1220px;
+  padding-top:30px;
+}
+.booking:before{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  inset:10px -60px auto;
+  height:440px;
+  border-radius:44px;
+  background:
+    radial-gradient(circle at 18% 10%,rgba(59,169,245,.12),transparent 34%),
+    radial-gradient(circle at 82% 12%,rgba(18,167,155,.10),transparent 30%),
+    linear-gradient(180deg,#f7fbff 0%,rgba(247,251,255,0) 100%);
+}
+.booking-intro{
+  display:grid;
+  gap:22px;
+  margin-bottom:22px;
+  padding:28px 30px;
+  border:1px solid rgba(10,37,71,.09);
+  border-radius:28px;
+  background:linear-gradient(135deg,rgba(255,255,255,.98),rgba(243,249,253,.96));
+  box-shadow:0 18px 50px rgba(10,37,71,.08);
+}
+.booking-intro-copy{max-width:720px}
+.booking-kicker{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:8px;
+  color:var(--aqua-dk);
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.booking-kicker:before{
+  content:"";
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 0 5px rgba(63,174,73,.12);
+}
+.booking-intro h2{
+  margin:0;
+  max-width:760px;
+  font-size:clamp(30px,5vw,48px);
+}
+.booking-intro p{
+  max-width:680px;
+  margin:10px 0 0;
+  color:var(--muted);
+  font-size:16.5px;
+}
+.booking-assurance{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.booking-assurance span{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:34px;
+  padding:7px 11px;
+  border:1px solid #d7e7f2;
+  border-radius:999px;
+  background:#fff;
+  color:#345673;
+  font-size:12.5px;
+  font-weight:650;
+}
+.booking-assurance span:before{
+  content:"✓";
+  display:grid;
+  place-items:center;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:rgba(18,167,155,.12);
+  color:var(--aqua-dk);
+  font-size:11px;
+  font-weight:900;
+}
+.phases{
+  position:sticky;
+  top:72px;
+  z-index:35;
+  gap:8px;
+  margin:0 0 16px;
+  padding:10px;
+  border:1px solid rgba(10,37,71,.08);
+  border-radius:18px;
+  background:rgba(251,252,253,.92);
+  box-shadow:0 10px 30px rgba(10,37,71,.06);
+  backdrop-filter:blur(14px);
+}
+.phase{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-height:42px;
+  padding:8px 10px;
+  border:0;
+  border-radius:12px;
+  color:#6a8298;
+  letter-spacing:.025em;
+  text-transform:none;
+  transition:background var(--t-base),color var(--t-base),transform var(--t-fast);
+}
+.phase:before{
+  content:attr(data-number);
+  display:grid;
+  place-items:center;
+  width:24px;
+  height:24px;
+  flex:none;
+  border:1px solid #cbdce8;
+  border-radius:50%;
+  background:#fff;
+  color:#6a8298;
+  font-family:'JetBrains Mono';
+  font-size:10px;
+}
+.phase:hover{background:#eef6fb;transform:translateY(-1px)}
+.phase.on{
+  color:#fff;
+  background:linear-gradient(135deg,#0B4DA2,#168DE8);
+  box-shadow:0 7px 18px rgba(11,77,162,.20);
+}
+.phase.on:before{
+  border-color:rgba(255,255,255,.35);
+  background:rgba(255,255,255,.16);
+  color:#fff;
+}
+.phase.done{
+  color:#126b63;
+  background:#edf9f7;
+}
+.phase.done:before{
+  content:"✓";
+  border-color:rgba(18,167,155,.26);
+  background:#dff5f1;
+  color:#0e786f;
+}
+.booking .grid{
+  gap:20px;
+  align-items:start;
+}
+.booking-stage{
+  min-width:0;
+  padding:28px;
+  border:1px solid rgba(10,37,71,.09);
+  border-radius:26px;
+  background:#fff;
+  box-shadow:0 18px 50px rgba(10,37,71,.08);
+}
+.booking-stage-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:24px;
+  padding-bottom:18px;
+  border-bottom:1px solid #e5eef5;
+}
+.booking-stage-label{
+  color:var(--aqua-dk);
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.booking-stage-context{
+  margin-top:4px;
+  color:var(--muted);
+  font-size:13px;
+}
+.booking-step-count{
+  flex:none;
+  padding:7px 10px;
+  border-radius:999px;
+  background:#f0f6fb;
+  color:#526f88;
+  font-family:'JetBrains Mono';
+  font-size:11px;
+  font-weight:700;
+}
+.step h2{max-width:700px}
+.step p.sub{max-width:650px}
+.fams{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+}
+.landing-service-card{
+  border-radius:20px;
+  box-shadow:0 9px 30px rgba(10,37,71,.08);
+}
+.landing-service-photo{height:164px}
+.landing-service-content{padding:17px 18px 18px}
+.landing-service-copy strong{font-size:18px}
+.opt,.kit,.freq{
+  border-color:#dbe7f0;
+  box-shadow:0 5px 16px rgba(10,37,71,.04);
+}
+.opt[aria-pressed="true"],.kit[aria-pressed="true"],.freq[aria-pressed="true"]{
+  box-shadow:0 0 0 3px rgba(18,167,155,.13),0 10px 28px rgba(10,37,71,.08);
+}
+.booking aside{
+  position:sticky;
+  top:140px;
+}
+.ledger{
+  overflow:hidden;
+  border:1px solid rgba(10,37,71,.10);
+  border-radius:24px;
+  background:#fff;
+  box-shadow:0 18px 52px rgba(10,37,71,.11);
+}
+.ledger:before{
+  content:"";
+  display:block;
+  height:5px;
+  background:linear-gradient(90deg,var(--deep),var(--electric),var(--teal),var(--lime));
+}
+.ledger .lh{
+  padding:20px 20px 14px;
+}
+.ledger .lh h3{font-size:22px}
+.ledger-trust{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+  padding:0 18px 18px;
+}
+.ledger-trust span{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  color:#5c748b;
+  font-size:11.5px;
+}
+.ledger-trust span:before{
+  content:"✓";
+  color:var(--teal);
+  font-weight:900;
+}
+#nav{
+  position:sticky;
+  bottom:14px;
+  z-index:20;
+  padding:10px;
+  border:1px solid rgba(10,37,71,.09);
+  border-radius:18px;
+  background:rgba(255,255,255,.94);
+  box-shadow:0 14px 38px rgba(10,37,71,.14);
+  backdrop-filter:blur(15px);
+}
+#nav .btn{min-height:52px}
+.booking-support{
+  margin-top:14px;
+  color:#688096;
+  font-size:12.5px;
+  text-align:center;
+}
+.booking-support a{color:var(--deep);font-weight:700;text-decoration:none}
+@media(max-width:999px){
+  .booking{padding-top:22px}
+  .booking-intro{padding:24px}
+  .booking aside{display:none}
+  .booking-stage{padding:24px}
+  .fams{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .sticky{display:block}
+}
+@media(max-width:700px){
+  .booking{padding-inline:14px}
+  .booking:before{inset:0 -10px auto;border-radius:0}
+  .booking-intro{
+    gap:16px;
+    margin-bottom:12px;
+    padding:21px 18px;
+    border-radius:22px;
+  }
+  .booking-intro h2{font-size:30px}
+  .booking-intro p{font-size:15px}
+  .booking-assurance{gap:6px}
+  .booking-assurance span{font-size:11.5px}
+  .phases{
+    top:64px;
+    gap:4px;
+    margin-inline:-3px;
+    padding:6px;
+    border-radius:15px;
+  }
+  .phase{
+    min-height:38px;
+    gap:4px;
+    padding:6px 3px;
+    font-size:10px;
+  }
+  .phase:before{width:20px;height:20px;font-size:9px}
+  .booking-stage{
+    padding:20px 16px 96px;
+    border-radius:22px;
+  }
+  .booking-stage-top{margin-bottom:20px}
+  .booking-stage-context{display:none}
+  .booking-step-count{font-size:10px}
+  .fams{grid-template-columns:1fr}
+  .landing-service-card{
+    display:grid;
+    grid-template-columns:118px 1fr;
+    min-height:112px;
+  }
+  .landing-service-photo{height:100%;min-height:112px}
+  .landing-service-content{align-self:center}
+  .opts.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #nav{
+    position:fixed;
+    left:10px;
+    right:10px;
+    bottom:calc(82px + env(safe-area-inset-bottom));
+    margin:0;
+  }
+  #nav .btn-primary{font-size:15px}
+  #nav .btn-ghost{max-width:112px}
+  .sticky{
+    z-index:50;
+    border-top:1px solid rgba(10,37,71,.08);
+    background:rgba(255,255,255,.97);
+    box-shadow:0 -12px 32px rgba(10,37,71,.10);
+  }
+  .sticky-in{padding-top:9px;padding-bottom:calc(9px + env(safe-area-inset-bottom))}
+  .help-fab{bottom:calc(158px + env(safe-area-inset-bottom))}
+}
+
 </style>
 </head>
 <body data-boot="BOOTING">
@@ -1345,11 +1691,25 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
 </section>
 
 <section class="booking wrap" id="book">
+  <div class="booking-intro">
+    <div class="booking-intro-copy">
+      <div class="booking-kicker" data-t="booking.kicker">Online booking</div>
+      <h2 data-t="booking.title">Your cleaning, booked without the back-and-forth.</h2>
+      <p data-t="booking.sub">Choose what you need, see real availability and know the full price before you confirm.</p>
+    </div>
+    <div class="booking-assurance" aria-label="Booking assurances">
+      <span data-t="booking.assurancePrice">Transparent price</span>
+      <span data-t="booking.assuranceTime">Real availability</span>
+      <span data-t="booking.assuranceSecure">Secure booking</span>
+    </div>
+  </div>
+
   <nav class="phases" aria-label="Booking progress">
     <button
       type="button"
       class="phase on"
       data-phase="CLEAN"
+      data-number="1"
       data-action="go-phase"
       data-t="phase.clean"
     >
@@ -1360,6 +1720,7 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
       type="button"
       class="phase"
       data-phase="HOME"
+      data-number="2"
       data-action="go-phase"
       data-t="phase.home"
     >
@@ -1370,6 +1731,7 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
       type="button"
       class="phase"
       data-phase="TIME"
+      data-number="3"
       data-action="go-phase"
       data-t="phase.time"
     >
@@ -1380,6 +1742,7 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
       type="button"
       class="phase"
       data-phase="CONFIRM"
+      data-number="4"
       data-action="go-phase"
       data-t="phase.confirm"
     >
@@ -1387,7 +1750,14 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
     </button>
   </nav>
   <div class="grid">
-    <div>
+    <div class="booking-stage">
+      <div class="booking-stage-top">
+        <div>
+          <div class="booking-stage-label" id="bookingStageLabel" data-t="booking.stageLabel">Build your cleaning</div>
+          <div class="booking-stage-context" id="bookingStageContext" data-t="booking.stageContext">Your selections are saved as you go.</div>
+        </div>
+        <div class="booking-step-count" id="bookingStepCount">1 / 7</div>
+      </div>
       <div class="step on" data-step="service">
         <h2 data-t="service.title">What kind of cleaning?</h2>
         <p class="sub" data-t="service.sub">Basic keeps a home maintained. Deep goes after what builds up.</p>
@@ -1459,12 +1829,19 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
         <button class="btn btn-ghost" id="backBtn" data-action="back" data-t="common.back">Back</button>
         <button class="btn btn-primary" style="flex:1" data-action="next" data-t="common.continue">Continue</button>
       </div>
+      <div class="booking-support"><span data-t="booking.help">Need help booking?</span> <a href="tel:+15148252825">(514) 825-2825</a></div>
     </div>
 
     <aside>
       <div class="ledger">
         <div class="lh"><h3 data-t="ledger.title">Your price</h3><span class="mono" style="font-size:11.5px;opacity:.6">CAD</span></div>
         <div id="ledgerBody"><div class="empty" data-t="ledger.empty">Pick a service and your price appears here, tax included.</div></div>
+        <div class="ledger-trust">
+          <span data-t="booking.noHiddenFees">No hidden fees</span>
+          <span data-t="booking.taxIncluded">Taxes shown clearly</span>
+          <span data-t="booking.livePrice">Live price</span>
+          <span data-t="booking.secure">Secure checkout</span>
+        </div>
       </div>
     </aside>
   </div>
