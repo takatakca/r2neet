@@ -119,6 +119,8 @@ const en: Dict = {
   'property.chalet': 'Chalet',
   'property.commercial': 'Commercial',
   'property.other': 'Other',
+  'property.shortTermTitle': 'Is this a short-term rental?',
+  'property.shortTermSub': 'Airbnb, Vrbo or another guest turnover property.',
 
   'products.title': 'Who brings the cleaning products?',
   'products.sub': 'We need to know what to load in the van.',
@@ -178,7 +180,9 @@ const en: Dict = {
   'details.name': 'Full name',
   'details.email': 'Email',
   'details.emailNote': 'Your confirmation goes here.',
-  'details.access': 'Entry instructions, parking, pets (optional)',
+  'details.access': 'Parking, pets or service notes (optional)',
+  'details.notesPlaceholder': 'Anything that helps the team prepare. Please do not enter alarm or door codes here.',
+  'details.notesSafety': 'For security, share access codes directly with the team when needed.',
 
   'checkout.title': 'Review and confirm',
   'checkout.sub': 'One last check. Your selected time is held while you finish.',
@@ -245,6 +249,8 @@ const en: Dict = {
 
   'common.continue': 'Continue',
   'common.back': 'Back',
+  'common.yes': 'Yes',
+  'common.no': 'No',
   'common.retry': 'Try again',
   'common.loading': 'Loading…',
 
@@ -473,6 +479,8 @@ const fr: Dict = {
   'property.chalet': 'Chalet',
   'property.commercial': 'Commercial',
   'property.other': 'Autre',
+  'property.shortTermTitle': 'Est-ce une location à court terme?',
+  'property.shortTermSub': 'Airbnb, Vrbo ou autre propriété avec rotation de voyageurs.',
 
   'products.title': 'Qui fournit les produits?',
   'products.sub': 'Nous devons savoir quoi charger dans la camionnette.',
@@ -532,7 +540,9 @@ const fr: Dict = {
   'details.name': 'Nom complet',
   'details.email': 'Courriel',
   'details.emailNote': 'Votre confirmation sera envoyée ici.',
-  'details.access': "Instructions d'accès, stationnement, animaux (facultatif)",
+  'details.access': 'Stationnement, animaux ou notes de service (facultatif)',
+  'details.notesPlaceholder': 'Tout ce qui aide l’équipe à se préparer. N’inscrivez pas de code d’alarme ou de porte ici.',
+  'details.notesSafety': 'Pour votre sécurité, transmettez les codes d’accès directement à l’équipe au besoin.',
 
   'checkout.title': 'Vérifier et confirmer',
   'checkout.sub': 'Une dernière vérification. Votre plage est retenue pendant que vous terminez.',
@@ -599,6 +609,8 @@ const fr: Dict = {
 
   'common.continue': 'Continuer',
   'common.back': 'Retour',
+  'common.yes': 'Oui',
+  'common.no': 'Non',
   'common.retry': 'Réessayer',
   'common.loading': 'Chargement…',
 
