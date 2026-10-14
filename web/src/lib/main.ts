@@ -1211,7 +1211,66 @@ function backToSlots(): void {
   void loadSlots();
 }
 
+function renderBookingJourney(): void {
+  const order = visibleSteps();
+  const current = Math.max(0, order.indexOf(S.step));
+  const count = $('bookingStepCount');
+  if (count) count.textContent = `${Math.min(current + 1, order.length)} / ${order.length}`;
+
+  const label = $('bookingStageLabel');
+  const context = $('bookingStageContext');
+  const copy: Record<string, { en: [string, string]; fr: [string, string] }> = {
+    service: {
+      en: ['Choose your cleaning', 'Start with the service that best matches your home.'],
+      fr: ['Choisissez votre ménage', 'Commencez par le service qui correspond le mieux à votre domicile.'],
+    },
+    welcome: {
+      en: ['Welcome back', 'We found your R2NETTE profile so you can move faster.'],
+      fr: ['Bon retour', 'Nous avons retrouvé votre profil R2NETTE pour accélérer la réservation.'],
+    },
+    property: {
+      en: ['Tell us about the space', 'A few details help us plan the right crew and duration.'],
+      fr: ['Parlez-nous du logement', 'Quelques détails nous aident à prévoir la bonne équipe et la bonne durée.'],
+    },
+    products: {
+      en: ['Choose your product setup', 'Bring your own or let R2NETTE arrive fully equipped.'],
+      fr: ['Choisissez vos produits', 'Utilisez les vôtres ou laissez R2NETTE arriver entièrement équipé.'],
+    },
+    frequency: {
+      en: ['Choose your rhythm', 'Recurring cleaning can lower the price on every visit.'],
+      fr: ['Choisissez votre rythme', 'Un ménage récurrent peut réduire le prix de chaque visite.'],
+    },
+    address: {
+      en: ['Where should we come?', 'Your address is used for service availability and accurate pricing.'],
+      fr: ['Où devons-nous aller?', 'Votre adresse sert à confirmer la disponibilité et le prix exact.'],
+    },
+    slots: {
+      en: ['Pick a real opening', 'These times come from current R2NETTE availability.'],
+      fr: ['Choisissez une vraie disponibilité', 'Ces heures proviennent des disponibilités R2NETTE actuelles.'],
+    },
+    details: {
+      en: ['Finish your details', 'We only need what is required to complete and service the booking.'],
+      fr: ['Finalisez vos coordonnées', 'Nous demandons seulement ce qui est nécessaire pour compléter le ménage.'],
+    },
+    checkout: {
+      en: ['Review before confirming', 'Check the service, price and payment details before you book.'],
+      fr: ['Vérifiez avant de confirmer', 'Validez le service, le prix et le paiement avant de réserver.'],
+    },
+    confirmation: {
+      en: ['Booking confirmed', 'Everything you need for this cleaning is now in one place.'],
+      fr: ['Réservation confirmée', 'Tout ce qu’il faut pour ce ménage est maintenant regroupé au même endroit.'],
+    },
+  };
+  const selected = copy[S.step];
+  if (selected) {
+    const [title, body] = selected[locale];
+    if (label) label.textContent = title;
+    if (context) context.textContent = body;
+  }
+}
+
 function render(): void {
+  renderBookingJourney();
   document.querySelectorAll<HTMLElement>('.step').forEach((el) => {
     el.classList.toggle('on', el.dataset.step === S.step);
   });
