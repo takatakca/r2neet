@@ -228,6 +228,15 @@ export function validateProductionEnvironment(
         });
       }
     }
+    if (
+      present(env, 'TAKATAK_R2NETTE_SYNC_WEBHOOK_SECRET') &&
+      weakEncryptionKey(env.TAKATAK_R2NETTE_SYNC_WEBHOOK_SECRET!)
+    ) {
+      issues.push({
+        severity: 'FATAL',
+        message: 'TAKATAK_R2NETTE_SYNC_WEBHOOK_SECRET is too weak; use at least 32 high-entropy characters.',
+      });
+    }
   }
 
   if (present(env, 'TEST_DATABASE_URL') && present(env, 'DATABASE_URL')) {
