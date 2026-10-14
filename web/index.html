@@ -1839,6 +1839,158 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
   }
 }
 
+
+/* ----- optional booking extras ----- */
+.addons-block{
+  margin-top:26px;
+  padding-top:24px;
+  border-top:1px solid #e3edf4;
+}
+.addons-head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:12px;
+}
+.addons-head h3{
+  margin:0;
+  color:#123d5f;
+  font-size:20px;
+}
+.addons-head p{
+  margin:4px 0 0;
+  color:#6a8298;
+  font-size:13px;
+}
+.addons-count{
+  flex:none;
+  padding:6px 10px;
+  border-radius:999px;
+  background:#eef6fb;
+  color:#53728d;
+  font-size:11px;
+  font-weight:750;
+}
+.addons-grid{
+  display:grid;
+  gap:10px;
+}
+.addon-card{
+  display:flex;
+  width:100%;
+  min-height:72px;
+  align-items:center;
+  gap:12px;
+  padding:13px 14px;
+  border:1px solid #dce8f1;
+  border-radius:16px;
+  background:#fff;
+  color:#173f60;
+  text-align:left;
+  box-shadow:0 5px 16px rgba(10,37,71,.04);
+  transition:border-color 160ms ease,box-shadow 160ms ease,background 160ms ease;
+}
+button.addon-card{cursor:pointer}
+.addon-card.selected,
+.addon-card[aria-pressed="true"]{
+  border-color:#66c8bd;
+  background:linear-gradient(145deg,#f1fbf9,#fff);
+  box-shadow:0 0 0 3px rgba(18,167,155,.09),0 8px 22px rgba(10,37,71,.06);
+}
+.addon-main{
+  display:flex;
+  flex:1;
+  min-width:0;
+  align-items:center;
+  gap:12px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:inherit;
+  text-align:left;
+}
+.addon-check{
+  display:grid;
+  place-items:center;
+  width:30px;
+  height:30px;
+  flex:none;
+  border:1px solid #cfe0eb;
+  border-radius:10px;
+  background:#f4f9fc;
+  color:#168de8;
+  font-weight:900;
+}
+.addon-card.selected .addon-check,
+.addon-card[aria-pressed="true"] .addon-check{
+  border-color:#8ed8cf;
+  background:#e3f7f3;
+  color:#0d8176;
+}
+.addon-copy{
+  min-width:0;
+  flex:1;
+}
+.addon-copy strong{
+  display:block;
+  color:#173f60;
+  font-size:14.5px;
+  font-weight:750;
+}
+.addon-copy span{
+  display:block;
+  margin-top:3px;
+  color:#748a9d;
+  font-size:12px;
+}
+.addon-price{
+  flex:none;
+  color:#0b4da2;
+  font-family:'JetBrains Mono';
+  font-size:12.5px;
+  font-weight:800;
+}
+.addon-qty{
+  display:flex;
+  flex:none;
+  align-items:center;
+  gap:8px;
+  padding-left:10px;
+  border-left:1px solid #e1ebf2;
+}
+.addon-qty[hidden]{display:none}
+.addon-qty button{
+  display:grid;
+  place-items:center;
+  width:30px;
+  height:30px;
+  padding:0;
+  border:1px solid #cfe0eb;
+  border-radius:9px;
+  background:#fff;
+  color:#0b4da2;
+  font-size:18px;
+  font-weight:700;
+}
+.addon-qty span{
+  min-width:20px;
+  color:#173f60;
+  font-family:'JetBrains Mono';
+  font-size:12px;
+  font-weight:800;
+  text-align:center;
+}
+@media(max-width:700px){
+  .addons-head{align-items:flex-start}
+  .addon-card{align-items:flex-start}
+  .addon-price{padding-top:5px}
+  .addon-qty{
+    align-self:center;
+    padding-left:8px;
+  }
+}
+
 </style>
 </head>
 <body data-boot="BOOTING">
@@ -2141,6 +2293,16 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
         <h2 data-t="frequency.title">How often?</h2>
         <p class="sub" data-t="frequency.sub">Recurring plans discount the cleaning on every visit.</p>
         <div id="freq"></div>
+        <div class="addons-block">
+          <div class="addons-head">
+            <div>
+              <h3 data-t="addons.title">Add a little extra</h3>
+              <p data-t="addons.sub">Optional. Choose only what would make this visit easier.</p>
+            </div>
+            <div class="addons-count" id="addonsCount" data-t="addons.optional">Optional</div>
+          </div>
+          <div class="addons-grid" id="addons"></div>
+        </div>
       </div>
 
       <div class="step" data-step="address">
