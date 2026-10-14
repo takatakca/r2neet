@@ -69,8 +69,9 @@ Production activation sequence:
 4. Put the matching client id and secret in the R2NETTE GitHub production environment. Never paste secret values in issues, docs or chat.
 5. Set the R2NETTE URL to the deployed receiver, currently designed as `https://takatak.ca/api/integrations/r2nette/events`.
 6. Keep `TAKATAK_R2NETTE_SYNC_ENABLED=false` until both ends are configured.
-7. Enable it, rerun the R2NETTE server setup/deploy workflow through the normal approved production gate, and verify the `takatak-sync` worker succeeds.
-8. Verify a test registration/profile update reaches TAKATAK, then a test payment summary. Do not use destructive production payment tests.
+7. After the outbox migration is deployed, run `npm run sync:takatak-backfill` once in the R2NETTE application environment. It only queues deterministic current snapshots; it does not call TAKATAK and is safe to rerun.
+8. Enable the bridge, rerun the R2NETTE server setup/deploy workflow through the normal approved production gate, and verify the `takatak-sync` worker succeeds.
+9. Verify a test registration/profile update reaches TAKATAK, then a test payment summary. Do not use destructive production payment tests.
 
 ## Failure handling
 
