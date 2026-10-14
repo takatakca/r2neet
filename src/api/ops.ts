@@ -185,6 +185,7 @@ export function createOpsApi(deps: OpsDeps) {
           service: b.service.nameEn,
           customerName: b.customer.firstName ?? 'Customer',
           address: b.address.formattedAddress,
+          serviceDetails: b.serviceDetails,
           crewSize: b.staff.length,
           requiredStaffCount: b.service.requiredStaffCount,
           status: b.status,
@@ -235,6 +236,7 @@ export function createOpsApi(deps: OpsDeps) {
           customerName: b.customer.firstName ?? 'Customer',
           address: b.address.formattedAddress,
           city: b.address.city,
+          serviceDetails: b.serviceDetails,
           status: b.status,
           grandTotalCents: b.grandTotalCents,
         })),
@@ -824,6 +826,7 @@ export function createOpsApi(deps: OpsDeps) {
           city: b.address.city,
           latitude: b.address.latitude,
           longitude: b.address.longitude,
+          serviceDetails: b.serviceDetails,
           status: b.status,
           // No grandTotal, no payment status, no risk data.
         })),

@@ -118,7 +118,11 @@ const en: Dict = {
   'property.airbnb': 'Airbnb',
   'property.chalet': 'Chalet',
   'property.commercial': 'Commercial',
+  'property.commercialScope': 'Commercial spaces are scoped by the selected service. Add any site-specific details before checkout.',
   'property.other': 'Other',
+  'property.shortTermTitle': 'Is this a short-term rental?',
+  'property.shortTermSub': 'Airbnb, Vrbo or another guest turnover property.',
+  'property.shortTermBadge': 'Short-term rental',
 
   'products.title': 'Who brings the cleaning products?',
   'products.sub': 'We need to know what to load in the van.',
@@ -178,7 +182,9 @@ const en: Dict = {
   'details.name': 'Full name',
   'details.email': 'Email',
   'details.emailNote': 'Your confirmation goes here.',
-  'details.access': 'Entry instructions, parking, pets (optional)',
+  'details.access': 'Parking, pets or service notes (optional)',
+  'details.notesPlaceholder': 'Anything that helps the team prepare. Please do not enter alarm or door codes here.',
+  'details.notesSafety': 'For security, share access codes directly with the team when needed.',
 
   'checkout.title': 'Review and confirm',
   'checkout.sub': 'One last check. Your selected time is held while you finish.',
@@ -231,6 +237,7 @@ const en: Dict = {
   'confirm.date': 'Date',
   'confirm.time': 'Time',
   'confirm.address': 'Cleaning address',
+  'confirm.property': 'Property',
   'confirm.service': 'Service',
   'confirm.crew': 'Crew',
   'confirm.frequency': 'Frequency',
@@ -245,6 +252,8 @@ const en: Dict = {
 
   'common.continue': 'Continue',
   'common.back': 'Back',
+  'common.yes': 'Yes',
+  'common.no': 'No',
   'common.retry': 'Try again',
   'common.loading': 'Loading…',
 
@@ -472,7 +481,11 @@ const fr: Dict = {
   'property.airbnb': 'Airbnb',
   'property.chalet': 'Chalet',
   'property.commercial': 'Commercial',
+  'property.commercialScope': 'Les espaces commerciaux sont évalués selon le service choisi. Ajoutez les détails propres au site avant le paiement.',
   'property.other': 'Autre',
+  'property.shortTermTitle': 'Est-ce une location à court terme?',
+  'property.shortTermSub': 'Airbnb, Vrbo ou autre propriété avec rotation de voyageurs.',
+  'property.shortTermBadge': 'Location court terme',
 
   'products.title': 'Qui fournit les produits?',
   'products.sub': 'Nous devons savoir quoi charger dans la camionnette.',
@@ -532,7 +545,9 @@ const fr: Dict = {
   'details.name': 'Nom complet',
   'details.email': 'Courriel',
   'details.emailNote': 'Votre confirmation sera envoyée ici.',
-  'details.access': "Instructions d'accès, stationnement, animaux (facultatif)",
+  'details.access': 'Stationnement, animaux ou notes de service (facultatif)',
+  'details.notesPlaceholder': 'Tout ce qui aide l’équipe à se préparer. N’inscrivez pas de code d’alarme ou de porte ici.',
+  'details.notesSafety': 'Pour votre sécurité, transmettez les codes d’accès directement à l’équipe au besoin.',
 
   'checkout.title': 'Vérifier et confirmer',
   'checkout.sub': 'Une dernière vérification. Votre plage est retenue pendant que vous terminez.',
@@ -585,6 +600,7 @@ const fr: Dict = {
   'confirm.date': 'Date',
   'confirm.time': 'Heure',
   'confirm.address': 'Adresse du ménage',
+  'confirm.property': 'Logement',
   'confirm.service': 'Service',
   'confirm.crew': 'Équipe',
   'confirm.frequency': 'Fréquence',
@@ -599,6 +615,8 @@ const fr: Dict = {
 
   'common.continue': 'Continuer',
   'common.back': 'Retour',
+  'common.yes': 'Oui',
+  'common.no': 'Non',
   'common.retry': 'Réessayer',
   'common.loading': 'Chargement…',
 

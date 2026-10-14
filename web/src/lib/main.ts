@@ -51,6 +51,13 @@ let locale: Locale = detectLocale();
 const t = (k: string, v: Record<string, string | number> = {}) => translate(locale, k, v);
 
 const S = { ...emptyDraft, ...(loadDraft() ?? {}) } as typeof emptyDraft & { familyId?: string };
+// Earlier prototypes treated Airbnb as a property type. Preserve that draft
+// without keeping the wrong data model: it is an apartment/condo-style home
+// with the separate short-term-rental flag enabled.
+if (S.propertyType === 'airbnb') {
+  S.propertyType = 'apartment';
+  S.isShortTermRental = true;
+}
 let services: ServiceOption[] = [];
 let addOns: AddOnOption[] = [];
 let ctx: CustomerContext | null = null;
@@ -233,6 +240,11 @@ function applyLocale(): void {
     const value = t(key);
     // Only replace when a translation exists, so fallback copy survives.
     if (value !== key) el.textContent = value;
+  });
+  document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-t-placeholder]').forEach((el) => {
+    const key = el.dataset.tPlaceholder!;
+    const value = t(key);
+    if (value !== key) el.placeholder = value;
   });
   document.querySelectorAll<HTMLElement>('.lang button').forEach((b) => {
     b.setAttribute('aria-pressed', String((b as HTMLElement).dataset.locale === locale));
@@ -508,9 +520,9 @@ const PROPS = [
   { id: 'apartment', ic: '🏢', k: 'property.apartment' },
   { id: 'condo', ic: '🏙', k: 'property.condo' },
   { id: 'house', ic: '🏡', k: 'property.house' },
-  { id: 'airbnb', ic: '🔑', k: 'property.airbnb' },
   { id: 'chalet', ic: '🌲', k: 'property.chalet' },
   { id: 'commercial', ic: '🏬', k: 'property.commercial' },
+  { id: 'other', ic: '⌂', k: 'property.other' },
 ];
 
 function renderProperty(): void {
@@ -525,10 +537,18 @@ function renderProperty(): void {
 
   const d = $('propDetail');
   if (!d) return;
-  if (['apartment', 'condo', 'airbnb'].includes(S.propertyType ?? '')) {
+  if (!S.propertyType) {
+    d.innerHTML = '';
+    return;
+  }
+
+  const residential = S.propertyType !== 'commercial';
+  let details = '';
+
+  if (['apartment', 'condo'].includes(S.propertyType)) {
     const sizes = ['Studio', '1½', '2½', '3½', '4½', '5½', '6½', '7½+'];
-    d.innerHTML =
-      `<div class="eyebrow">${esc(t('property.size'))}</div><div class="opts tiles">` +
+    details =
+      `<div class="eyebrow">${esc(t('property.size'))}</div><div class="opts tiles property-size-grid">` +
       sizes
         .map(
           (z) => `<button type="button" class="opt tile" data-action="pick-size" data-size="${z}"
@@ -536,13 +556,32 @@ function renderProperty(): void {
         )
         .join('') +
       '</div>';
-  } else if (S.propertyType) {
-    d.innerHTML = `<div class="f2">
-      <div><label class="fl">${esc(t('property.bedrooms'))}</label>
-        <input class="inp" type="number" min="0" max="12" value="${S.bedrooms}" data-field="bedrooms"></div>
-      <div><label class="fl">${esc(t('property.bathrooms'))}</label>
-        <input class="inp" type="number" min="0" max="12" value="${S.bathrooms}" data-field="bathrooms"></div></div>`;
-  } else d.innerHTML = '';
+  } else if (S.propertyType === 'commercial') {
+    details = `<div class="step-section-note"><span class="mark">i</span><span>${esc(t('property.commercialScope'))}</span></div>`;
+  } else {
+    details = `<div class="f2 property-numbers">
+      <div class="booking-field"><label class="fl">${esc(t('property.bedrooms'))}</label>
+        <input class="inp" type="number" min="0" max="20" value="${S.bedrooms}" data-field="bedrooms" inputmode="numeric"></div>
+      <div class="booking-field"><label class="fl">${esc(t('property.bathrooms'))}</label>
+        <input class="inp" type="number" min="0" max="20" value="${S.bathrooms}" data-field="bathrooms" inputmode="numeric"></div></div>`;
+  }
+
+  const rental = residential
+    ? `<div class="rental-question">
+        <div><strong>${esc(t('property.shortTermTitle'))}</strong>
+          <span>${esc(t('property.shortTermSub'))}</span></div>
+        <div class="rental-options" role="group" aria-label="${esc(t('property.shortTermTitle'))}">
+          <button type="button" data-action="pick-rental" data-rental="false" aria-pressed="${!S.isShortTermRental}">
+            ${esc(t('common.no'))}
+          </button>
+          <button type="button" data-action="pick-rental" data-rental="true" aria-pressed="${S.isShortTermRental}">
+            ${esc(t('common.yes'))}
+          </button>
+        </div>
+      </div>`
+    : '';
+
+  d.innerHTML = details + rental;
 }
 
 function renderProducts(): void {
@@ -873,8 +912,61 @@ function renderDetails(): void {
   }
   const nm = $('nm') as HTMLInputElement | null;
   const em = $('em') as HTMLInputElement | null;
-  if (nm && c?.firstName && !nm.value) nm.value = c.firstName;
-  if (em && c?.email && !em.value) em.value = c.email;
+  if (nm && !nm.value) {
+    const profileName = [c?.firstName, c?.lastName].filter(Boolean).join(' ');
+    nm.value = S.name || profileName;
+  }
+  if (em && !em.value) em.value = S.email || c?.email || '';
+  const notes = $('notes') as HTMLTextAreaElement | null;
+  if (notes && !notes.value && S.notes) notes.value = S.notes;
+}
+
+function readBookingContact(): {
+  fullName: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  serviceNotes: string;
+} {
+  const fullName = (($('nm') as HTMLInputElement | null)?.value ?? '').trim();
+  const email = (($('em') as HTMLInputElement | null)?.value ?? '').trim();
+  const serviceNotes = (($('notes') as HTMLTextAreaElement | null)?.value ?? '').trim();
+  const parts = fullName.split(/\s+/).filter(Boolean);
+  return {
+    fullName,
+    firstName: parts[0] ?? '',
+    lastName: parts.slice(1).join(' '),
+    email,
+    serviceNotes,
+  };
+}
+
+async function persistBookingContact(): Promise<void> {
+  const contact = readBookingContact();
+  S.name = contact.fullName;
+  S.email = contact.email;
+  S.notes = contact.serviceNotes;
+  await api.updateProfile({
+    firstName: contact.firstName,
+    lastName: contact.lastName || undefined,
+    email: contact.email,
+  });
+}
+
+function bookingServiceDetails() {
+  const contact = readBookingContact();
+  return {
+    propertyType: S.propertyType!,
+    propertySize: S.propertySize ?? null,
+    isShortTermRental: Boolean(S.isShortTermRental),
+    bedrooms: ['house', 'chalet', 'other'].includes(S.propertyType ?? '')
+      ? Number(S.bedrooms ?? 0)
+      : 0,
+    bathrooms: ['house', 'chalet', 'other'].includes(S.propertyType ?? '')
+      ? Number(S.bathrooms ?? 0)
+      : 0,
+    ...(contact.serviceNotes ? { serviceNotes: contact.serviceNotes } : {}),
+  };
 }
 
 async function renderCheckout(): Promise<void> {
@@ -923,7 +1015,12 @@ async function submitBooking(): Promise<void> {
   btn.innerHTML = `<span class="spin"></span> ${esc(t('checkout.confirming'))}`;
   try {
     const res = await api.createBooking(
-      { holdId: hold.id, quoteId: quote!.id, addressId: S.addressId! },
+      {
+        holdId: hold.id,
+        quoteId: quote!.id,
+        addressId: S.addressId!,
+        serviceDetails: bookingServiceDetails(),
+      },
       `booking:${hold.id}`,
     );
     if (holdTimer) clearInterval(holdTimer);
@@ -949,10 +1046,19 @@ function renderConfirmation(b: Booking): void {
   const box = $('confirmBody');
   if (!box) return;
   const paid = b.paymentStatus === 'SUCCEEDED';
+  const detail = b.serviceDetails;
+  const propertyLabel = detail?.propertyType
+    ? [
+        t(`property.${detail.propertyType}`),
+        detail.propertySize ?? null,
+        detail.isShortTermRental ? t('property.shortTermBadge') : null,
+      ].filter(Boolean).join(' · ')
+    : '';
   const rows: [string, string][] = [
     [t('confirm.date'), formatSlotDate(b.startAt, locale)],
     [t('confirm.time'), `${formatSlotTime(b.startAt, locale)} – ${formatSlotTime(b.endAt, locale)}`],
     [t('confirm.address'), S.addressSummary ?? ''],
+    ...(propertyLabel ? [[t('confirm.property'), propertyLabel] as [string, string]] : []),
     [t('confirm.crew'), String(b.crewSize)],
     [t('confirm.total'), formatMoney(b.grandTotalCents, locale)],
     [t('confirm.payment'), paid ? t('confirm.paid') : t('confirm.payLater')],
@@ -1184,6 +1290,14 @@ async function goNext(): Promise<void> {
     return;
   }
   if (S.step === 'frequency' || S.step === 'address') await refreshQuote();
+  if (S.step === 'details') {
+    try {
+      await persistBookingContact();
+    } catch (error) {
+      showError(error);
+      return;
+    }
+  }
   goTo(order[Math.min(i + 1, order.length - 1)]!);
 }
 
@@ -1287,10 +1401,14 @@ function renderLiveBookingSummary(): void {
   }
 
   if (S.propertyType) {
+    const propertyDetail = [
+      S.propertySize,
+      S.isShortTermRental ? t('property.shortTermBadge') : null,
+    ].filter(Boolean).join(' · ');
     rows.push({
       icon: '02',
       title: t(`property.${S.propertyType}`),
-      detail: S.propertySize ?? undefined,
+      detail: propertyDetail || undefined,
       step: 'property',
     });
   }
@@ -1628,17 +1746,48 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
     S.productSupplyOption =
       S.productSupplyOption ?? 'CLIENT_SUPPLIED';
 
+    if (usual.property) {
+      S.propertyType = usual.property.propertyType;
+      S.propertySize = usual.property.propertySize;
+      S.isShortTermRental = usual.property.isShortTermRental;
+      S.bedrooms = usual.property.bedrooms;
+      S.bathrooms = usual.property.bathrooms;
+    }
+
     saveDraft(S);
 
-    await refreshQuote();
+    // The shortcut stays fast, but never jumps over information that was not
+    // safely reusable from the previous visit.
+    if (!S.propertyType) {
+      goTo('property');
+      return;
+    }
+    if (!S.addressId) {
+      goTo('address');
+      return;
+    }
 
+    await refreshQuote();
     goTo('slots');
   },
 
   'pick-prop': (el) => {
-    S.propertyType = el.dataset.prop!;
-    S.isShortTermRental = el.dataset.prop === 'airbnb';
+    const next = el.dataset.prop!;
+    if (S.propertyType !== next) {
+      S.propertyType = next;
+      S.propertySize = null;
+      if (['apartment', 'condo', 'commercial'].includes(next)) {
+        S.bedrooms = 0;
+        S.bathrooms = 0;
+      }
+      if (next === 'commercial') S.isShortTermRental = false;
+    }
+    renderProperty();
+    saveDraft(S);
+  },
 
+  'pick-rental': (el) => {
+    S.isShortTermRental = el.dataset.rental === 'true';
     renderProperty();
     saveDraft(S);
   },
@@ -1928,8 +2077,14 @@ function installDelegation(): void {
 
   document.addEventListener('input', (e) => {
     const el = e.target as HTMLInputElement;
-    if (el.dataset.field === 'bedrooms') S.bedrooms = Number(el.value);
-    if (el.dataset.field === 'bathrooms') S.bathrooms = Number(el.value);
+    if (el.dataset.field === 'bedrooms') {
+      S.bedrooms = Math.max(0, Math.min(20, Number(el.value) || 0));
+      saveDraft(S);
+    }
+    if (el.dataset.field === 'bathrooms') {
+      S.bathrooms = Math.max(0, Math.min(20, Number(el.value) || 0));
+      saveDraft(S);
+    }
     if (el.id === 'addrInput') void onAddressType(el.value);
   });
 }

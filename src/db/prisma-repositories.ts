@@ -300,6 +300,9 @@ export class PrismaSchedulingRepo implements SchedulingRepository {
         status: booking.status,
         grandTotalCents: booking.grandTotalCents,
         priceSnapshot: booking.priceSnapshot as Prisma.InputJsonValue,
+        serviceDetails: booking.serviceDetails
+          ? (booking.serviceDetails as Prisma.InputJsonValue)
+          : undefined,
         createdAt: booking.createdAt,
         staff: {
           create: booking.staffIds.map((staffId) => ({ staffId })),

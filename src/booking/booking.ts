@@ -66,6 +66,8 @@ export interface Booking {
   quoteId: string;
   /** Frozen copy of the quote. Never recomputed from today's price table. */
   priceSnapshot: unknown;
+  /** Visit-specific property and service context supplied by the customer. */
+  serviceDetails?: unknown;
   grandTotalCents: number;
   createdAt: Date;
 }
@@ -199,10 +201,11 @@ export class BookingService {
     customerId: string;
     addressId: string;
     service: ServiceOption;
+    serviceDetails?: unknown;
     /** Present only so we can prove we ignore it. */
     clientClaimedTotalCents?: number;
   }): Promise<Booking> {
-    const { holdId, quoteId, customerId, addressId, service } = params;
+    const { holdId, quoteId, customerId, addressId, service, serviceDetails } = params;
     const now = this.now();
 
     const hold = await this.repo.getHold(holdId);
@@ -265,6 +268,7 @@ export class BookingService {
           status: 'CONFIRMED',
           quoteId: quote.id,
           priceSnapshot: quote.snapshot,
+          serviceDetails,
           // authoritative: from the quote row, never from the request body
           grandTotalCents: quote.grandTotalCents,
           createdAt: now,

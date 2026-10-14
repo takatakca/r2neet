@@ -485,6 +485,10 @@ model Booking {
   grandTotalCents Int
   priceSnapshot   Json
 
+  /// Operational context the customer supplied for this specific visit.
+  /// It is not pricing authority and never leaves R2NETTE through master sync.
+  serviceDetails Json?
+
   idempotencyKey String?  @unique
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

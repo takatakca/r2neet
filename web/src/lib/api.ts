@@ -124,6 +124,7 @@ export interface CustomerContext {
   customer: {
     id: string;
     firstName: string | null;
+    lastName: string | null;
     email: string | null;
     verifiedPhone: string | null;
     isReturningCustomer: boolean;
@@ -135,8 +136,15 @@ export interface CustomerContext {
     requiredStaffCount: number;
     appointmentDurationMinutes: number | null;
     frequency: string;
-    addressId: string;
-    addressSummary: string;
+    addressId: string | null;
+    addressSummary: string | null;
+    property: {
+      propertyType: string;
+      propertySize: string | null;
+      isShortTermRental: boolean;
+      bedrooms: number;
+      bathrooms: number;
+    } | null;
   } | null;
 }
 
@@ -163,6 +171,14 @@ export interface Booking {
   paymentStatus: string;
   paymentPolicy: string;
   crewSize: number;
+  serviceDetails: {
+    propertyType?: string;
+    propertySize?: string | null;
+    isShortTermRental?: boolean;
+    bedrooms?: number;
+    bathrooms?: number;
+    serviceNotes?: string;
+  } | null;
 }
 
 export interface PaymentConfig {
@@ -212,6 +228,12 @@ export const api = {
     ),
 
   context: () => call<CustomerContext>('/api/v1/customer/context'),
+
+  updateProfile: (input: { firstName?: string; lastName?: string; email?: string }) =>
+    call<{ firstName: string | null; lastName: string | null; email: string | null }>(
+      '/api/v1/account/profile',
+      { method: 'PATCH', body: JSON.stringify(input) },
+    ),
 
   autocomplete: (q: string, sessionId?: string) =>
     call<{ sessionId: string; suggestions: { placeId: string; primaryText: string; secondaryText: string }[] }>(
@@ -270,7 +292,19 @@ export const api = {
     }),
 
   createBooking: (
-    input: { holdId: string; quoteId: string; addressId: string },
+    input: {
+      holdId: string;
+      quoteId: string;
+      addressId: string;
+      serviceDetails?: {
+        propertyType: string;
+        propertySize?: string | null;
+        isShortTermRental: boolean;
+        bedrooms: number;
+        bathrooms: number;
+        serviceNotes?: string;
+      };
+    },
     idempotencyKey: string,
   ) =>
     call<{ booking: Booking }>('/api/v1/bookings', {

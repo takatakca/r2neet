@@ -65,6 +65,17 @@ Before the latest booking-UI commits, PR #18 CI run #60 was fully green:
 
 The newest UI commits should continue through the normal repository CI after push/merge. Do not disable production safety, migration, secret or deployment gates.
 
+## Operational booking context completion
+
+- Corrected the data model: Airbnb/Vrbo is now a short-term-rental attribute, not a property type.
+- Booking contact name/email is saved to the real customer profile before checkout.
+- Visit-specific property context is persisted on the Booking row in `serviceDetails`.
+- Service notes are persisted for the assigned team; UI explicitly warns customers not to enter alarm/door codes.
+- Returning-customer "usual clean" reuses only safe property context and never reuses old service notes.
+- If an old booking lacks a reusable property/address, the shortcut asks only for the missing information.
+- Assigned crew receives the property context/service notes through its scoped jobs endpoint.
+- Confirmation shows the persisted property context.
+
 ## Latest booking completion
 
 - Connected the existing ADD_ONS backend catalogue to the public booking catalogue.
