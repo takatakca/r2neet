@@ -78,6 +78,7 @@ import {
   StripeError,
   type StripeProvider,
 } from '../payments/stripe-provider.js';
+import { enqueueCustomerProfile } from '../integrations/takatak-sync.js';
 
 /**
  * R2NETTE HTTP API (v1).
@@ -1175,6 +1176,13 @@ export function createApi(deps: ApiDeps) {
             );
           }
 
+          await enqueueCustomerProfile(
+            transaction,
+            savedCustomer.id,
+            'CUSTOMER_REGISTERED',
+            completedAt,
+          );
+
           return {
             id: savedCustomer.id,
             firstName: savedCustomer.firstName,
@@ -1725,16 +1733,22 @@ export function createApi(deps: ApiDeps) {
       if (!addr || addr.customerId !== customerId) {
         throw new ApiError(404, 'NOT_FOUND', 'We could not find that address.');
       }
-      await prisma.$transaction([
-        prisma.customerAddress.updateMany({
+      await prisma.$transaction(async (transaction) => {
+        await transaction.customerAddress.updateMany({
           where: { customerId },
           data: { isDefault: false },
-        }),
-        prisma.customerAddress.update({
+        });
+        await transaction.customerAddress.update({
           where: { id: addr.id },
           data: { isDefault: true },
-        }),
-      ]);
+        });
+        await enqueueCustomerProfile(
+          transaction,
+          customerId,
+          'ADDRESS_UPDATED',
+          now(),
+        );
+      });
       res.json({ ok: true });
     }),
   );
@@ -1764,7 +1778,15 @@ export function createApi(deps: ApiDeps) {
           'This address has an upcoming cleaning. Cancel or move it first.',
         );
       }
-      await prisma.customerAddress.delete({ where: { id: addr.id } });
+      await prisma.$transaction(async (transaction) => {
+        await transaction.customerAddress.delete({ where: { id: addr.id } });
+        await enqueueCustomerProfile(
+          transaction,
+          customerId,
+          'ADDRESS_UPDATED',
+          now(),
+        );
+      });
       res.json({ ok: true });
     }),
   );
@@ -1785,13 +1807,22 @@ export function createApi(deps: ApiDeps) {
           'Enter a valid email address.',
         );
       }
-      const updated = await prisma.customer.update({
-        where: { id: customerId },
-        data: {
-          firstName: body.firstName?.trim() || undefined,
-          lastName: body.lastName?.trim() || undefined,
-          email: body.email?.trim() || undefined,
-        },
+      const updated = await prisma.$transaction(async (transaction) => {
+        const saved = await transaction.customer.update({
+          where: { id: customerId },
+          data: {
+            firstName: body.firstName?.trim() || undefined,
+            lastName: body.lastName?.trim() || undefined,
+            email: body.email?.trim() || undefined,
+          },
+        });
+        await enqueueCustomerProfile(
+          transaction,
+          customerId,
+          'PROFILE_UPDATED',
+          now(),
+        );
+        return saved;
       });
       res.json({
         firstName: updated.firstName,
@@ -2244,22 +2275,31 @@ export function createApi(deps: ApiDeps) {
       // Place Details ends the session; the next search must use a new token.
       tokens.retire(sid);
 
-      const saved = await prisma.customerAddress.create({
-        data: {
+      const saved = await prisma.$transaction(async (transaction) => {
+        const created = await transaction.customerAddress.create({
+          data: {
+            customerId,
+            label: label ?? null,
+            formattedAddress: address.formattedAddress,
+            streetNumber: address.streetNumber,
+            route: address.route,
+            unit: unit ?? null,
+            city: address.city,
+            province: address.province,
+            postalCode: address.postalCode,
+            country: address.country,
+            placeId: address.placeId,
+            latitude: address.latitude,
+            longitude: address.longitude,
+          },
+        });
+        await enqueueCustomerProfile(
+          transaction,
           customerId,
-          label: label ?? null,
-          formattedAddress: address.formattedAddress,
-          streetNumber: address.streetNumber,
-          route: address.route,
-          unit: unit ?? null,
-          city: address.city,
-          province: address.province,
-          postalCode: address.postalCode,
-          country: address.country,
-          placeId: address.placeId,
-          latitude: address.latitude,
-          longitude: address.longitude,
-        },
+          'ADDRESS_UPDATED',
+          now(),
+        );
+        return created;
       });
 
       // Distance is computed here, on the server, from the business origin.
