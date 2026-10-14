@@ -201,6 +201,20 @@ describe('calendar file', () => {
     expect(ics).toContain('754 Av. 36e\\, Lachine');
   });
 
+  it('folds long Unicode calendar fields on UTF-8 boundaries without altering their content', () => {
+    const summary = 'Nettoyage à Montréal 🧽 '.repeat(15);
+    const ics = buildIcs(booking, summary, '123 rue de l’Église, Montréal');
+    const lines = ics.split('\r\n');
+    expect(lines.some((line) => line.startsWith(' '))).toBe(true);
+    for (const line of lines) {
+      expect(new TextEncoder().encode(line).byteLength).toBeLessThanOrEqual(75);
+    }
+    const unfolded = ics.replace(/\r\n /g, '');
+    expect(unfolded).toContain(`SUMMARY:${summary}`);
+    expect(unfolded).toContain('LOCATION:123 rue de l’Église\\, Montréal');
+    expect(unfolded.match(/(?:^|\r\n)BEGIN:VEVENT/g)).toHaveLength(1);
+  });
+
   it('escapes punctuation, backslashes and newline injection in calendar fields', () => {
     const ics = buildIcs(
       booking,

@@ -3,6 +3,8 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-10-14 | ChatGPT | chatgpt/r2nette-handoff-ics-20261014 → PR pending | active | Fold UTF-8 ICS lines per RFC 5545 and establish five durable agent-status docs | verify PR CI, merge to main, validate deploy, update handoff with final SHA
+
 - 2026-10-14 | ChatGPT | main (docs) | done | Replaced outdated phase-1 README with current platform features, deployment and configuration boundaries | continue configuring optional live integrations and verifying end-to-end flows
 
 - 2026-10-14 | ChatGPT | chatgpt/deploy-skip-stale-20261014 → PR #24 | done | Protect Contabo Deploy from queued obsolete commits and last-minute main changes | PR CI passed; merged to main as 3ff24c9d
