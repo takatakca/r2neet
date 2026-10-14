@@ -1750,8 +1750,18 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
 
     saveDraft(S);
 
-    await refreshQuote();
+    // The shortcut stays fast, but never jumps over information that was not
+    // safely reusable from the previous visit.
+    if (!S.propertyType) {
+      goTo('property');
+      return;
+    }
+    if (!S.addressId) {
+      goTo('address');
+      return;
+    }
 
+    await refreshQuote();
     goTo('slots');
   },
 
