@@ -52,22 +52,59 @@ jobs:
             exit 1
           fi
 
+      # workflow_run jobs can be queued out of order. Never publish an older
+      # commit after a newer one has reached main.
+      - name: Skip a superseded release
+        id: release-head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [ "$MAIN_SHA" = "$EXPECTED_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping obsolete deployment: $EXPECTED_SHA; main is $MAIN_SHA."
+            echo "current=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check out the exact commit CI passed
+        if: steps.release-head.outputs.current == 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
 
       - name: Build and push the immutable image
+        if: steps.release-head.outputs.current == 'true'
         env:
           GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/deploy/publish-image.sh
 
       - name: Install sshpass
+        if: steps.release-head.outputs.current == 'true'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null
 
+      # A new push may land while an image is being built. Check again at
+      # the last safe moment before touching the production server.
+      - name: Verify main before rolling the VPS
+        id: roll-head
+        if: steps.release-head.outputs.current == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [ "$MAIN_SHA" = "$EXPECTED_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping VPS roll of obsolete commit $EXPECTED_SHA; main is $MAIN_SHA."
+            echo "current=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Roll the VPS to that image
+        if: steps.roll-head.outputs.current == 'true'
         env:
           GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
           CONTABO_SSH_HOST: ${{ secrets.CONTABO_SSH_HOST }}

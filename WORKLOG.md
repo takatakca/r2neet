@@ -3,6 +3,8 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-10-14 | ChatGPT | chatgpt/deploy-skip-stale-20261014 → PR pending | ready for CI | Guard automatic production deploy against obsolete queued main commits; recheck before server roll | merge after independent CI and inspect deploy result
+
 - 2026-10-14 | ChatGPT | main (CI unblock) | done | Correct frontend booking fixture after nullable serviceDetails contract change; restore TypeScript CI gate for production rollout | confirm CI green and automatic Deploy on the new SHA
 
 - 2026-10-14 | codex | codex/booking-product-catalogue-20261014 → PR pending | ready to merge | Product options/prices and frequency savings are now server-driven; stale incompatible product drafts clear automatically | merge to main, continue auditing booking for client/backend drift
