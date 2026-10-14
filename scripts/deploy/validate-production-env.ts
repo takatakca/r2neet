@@ -195,6 +195,41 @@ export function validateProductionEnvironment(
     });
   }
 
+  if (env.TAKATAK_R2NETTE_SYNC_ENABLED === 'true') {
+    const required = [
+      'TAKATAK_R2NETTE_SYNC_URL',
+      'TAKATAK_R2NETTE_SYNC_CLIENT_ID',
+      'TAKATAK_R2NETTE_SYNC_WEBHOOK_SECRET',
+    ] as const;
+    const missing = missingNames(env, required);
+    if (missing.length > 0) {
+      issues.push({
+        severity: 'FATAL',
+        message: `TAKATAK R2NETTE sync is enabled but incomplete (missing ${missing.join(', ')}).`,
+      });
+    }
+    if (present(env, 'TAKATAK_R2NETTE_SYNC_URL')) {
+      try {
+        const syncUrl = new URL(env.TAKATAK_R2NETTE_SYNC_URL!.trim());
+        if (
+          syncUrl.protocol !== 'https:' ||
+          !syncUrl.hostname ||
+          syncUrl.username ||
+          syncUrl.password ||
+          syncUrl.search ||
+          syncUrl.hash
+        ) {
+          throw new Error('invalid');
+        }
+      } catch {
+        issues.push({
+          severity: 'FATAL',
+          message: 'TAKATAK_R2NETTE_SYNC_URL must be a clean HTTPS URL.',
+        });
+      }
+    }
+  }
+
   if (present(env, 'TEST_DATABASE_URL') && present(env, 'DATABASE_URL')) {
     if (env.TEST_DATABASE_URL!.trim() === env.DATABASE_URL!.trim()) {
       issues.push({
