@@ -10,8 +10,9 @@ import { z } from 'zod';
 
 import { createQuote } from '../engine/quote.js';
 import { GUEST } from '../engine/discounts.js';
-import { SERVICES, ADD_ONS } from '../data/catalogue.js';
+import { SERVICES, ADD_ONS, PRODUCT_OPTIONS } from '../data/catalogue.js';
 import { CleaningFrequency, ProductSupplyType } from '../domain/types.js';
+import { FREQUENCY_RULES } from '../data/config.js';
 import {
   findAvailableSlots,
   localToUtc,
@@ -1894,8 +1895,19 @@ export function createApi(deps: ApiDeps) {
             labourMinutes: s.labourMinutes,
             allowedFrequencies: s.allowedFrequencies,
             productSupplyMode: s.productSupplyMode,
+            allowedProductOptions: s.allowedProductOptions,
           }),
         ),
+        productSupplyOptions: Object.values(PRODUCT_OPTIONS).map((option) => ({
+          type: option.type,
+          name: option.name,
+          amountCents: option.amountCents,
+        })),
+        frequencyRules: Object.values(FREQUENCY_RULES).map((rule) => ({
+          frequency: rule.frequency,
+          label: rule.label,
+          discountPercent: rule.discountRate / 1_000_000,
+        })),
         addOns: ADD_ONS.filter((addOn) => addOn.active).map((addOn) => ({
           id: addOn.id,
           slug: addOn.slug,
