@@ -121,6 +121,7 @@ const en: Dict = {
   'property.other': 'Other',
   'property.shortTermTitle': 'Is this a short-term rental?',
   'property.shortTermSub': 'Airbnb, Vrbo or another guest turnover property.',
+  'property.shortTermBadge': 'Short-term rental',
 
   'products.title': 'Who brings the cleaning products?',
   'products.sub': 'We need to know what to load in the van.',
@@ -235,6 +236,7 @@ const en: Dict = {
   'confirm.date': 'Date',
   'confirm.time': 'Time',
   'confirm.address': 'Cleaning address',
+  'confirm.property': 'Property',
   'confirm.service': 'Service',
   'confirm.crew': 'Crew',
   'confirm.frequency': 'Frequency',
@@ -481,6 +483,7 @@ const fr: Dict = {
   'property.other': 'Autre',
   'property.shortTermTitle': 'Est-ce une location à court terme?',
   'property.shortTermSub': 'Airbnb, Vrbo ou autre propriété avec rotation de voyageurs.',
+  'property.shortTermBadge': 'Location court terme',
 
   'products.title': 'Qui fournit les produits?',
   'products.sub': 'Nous devons savoir quoi charger dans la camionnette.',
@@ -595,6 +598,7 @@ const fr: Dict = {
   'confirm.date': 'Date',
   'confirm.time': 'Heure',
   'confirm.address': 'Adresse du ménage',
+  'confirm.property': 'Logement',
   'confirm.service': 'Service',
   'confirm.crew': 'Équipe',
   'confirm.frequency': 'Fréquence',
