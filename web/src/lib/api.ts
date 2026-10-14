@@ -478,6 +478,15 @@ export function formatCountdown(ms: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+/** RFC 5545 TEXT values must escape delimiters and never introduce raw lines. */
+function escapeIcsText(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\r\n|\r|\n/g, '\\n')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,');
+}
+
 /** Build a calendar file from the PERSISTED booking, never a held time. */
 export function buildIcs(booking: Booking, summary: string, location: string): string {
   const stamp = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -486,13 +495,13 @@ export function buildIcs(booking: Booking, summary: string, location: string): s
     'VERSION:2.0',
     'PRODID:-//R2NETTE//Booking//EN',
     'BEGIN:VEVENT',
-    `UID:${booking.bookingNumber}@r2nette.ca`,
+    `UID:${encodeURIComponent(booking.bookingNumber)}@r2nette.ca`,
     `DTSTAMP:${stamp(new Date().toISOString())}`,
     `DTSTART:${stamp(booking.startAt)}`,
     `DTEND:${stamp(booking.endAt)}`,
-    `SUMMARY:${summary}`,
-    `LOCATION:${location}`,
-    `DESCRIPTION:R2NETTE booking ${booking.bookingNumber}`,
+    `SUMMARY:${escapeIcsText(summary)}`,
+    `LOCATION:${escapeIcsText(location)}`,
+    `DESCRIPTION:R2NETTE booking ${escapeIcsText(booking.bookingNumber)}`,
     'END:VEVENT',
     'END:VCALENDAR',
   ].join('\r\n');
