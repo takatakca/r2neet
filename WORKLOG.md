@@ -3,7 +3,7 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
-- 2026-10-14 | codex | codex/booking-service-context-20261014 → PR pending | active | Make property/customer fields operational: separate short-term rental from property type, persist service context on bookings, save booking contact updates | implement end-to-end and merge to main
+- 2026-10-14 | codex | codex/booking-service-context-20261014 → PR pending | ready to merge | Made property/contact fields operational: correct rental model, additive booking serviceDetails, real profile save, safe usual-clean reuse, crew context | review diff then merge to main and continue booking UX
 - 2026-10-14 | codex | codex/booking-extras-20261014 → PR pending | ready to merge | Connected active backend add-ons to booking catalogue, draft, quote payload, live summary and bilingual premium quantity UI | merge to main and continue property/short-term-rental booking polish
 - 2026-10-14 | codex | codex/booking-experience-phase2-20261014 → PR pending | ready to merge | Booking UX phase 2: live desktop/mobile booking summary with direct edit links and stronger continuity across the flow | open/merge PR to main; production stays protected by existing CI/deploy gate; TAKATAK sync remains disabled
 - 2026-10-14 | codex | codex/r2nette-takatak-outbox-20261013 → PR #18 | active / booking UX pushed | Added durable TAKATAK bridge (disabled by default) plus premium bilingual booking shell, guided progress, service/property/address/availability/details/checkout/confirmation UX | continue section-by-section booking polish, then merge to main when repo protections permit; automatic R2NETTE deploy follows main
