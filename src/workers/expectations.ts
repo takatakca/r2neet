@@ -27,6 +27,13 @@ export function workerExpectations(
       expectedWithinSeconds: 1800,
       critical: true,
     },
+    {
+      name: 'takatak-sync',
+      label: 'TAKATAK ecosystem synchronization',
+      expectedWithinSeconds: 600,
+      critical: true,
+      configured: env.TAKATAK_R2NETTE_SYNC_ENABLED === 'true',
+    },
     { name: 'recurrence', label: 'Recurring visits', expectedWithinSeconds: 14400, critical: true },
     {
       name: 'backup',
