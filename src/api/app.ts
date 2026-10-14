@@ -10,7 +10,7 @@ import { z } from 'zod';
 
 import { createQuote } from '../engine/quote.js';
 import { GUEST } from '../engine/discounts.js';
-import { SERVICES } from '../data/catalogue.js';
+import { SERVICES, ADD_ONS } from '../data/catalogue.js';
 import { CleaningFrequency, ProductSupplyType } from '../domain/types.js';
 import {
   findAvailableSlots,
@@ -1855,6 +1855,15 @@ export function createApi(deps: ApiDeps) {
             productSupplyMode: s.productSupplyMode,
           }),
         ),
+        addOns: ADD_ONS.filter((addOn) => addOn.active).map((addOn) => ({
+          id: addOn.id,
+          slug: addOn.slug,
+          name: addOn.name,
+          unitAmountCents: addOn.unitAmountCents,
+          unitLabel: addOn.unitLabel,
+          quantityEnabled: addOn.quantityEnabled,
+          maxQuantity: addOn.maxQuantity,
+        })),
       });
     }),
   );
