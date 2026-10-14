@@ -556,6 +556,8 @@ function renderProperty(): void {
         )
         .join('') +
       '</div>';
+  } else if (S.propertyType === 'commercial') {
+    details = `<div class="step-section-note"><span class="mark">i</span><span>${esc(t('property.commercialScope'))}</span></div>`;
   } else {
     details = `<div class="f2 property-numbers">
       <div class="booking-field"><label class="fl">${esc(t('property.bedrooms'))}</label>
@@ -957,8 +959,12 @@ function bookingServiceDetails() {
     propertyType: S.propertyType!,
     propertySize: S.propertySize ?? null,
     isShortTermRental: Boolean(S.isShortTermRental),
-    bedrooms: Number(S.bedrooms ?? 0),
-    bathrooms: Number(S.bathrooms ?? 0),
+    bedrooms: ['house', 'chalet', 'other'].includes(S.propertyType ?? '')
+      ? Number(S.bedrooms ?? 0)
+      : 0,
+    bathrooms: ['house', 'chalet', 'other'].includes(S.propertyType ?? '')
+      ? Number(S.bathrooms ?? 0)
+      : 0,
     ...(contact.serviceNotes ? { serviceNotes: contact.serviceNotes } : {}),
   };
 }
@@ -1770,6 +1776,10 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
     if (S.propertyType !== next) {
       S.propertyType = next;
       S.propertySize = null;
+      if (['apartment', 'condo', 'commercial'].includes(next)) {
+        S.bedrooms = 0;
+        S.bathrooms = 0;
+      }
       if (next === 'commercial') S.isShortTermRental = false;
     }
     renderProperty();
