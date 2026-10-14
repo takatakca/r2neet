@@ -826,6 +826,7 @@ export function createOpsApi(deps: OpsDeps) {
           city: b.address.city,
           latitude: b.address.latitude,
           longitude: b.address.longitude,
+          serviceDetails: b.serviceDetails,
           status: b.status,
           // No grandTotal, no payment status, no risk data.
         })),
