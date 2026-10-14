@@ -37,6 +37,7 @@ import {
   formatCountdown,
   buildIcs,
   type ServiceOption,
+  type AddOnOption,
   type Quote,
   type CustomerContext,
   type Hold,
@@ -51,6 +52,7 @@ const t = (k: string, v: Record<string, string | number> = {}) => translate(loca
 
 const S = { ...emptyDraft, ...(loadDraft() ?? {}) } as typeof emptyDraft & { familyId?: string };
 let services: ServiceOption[] = [];
+let addOns: AddOnOption[] = [];
 let ctx: CustomerContext | null = null;
 let quote: Quote | null = null;
 let hold: Hold | null = null;
@@ -593,6 +595,60 @@ function renderFrequency(): void {
     .join('');
 }
 
+function selectedAddOns(): { id: string; quantity: number }[] {
+  return Object.entries(S.addOns ?? {})
+    .filter(([, quantity]) => Number(quantity) > 0)
+    .map(([id, quantity]) => ({ id, quantity: Number(quantity) }));
+}
+
+function renderAddOns(): void {
+  const box = $('addons');
+  const count = $('addonsCount');
+  if (!box || !count) return;
+
+  const selected = selectedAddOns();
+  const totalUnits = selected.reduce((sum, item) => sum + item.quantity, 0);
+  count.textContent = totalUnits > 0
+    ? t('addons.selected', { n: totalUnits })
+    : t('addons.optional');
+
+  if (!addOns.length) {
+    box.innerHTML = `<div class="note">${esc(t('addons.none'))}</div>`;
+    return;
+  }
+
+  box.innerHTML = addOns.map((addOn) => {
+    const quantity = Math.max(0, Number(S.addOns?.[addOn.id] ?? 0));
+    const active = quantity > 0;
+    const unit = addOn.unitLabel[locale] ?? addOn.unitLabel.en;
+    const name = addOn.name[locale] ?? addOn.name.en;
+    const price = formatMoney(addOn.unitAmountCents, locale);
+
+    if (!addOn.quantityEnabled) {
+      return `<button type="button" class="addon-card" data-action="toggle-addon" data-addon="${esc(addOn.id)}"
+        aria-pressed="${active}">
+        <span class="addon-check">${active ? TICK : '+'}</span>
+        <span class="addon-copy"><strong>${esc(name)}</strong><span>${esc(unit)}</span></span>
+        <span class="addon-price">+${esc(price)}</span>
+      </button>`;
+    }
+
+    return `<div class="addon-card${active ? ' selected' : ''}">
+      <button type="button" class="addon-main" data-action="toggle-addon" data-addon="${esc(addOn.id)}"
+        aria-pressed="${active}">
+        <span class="addon-check">${active ? TICK : '+'}</span>
+        <span class="addon-copy"><strong>${esc(name)}</strong><span>${esc(unit)}</span></span>
+        <span class="addon-price">+${esc(price)}</span>
+      </button>
+      <div class="addon-qty" ${active ? '' : 'hidden'}>
+        <button type="button" data-action="addon-minus" data-addon="${esc(addOn.id)}" aria-label="${esc(t('addons.less'))}">−</button>
+        <span>${quantity}</span>
+        <button type="button" data-action="addon-plus" data-addon="${esc(addOn.id)}" data-max="${addOn.maxQuantity}" aria-label="${esc(t('addons.more'))}">+</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 /* ------------------------------------------------------------------ */
 /* address                                                             */
 /* ------------------------------------------------------------------ */
@@ -646,6 +702,7 @@ async function refreshQuote(): Promise<void> {
       frequency: S.frequency,
       productSupplyOption: S.productSupplyOption ?? undefined,
       addressId: S.addressId ?? undefined,
+      addOns: selectedAddOns(),
     });
     if (seq !== quoteSeq) return;
     quote = res.quote;
@@ -1249,6 +1306,20 @@ function renderLiveBookingSummary(): void {
     });
   }
 
+  const extras = selectedAddOns();
+  if (extras.length) {
+    const unitCount = extras.reduce((sum, item) => sum + item.quantity, 0);
+    rows.push({
+      icon: '+',
+      title: t('addons.summary', { n: unitCount }),
+      detail: extras
+        .map((item) => addOns.find((option) => option.id === item.id)?.name[locale] ?? '')
+        .filter(Boolean)
+        .join(' · '),
+      step: 'frequency',
+    });
+  }
+
   if (S.addressSummary) {
     rows.push({
       icon: '04',
@@ -1377,7 +1448,10 @@ function render(): void {
 
   if (S.step === 'property') renderProperty();
   if (S.step === 'products') renderProducts();
-  if (S.step === 'frequency') renderFrequency();
+  if (S.step === 'frequency') {
+    renderFrequency();
+    renderAddOns();
+  }
   if (S.step === 'address') renderAddress();
   if (S.step === 'slots') {
     renderDays();
@@ -1589,6 +1663,7 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
     S.frequency = el.dataset.freq!;
 
     renderFrequency();
+    renderAddOns();
     saveDraft(S);
 
     await refreshQuote();
@@ -1603,6 +1678,34 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
         'save',
       );
     }
+  },
+
+  'toggle-addon': async (el) => {
+    const id = el.dataset.addon!;
+    const current = Number(S.addOns?.[id] ?? 0);
+    S.addOns = { ...(S.addOns ?? {}), [id]: current > 0 ? 0 : 1 };
+    saveDraft(S);
+    renderAddOns();
+    await refreshQuote();
+  },
+
+  'addon-minus': async (el) => {
+    const id = el.dataset.addon!;
+    const current = Number(S.addOns?.[id] ?? 0);
+    S.addOns = { ...(S.addOns ?? {}), [id]: Math.max(0, current - 1) };
+    saveDraft(S);
+    renderAddOns();
+    await refreshQuote();
+  },
+
+  'addon-plus': async (el) => {
+    const id = el.dataset.addon!;
+    const max = Math.max(1, Number(el.dataset.max ?? 1));
+    const current = Number(S.addOns?.[id] ?? 0);
+    S.addOns = { ...(S.addOns ?? {}), [id]: Math.min(max, current + 1) };
+    saveDraft(S);
+    renderAddOns();
+    await refreshQuote();
   },
 
   'use-saved': async (el) => {
@@ -1885,7 +1988,9 @@ export async function boot(): Promise<void> {
   }
 
   try {
-    services = (await api.services()).services;
+    const catalogue = await api.services();
+    services = catalogue.services;
+    addOns = catalogue.addOns;
   } catch (e) {
     setBoot('API_UNAVAILABLE', String(e));
     return;
