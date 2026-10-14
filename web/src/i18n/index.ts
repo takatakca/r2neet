@@ -164,6 +164,8 @@ const en: Dict = {
   'hold.reserving': 'Reserving your time…',
 
   'details.title': 'Almost done',
+  'details.sub': 'Tell us who we are cleaning for and anything the team should know before arriving.',
+  'details.privacy': 'Your booking details stay with R2NETTE and are only used to provide your service.',
   'details.verified': 'Verified phone',
   'details.name': 'Full name',
   'details.email': 'Email',
@@ -171,6 +173,10 @@ const en: Dict = {
   'details.access': 'Entry instructions, parking, pets (optional)',
 
   'checkout.title': 'Review and confirm',
+  'checkout.sub': 'One last check. Your selected time is held while you finish.',
+  'checkout.confidence1': 'Encrypted payment',
+  'checkout.confidence2': 'No surprise charges',
+  'checkout.confidence3': 'Instant confirmation',
   'checkout.dueToday': 'Due today',
   'checkout.nothingDue': 'Nothing due today.',
   'checkout.payLaterNote': "We'll collect payment according to your plan.",
@@ -504,6 +510,8 @@ const fr: Dict = {
   'hold.reserving': 'Réservation de votre plage…',
 
   'details.title': 'Presque terminé',
+  'details.sub': 'Dites-nous pour qui nous faisons le ménage et ce que l’équipe doit savoir avant d’arriver.',
+  'details.privacy': 'Les détails de votre réservation restent chez R2NETTE et servent uniquement à fournir votre service.',
   'details.verified': 'Numéro vérifié',
   'details.name': 'Nom complet',
   'details.email': 'Courriel',
@@ -511,6 +519,10 @@ const fr: Dict = {
   'details.access': "Instructions d'accès, stationnement, animaux (facultatif)",
 
   'checkout.title': 'Vérifier et confirmer',
+  'checkout.sub': 'Une dernière vérification. Votre plage est retenue pendant que vous terminez.',
+  'checkout.confidence1': 'Paiement chiffré',
+  'checkout.confidence2': 'Aucun frais surprise',
+  'checkout.confidence3': 'Confirmation instantanée',
   'checkout.dueToday': "À payer aujourd'hui",
   'checkout.nothingDue': "Rien à payer aujourd'hui.",
   'checkout.payLaterNote': 'Le paiement sera perçu selon votre forfait.',
