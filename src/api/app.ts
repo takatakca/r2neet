@@ -1327,6 +1327,35 @@ export function createApi(deps: ApiDeps) {
       const addressStillSaved =
         lastBooking && c.addresses.some((a) => a.id === lastBooking.addressId);
 
+      // Property context is safe to reuse as a convenience; visit-specific
+      // service notes are intentionally excluded so stale instructions or
+      // access details never carry into a new cleaning.
+      const rawServiceDetails =
+        lastBooking?.serviceDetails &&
+        typeof lastBooking.serviceDetails === 'object' &&
+        !Array.isArray(lastBooking.serviceDetails)
+          ? (lastBooking.serviceDetails as Record<string, unknown>)
+          : null;
+      const reusableProperty =
+        rawServiceDetails && typeof rawServiceDetails.propertyType === 'string'
+          ? {
+              propertyType: rawServiceDetails.propertyType,
+              propertySize:
+                typeof rawServiceDetails.propertySize === 'string'
+                  ? rawServiceDetails.propertySize
+                  : null,
+              isShortTermRental: rawServiceDetails.isShortTermRental === true,
+              bedrooms:
+                typeof rawServiceDetails.bedrooms === 'number'
+                  ? rawServiceDetails.bedrooms
+                  : 0,
+              bathrooms:
+                typeof rawServiceDetails.bathrooms === 'number'
+                  ? rawServiceDetails.bathrooms
+                  : 0,
+            }
+          : null;
+
       const bookingTemplate =
         lastBooking &&
         lastBooking.service.active &&
@@ -1346,6 +1375,7 @@ export function createApi(deps: ApiDeps) {
                 ? lastBooking.address.formattedAddress
                 : null,
               lastBookedAt: lastBooking.createdAt,
+              property: reusableProperty,
             }
           : null;
 
