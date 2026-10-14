@@ -605,6 +605,35 @@ model AuditLog {
 }
 
 /**
+ * Durable integration outbox for the narrow R2NETTE -> TAKATAK contract.
+ *
+ * The business transaction only writes this row. Network delivery happens
+ * later in the scheduler, so a TAKATAK outage can never block a booking,
+ * registration, address update, or payment webhook.
+ */
+model TakatakSyncEvent {
+  id             String    @id
+  eventType      String
+  externalUserId String
+  priority       Int       @default(10)
+  payload        Json
+  status         String    @default("PENDING")
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime  @default(now())
+  claimedUntil   DateTime?
+  claimedBy      String?
+  lastAttemptAt  DateTime?
+  deliveredAt    DateTime?
+  lastHttpStatus Int?
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([externalUserId, createdAt])
+}
+
+/**
  * ------------------------------------------------------------------
  */
 /**
