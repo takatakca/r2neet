@@ -1679,6 +1679,76 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
   .conf-actions .btn-primary{grid-column:auto}
 }
 
+
+/* ----- selection cards: service, home and frequency ----- */
+.service-choice-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:7px;
+}
+.service-choice-meta span{
+  padding:4px 7px;
+  border-radius:999px;
+  background:#f1f6fa;
+  color:#5c748a;
+  font-size:11.5px;
+  font-weight:650;
+}
+.opt[aria-pressed="true"] .service-choice-meta span{
+  background:#edf8f6;
+  color:#377369;
+}
+.property-grid .opt{
+  min-height:112px;
+  justify-content:center;
+  border-radius:18px;
+}
+.property-grid .ic{
+  display:grid;
+  place-items:center;
+  width:44px;
+  height:44px;
+  border-radius:14px;
+  background:linear-gradient(145deg,#eff7fc,#e4f1fa);
+  font-size:22px;
+}
+.property-grid .opt[aria-pressed="true"] .ic{
+  background:linear-gradient(145deg,#dff7f2,#edfafa);
+}
+.property-grid .opt-t{font-weight:750}
+#propDetail{
+  padding-top:4px;
+}
+#freq{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+.freq{
+  min-height:104px;
+  justify-content:center;
+  padding:18px 18px 16px;
+}
+.freq.hero{
+  position:relative;
+  overflow:hidden;
+}
+.freq.hero:after{
+  content:"";
+  position:absolute;
+  right:-28px;
+  bottom:-34px;
+  width:110px;
+  height:110px;
+  border-radius:50%;
+  border:18px solid rgba(255,255,255,.06);
+}
+.freq-main{position:relative;z-index:1}
+.freq .badge{position:relative;z-index:1}
+@media(max-width:700px){
+  #freq{grid-template-columns:1fr}
+  .freq{min-height:82px}
+}
+
 </style>
 </head>
 <body data-boot="BOOTING">
