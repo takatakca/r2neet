@@ -119,6 +119,50 @@ describe('production environment gate', () => {
     ).toBe(true);
   });
 
+  it('fails closed when TAKATAK synchronization is enabled without the full signed bridge config', () => {
+    expect(
+      fatals(
+        productionEnv({
+          TAKATAK_R2NETTE_SYNC_ENABLED: 'true',
+          TAKATAK_R2NETTE_SYNC_URL: undefined,
+        }),
+      ).some((issue) => /TAKATAK R2NETTE sync is enabled but incomplete/.test(issue.message)),
+    ).toBe(true);
+
+    expect(
+      fatals(
+        productionEnv({
+          TAKATAK_R2NETTE_SYNC_ENABLED: 'true',
+          TAKATAK_R2NETTE_SYNC_URL: 'http://takatak.ca/api/integrations/r2nette/events',
+          TAKATAK_R2NETTE_SYNC_CLIENT_ID: 'r2nette-prod',
+          TAKATAK_R2NETTE_SYNC_WEBHOOK_SECRET: 'r2nette-takatak-test-secret-0123456789abcdef',
+        }),
+      ).some((issue) => /clean HTTPS URL/.test(issue.message)),
+    ).toBe(true);
+
+    expect(
+      fatals(
+        productionEnv({
+          TAKATAK_R2NETTE_SYNC_ENABLED: 'true',
+          TAKATAK_R2NETTE_SYNC_URL: 'https://takatak.ca/api/integrations/r2nette/events',
+          TAKATAK_R2NETTE_SYNC_CLIENT_ID: 'r2nette-prod',
+          TAKATAK_R2NETTE_SYNC_WEBHOOK_SECRET: 'short-secret',
+        }),
+      ).some((issue) => /WEBHOOK_SECRET is too weak/.test(issue.message)),
+    ).toBe(true);
+
+    expect(
+      fatals(
+        productionEnv({
+          TAKATAK_R2NETTE_SYNC_ENABLED: 'true',
+          TAKATAK_R2NETTE_SYNC_URL: 'https://takatak.ca/api/integrations/r2nette/events',
+          TAKATAK_R2NETTE_SYNC_CLIENT_ID: 'r2nette-prod',
+          TAKATAK_R2NETTE_SYNC_WEBHOOK_SECRET: 'r2nette-takatak-test-secret-0123456789abcdef',
+        }),
+      ),
+    ).toEqual([]);
+  });
+
   it('rejects published database ports and any host port other than 80 or 443', () => {
     const unsafe = `
 services:

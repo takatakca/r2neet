@@ -7,6 +7,7 @@ import {
   type StripeWebhookEvent,
 } from './stripe-provider.js';
 import { PromotionClaimService } from '../promotions/claims.js';
+import { enqueuePaymentSummary } from '../integrations/takatak-sync.js';
 
 /**
  * Payment orchestration.
@@ -326,23 +327,27 @@ export class PaymentService {
         }),
     );
 
-    const payment = await this.prisma.payment.upsert({
-      where: { stripePaymentIntentId: intent.id },
-      create: {
-        bookingId,
-        customerId,
-        quoteId: booking.quoteId,
-        currency: 'CAD',
-        amountCents: dueNow,
-        status: mapProviderStatus(intent.status),
-        policy,
-        stripeCustomerId,
-        stripePaymentIntentId: intent.id,
-        paymentMethodType: intent.paymentMethodType,
-        riskLevel: intent.riskLevel,
-        riskScore: intent.riskScore,
-      },
-      update: { status: mapProviderStatus(intent.status) },
+    const payment = await this.prisma.$transaction(async (tx) => {
+      const saved = await tx.payment.upsert({
+        where: { stripePaymentIntentId: intent.id },
+        create: {
+          bookingId,
+          customerId,
+          quoteId: booking.quoteId,
+          currency: 'CAD',
+          amountCents: dueNow,
+          status: mapProviderStatus(intent.status),
+          policy,
+          stripeCustomerId,
+          stripePaymentIntentId: intent.id,
+          paymentMethodType: intent.paymentMethodType,
+          riskLevel: intent.riskLevel,
+          riskScore: intent.riskScore,
+        },
+        update: { status: mapProviderStatus(intent.status) },
+      });
+      await enqueuePaymentSummary(tx, saved.id, this.now());
+      return saved;
     });
 
     return {
@@ -445,23 +450,27 @@ export class PaymentService {
     );
 
     const status = mapProviderStatus(intent.status);
-    const payment = await this.prisma.payment.upsert({
-      where: { stripePaymentIntentId: intent.id },
-      create: {
-        bookingId,
-        customerId: booking.customerId,
-        quoteId: booking.quoteId,
-        currency: 'CAD',
-        amountCents: booking.grandTotalCents,
-        status,
-        policy: 'FULL_PAYMENT',
-        offSession: true,
-        requiresAction: status === 'REQUIRES_ACTION',
-        stripeCustomerId,
-        stripePaymentIntentId: intent.id,
-        stripePaymentMethodId: method.providerMethodId,
-      },
-      update: { status, requiresAction: status === 'REQUIRES_ACTION' },
+    const payment = await this.prisma.$transaction(async (tx) => {
+      const saved = await tx.payment.upsert({
+        where: { stripePaymentIntentId: intent.id },
+        create: {
+          bookingId,
+          customerId: booking.customerId,
+          quoteId: booking.quoteId,
+          currency: 'CAD',
+          amountCents: booking.grandTotalCents,
+          status,
+          policy: 'FULL_PAYMENT',
+          offSession: true,
+          requiresAction: status === 'REQUIRES_ACTION',
+          stripeCustomerId,
+          stripePaymentIntentId: intent.id,
+          stripePaymentMethodId: method.providerMethodId,
+        },
+        update: { status, requiresAction: status === 'REQUIRES_ACTION' },
+      });
+      await enqueuePaymentSummary(tx, saved.id, this.now());
+      return saved;
     });
 
     if (status === 'REQUIRES_ACTION') {
@@ -559,6 +568,7 @@ export class PaymentService {
               });
             }
           }
+          await enqueuePaymentSummary(tx, payment.id, this.now());
         });
         return;
       }
@@ -569,22 +579,25 @@ export class PaymentService {
         });
         if (!payment) return;
         const err = obj.last_payment_error as { code?: string; message?: string } | undefined;
-        await this.prisma.payment.update({
-          where: { id: payment.id },
-          data: {
-            status: 'FAILED',
-            failedAt: this.now(),
-            failureCode: err?.code ?? null,
-            failureMessage: err?.message ?? null,
-          },
-        });
-        // The booking is NOT confirmed, and the welcome offer goes back.
-        if (payment.bookingId) {
-          const claim = await this.prisma.promotionClaim.findFirst({
-            where: { bookingId: payment.bookingId, status: 'RESERVED' },
+        await this.prisma.$transaction(async (tx) => {
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              status: 'FAILED',
+              failedAt: this.now(),
+              failureCode: err?.code ?? null,
+              failureMessage: err?.message ?? null,
+            },
           });
-          if (claim) await this.claims.release(claim.id, 'PAYMENT_FAILED');
-        }
+          // The booking is NOT confirmed, and the welcome offer goes back.
+          if (payment.bookingId) {
+            const claim = await tx.promotionClaim.findFirst({
+              where: { bookingId: payment.bookingId, status: 'RESERVED' },
+            });
+            if (claim) await this.claims.release(claim.id, 'PAYMENT_FAILED', tx);
+          }
+          await enqueuePaymentSummary(tx, payment.id, this.now());
+        });
         return;
       }
 
@@ -646,12 +659,15 @@ export class PaymentService {
         });
         if (!payment) return;
         const refunded = Number(obj.amount_refunded ?? 0);
-        await this.prisma.payment.update({
-          where: { id: payment.id },
-          data: {
-            refundedAmountCents: refunded,
-            status: refunded >= payment.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
-          },
+        await this.prisma.$transaction(async (tx) => {
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              refundedAmountCents: refunded,
+              status: refunded >= payment.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+            },
+          });
+          await enqueuePaymentSummary(tx, payment.id, this.now());
         });
         return;
       }
