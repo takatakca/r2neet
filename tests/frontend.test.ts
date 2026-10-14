@@ -198,7 +198,19 @@ describe('calendar file', () => {
     expect(ics).toContain('UID:R2N-2026-000042@r2nette.ca');
     expect(ics).toContain('DTSTART:20260914T140000Z');
     expect(ics).toContain('DTEND:20260914T170000Z');
-    expect(ics).toContain('754 Av. 36e, Lachine');
+    expect(ics).toContain('754 Av. 36e\\, Lachine');
+  });
+
+  it('escapes punctuation, backslashes and newline injection in calendar fields', () => {
+    const ics = buildIcs(
+      booking,
+      'Deep clean, kitchen;\r\nBEGIN:VEVENT',
+      'Rue St\\Example\nX-WR-CALNAME:Injected',
+    );
+    expect(ics).toContain('SUMMARY:Deep clean\\, kitchen\\;\\nBEGIN:VEVENT');
+    expect(ics).toContain('LOCATION:Rue St\\\\Example\\nX-WR-CALNAME:Injected');
+    expect(ics.match(/(?:^|\r\n)BEGIN:VEVENT/g)).toHaveLength(1);
+    expect(ics).not.toContain('\r\nX-WR-CALNAME:Injected');
   });
 });
 
