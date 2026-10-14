@@ -297,6 +297,16 @@ const bookingSchema = z
     holdId: z.string(),
     quoteId: z.string(),
     addressId: z.string(),
+    serviceDetails: z
+      .object({
+        propertyType: z.string().trim().min(1).max(80),
+        propertySize: z.string().trim().max(40).nullable().optional(),
+        isShortTermRental: z.boolean(),
+        bedrooms: z.number().int().min(0).max(20),
+        bathrooms: z.number().int().min(0).max(20),
+        serviceNotes: z.string().trim().max(1000).optional(),
+      })
+      .optional(),
   })
   .passthrough();
 
@@ -1432,6 +1442,7 @@ export function createApi(deps: ApiDeps) {
           requiredStaffCount: b.service.requiredStaffCount,
           crewAssigned: b.staff.length,
           addressSummary: b.address.formattedAddress,
+          serviceDetails: b.serviceDetails,
           grandTotalCents: b.grandTotalCents,
           paymentStatus: paid ? 'PAID' : 'NOT_COLLECTED',
           // The 24-hour policy is enforced server-side; the flag only tells
@@ -2198,6 +2209,7 @@ export function createApi(deps: ApiDeps) {
           customerId, // from session, never from body
           addressId: input.addressId,
           service,
+          serviceDetails: input.serviceDetails,
         });
       } catch (e) {
         // Free the key so a genuine retry can run.
@@ -2789,6 +2801,7 @@ interface BookingLike {
   endUtc?: Date;
   status: string;
   grandTotalCents: number;
+  serviceDetails?: unknown;
   staff?: { staffId: string }[];
   staffIds?: string[];
 }
@@ -2801,6 +2814,7 @@ function publicBooking(b: BookingLike) {
     endAt: (b.endAt ?? b.endUtc)?.toISOString(),
     status: b.status,
     grandTotalCents: b.grandTotalCents,
+    serviceDetails: b.serviceDetails ?? null,
     // PAY_LATER is the seeded default: a booking exists, no money moved.
     paymentStatus: 'NOT_COLLECTED',
     paymentPolicy: 'PAY_LATER',
