@@ -3,11 +3,13 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
-- 2026-10-14 | ChatGPT | chatgpt/deploy-skip-stale-20261014 → PR pending | ready for CI | Protect Contabo Deploy from queued obsolete commits and last-minute main changes | complete CI then merge
+- 2026-10-14 | ChatGPT | main (docs) | done | Replaced outdated phase-1 README with current platform features, deployment and configuration boundaries | continue configuring optional live integrations and verifying end-to-end flows
+
+- 2026-10-14 | ChatGPT | chatgpt/deploy-skip-stale-20261014 → PR #24 | done | Protect Contabo Deploy from queued obsolete commits and last-minute main changes | PR CI passed; merged to main as 3ff24c9d
 
 - 2026-10-14 | ChatGPT | chatgpt/ics-export-hardening-20261014 → PR #23 | done | Escape RFC5545 calendar text and guard against injected ICS lines, add regression test | CI passed; merged to main in 6d1ea234
 
-- 2026-10-14 | ChatGPT | main (CI unblock) | done | Correct frontend booking fixture after nullable serviceDetails contract change; restore TypeScript CI gate for production rollout | confirm CI green and automatic Deploy on the new SHA
+- 2026-10-14 | ChatGPT | main (CI unblock) | done | Correct frontend booking fixture after nullable serviceDetails contract change; restore TypeScript CI gate for production rollout | CI and Deploy #38609851341 passed, including /healthz and /readyz
 
 - 2026-10-14 | codex | codex/booking-product-catalogue-20261014 → PR pending | ready to merge | Product options/prices and frequency savings are now server-driven; stale incompatible product drafts clear automatically | merge to main, continue auditing booking for client/backend drift
 - 2026-10-14 | codex | codex/booking-service-context-20261014 → PR pending | ready to merge | Made property/contact fields operational: correct rental model, additive booking serviceDetails, real profile save, safe usual-clean reuse, crew context | review diff then merge to main and continue booking UX

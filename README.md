@@ -1,15 +1,15 @@
 # R2NETTE Reservation Platform
 
-First-party replacement for Setmore. This repository contains **Phase 1: the authoritative
-pricing engine** plus a working customer booking flow.
+First-party replacement for Setmore: a working bilingual reservation platform with authoritative server pricing, PostgreSQL/Prisma, scheduling, customer accounts, crew/dispatch operations, payments integration and CI-gated Docker deployment. Historical phase-1 price audit notes are retained below.
 
 ```
-npm install
-npm test         # 46 tests
-npm run typecheck
+npm ci
+npx prisma generate
+npm run ci
+npm start
 ```
 
-Open `booking.html` in a browser to see the customer flow.
+Run the API and open `http://localhost:3000/book` after configuring the database. See [`RUN.md`](RUN.md), [`WORKLOG.md`](WORKLOG.md) and the [Contabo production runbook](docs/deployment/contabo-runbook.md).
 
 ---
 
@@ -33,14 +33,9 @@ on the site and a different one on their invoice.
 | `engine/recurrence.ts` | Weekly = 7 days. Monthly = real calendar dates with short-month clamping. |
 | `engine/quote.ts` | The engine. Validates, prices, snapshots. |
 
-### `booking.html` — the customer flow
+### `web/` — the production customer flow
 
-Mobile-first, single file, no build step. Drop it on any host and point a TikTok or
-Instagram link at it. Steps: service → property → **products (required)** → frequency →
-extras → address → contact → review.
-
-The running receipt on the right is the point of the whole thing: every fee appears the
-moment it applies, so nobody discovers the $25 transport charge at the end.
+Mobile-first and bilingual. The running app is built from `web/` and served by the Node API at `/book`. Steps cover service, property, required cleaning products, frequency, extras, address, available time, details and checkout. Catalogue choices and price quotes come from the server. `booking.html` remains a legacy/prototype file, not the deployed application.
 
 ---
 
@@ -112,36 +107,30 @@ with a grandfathering structure ready, until you decide.
 
 ---
 
-## What is not built yet
+## Operational features and production configuration
 
-Deliberately out of scope for this phase:
+The original phase-1 "not built" list is now obsolete. The repository
+implements PostgreSQL/Prisma persistence, capacity-based scheduling and slot
+holds, Stripe payment logic, recurring workers, a customer portal, staff
+dispatch/crew views, notifications and a production Docker release workflow.
+Read [RUN.md](RUN.md) and the reservation-system docs for current contracts.
 
-- **Availability and scheduling.** Staff capacity, slot holds, double-booking prevention,
-  travel buffers, preferred cleaner. A 2-cleaner job must block two people for the full
-  window — that's the next piece.
-- **Stripe.** Payment policy is seeded `PAY_LATER` to match how Setmore behaves today
-  ($0 collected online). The `DEPOSIT` / `FULL_PAYMENT` / `CARD_ON_FILE` types exist in the
-  domain; the integration doesn't. Recurring off-session charging comes with it.
-- **Database.** The catalogue is in TypeScript. It maps cleanly to Prisma models — every
-  monetary field is already an integer, every enum is already defined.
-- **Customer accounts, admin dashboard, cleaner app, notifications.**
+**Deployed code is not the same as configured service.** The successful
+2026-10-14 Contabo release warned of missing production settings for Stripe,
+Twilio SMS/Voice, Google Maps, the dispatch origin coordinates, off-host S3
+backups, and the alert webhook. These features cannot be considered fully
+operational until settings are added securely and verified. Never commit
+credential values to the repository.
 
-## Order I'd build the rest in
-
-1. **Postgres + Prisma.** Move `data/` into the schema. The engine doesn't change.
-2. **Availability.** The hard one. Staff, shifts, time off, slot holds with expiry, atomic
-   booking so two customers can't take the last slot.
-3. **Stripe.** Server-created PaymentIntents from engine totals only. Webhook is the source
-   of truth. SetupIntent for recurring cards.
-4. **Customer portal + admin.** Everything in `config.ts` becomes editable without a deploy.
-5. **Cleaner mobile view.** Job sheet, en route, arrived, complete.
+The TAKATAK synchronization outbox is intentionally disabled pending
+TAKATAK-side approval, release and verified HMAC signature handling. See
+[TAKATAK integration](docs/TAKATAK_INTEGRATION.md).
 
 ---
 
 ## Wiring the browser to the server
 
-`booking.html` contains a mirror of the pricing math so the total updates instantly while
-someone answers questions. It is **display only**. When you connect a backend:
+The deployed browser requests server catalogue values and authoritative quotes. It sends **selections, never client-computed totals**. This sample illustrates the existing backend contract:
 
 ```js
 // Send selections. Never send a total.
