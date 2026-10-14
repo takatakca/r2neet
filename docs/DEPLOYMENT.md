@@ -7,7 +7,11 @@ Snapshot: 2026-10-14. Detailed canonical procedure: [Contabo runbook](deployment
 - App: Contabo VPS, Docker Compose project at `/opt/r2nette`, Coolify proxy when detected; public domain `https://r2nette.ca`.
 - Domain DNS/email: MochaHost. Preserve MX, SPF, DKIM, `mail` host and existing cPanel mail.
 - GitHub Actions: `CI` must pass on the pushed `main` SHA; `Deploy` builds/pushes a tagged image and rolls the VPS, performs health/readiness and rollback checks. Its workflow skips superseded commits before build and again before the server roll.
-- Last verified production deployment: `fea51644ecee9e8ed600a72915dfb72425daae66`, [run #38611624915](https://github.com/takatakca/r2neet/actions/runs/38611624915), status success. Deployment log: `/healthz ok`, `/readyz ok`, `Deploy verified for commit fea51644...`.
+- Last verified production deployment (before the new release): `fea51644ecee9e8ed600a72915dfb72425daae66`, [run #38611624915](https://github.com/takatakca/r2neet/actions/runs/38611624915), status success. Deployment log: `/healthz ok`, `/readyz ok`, `Deploy verified for commit fea51644...`.
+
+## Next publication
+
+Feature [PR #26](https://github.com/takatakca/r2neet/pull/26) is merged as `39e10d165357c3882ed16f9e59b8ded986411719` and its PR CI was green. The independent `main` CI and corresponding deployment must still be checked for this and the subsequent documentation maintenance commit. A merged SHA is **not** a verified deployed SHA.
 
 ## Operational steps
 1. Review `AGENTS.md`, recent PRs/issues and `WORKLOG.md`; ensure no conflicting ongoing task.

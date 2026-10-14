@@ -3,7 +3,7 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
-- 2026-10-14 | ChatGPT | chatgpt/r2nette-handoff-ics-20261014 → PR pending | active | Fold UTF-8 ICS lines per RFC 5545 and establish five durable agent-status docs | verify PR CI, merge to main, validate deploy, update handoff with final SHA
+- 2026-10-14 | ChatGPT | chatgpt/r2nette-handoff-ics-20261014 → PR #26 | done | Fold RFC5545 UTF-8 ICS lines + regression test; added five durable agent files and corrected TAKATAK gate | PR CI #38612761806 passed; merged to main as 39e10d16, verify matching main deployment
 
 - 2026-10-14 | ChatGPT | main (docs) | done | Replaced outdated phase-1 README with current platform features, deployment and configuration boundaries | continue configuring optional live integrations and verifying end-to-end flows
 

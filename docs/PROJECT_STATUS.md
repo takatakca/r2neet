@@ -1,9 +1,10 @@
 # R2NETTE — Project status
 
-Verified snapshot: **2026-10-14**. Repository: `takatakca/r2neet`; default publication branch: `main`. **This is not a 100%-complete production acceptance.**
+Verified snapshot: **2026-10-14**. Latest verified *code merge* SHA: `39e10d165357c3882ed16f9e59b8ded986411719` (PR #26, CI green); release still requires a matching production deploy check. Repository: `takatakca/r2neet`; default publication branch: `main`. **This is not a 100%-complete production acceptance.**
 
 ## Verified existing platform
 
+- RFC 5545 calendar exports now fold Unicode content lines at 75 UTF-8 octets; [PR #26](https://github.com/takatakca/r2neet/pull/26) passed its CI and merged to `main`.
 - Customer booking flow, account portal, staff roles/admin/crew, backend pricing engine and quotes, PostgreSQL/Prisma, slot holds and scheduling, recurring visits, payment and notification integrations in code.
 - Deployment uses GitHub Actions `CI` → `Deploy`, immutable SHA-tagged image, Docker Compose on Contabo at `/opt/r2nette`, health/readiness checks and rollback. The VPS uses the existing Coolify proxy when present.
 - **Production release evidence:** `fea51644ecee9e8ed600a72915dfb72425daae66` passed [CI #38611375959](https://github.com/takatakca/r2neet/actions/runs/38611375959) and [Deploy #38611624915](https://github.com/takatakca/r2neet/actions/runs/38611624915). The latter logged `/healthz ok`, `/readyz ok`, and a verified SHA.

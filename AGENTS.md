@@ -1,5 +1,7 @@
 # Agent instructions
 
+**Mandatory restart:** read `AGENTS.md`, `docs/AGENT_HANDOFF.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md` and `docs/DECISIONS.md`; then verify that the documented SHA matches the actual GitHub branch and release runs. Continue the next task, not a new implementation. Update the handoff before stopping. Keep `WORKLOG.md` as the short claim ledger.
+
 ## Work log rule (every agent: Claude, Codex, Cursor, people)
 
 Cheap to follow: read only what is listed here.
