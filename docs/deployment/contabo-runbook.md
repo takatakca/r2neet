@@ -58,8 +58,10 @@ secrets**, choose **Add environment secret** once per name:
 
 Provider keys can be added the same way whenever you have them, and **Server
 setup** copies each one it finds into the server's `.env`: `TAKATAK_SUPABASE_URL`,
-`TAKATAK_SUPABASE_ANON_KEY`, `TWILIO_ACCOUNT_SID`,
-`TWILIO_AUTH_TOKEN`, `STRIPE_SECRET_KEY`,
+`TAKATAK_SUPABASE_ANON_KEY`, the optional R2NETTE → TAKATAK bridge settings
+(`TAKATAK_R2NETTE_SYNC_ENABLED`, `TAKATAK_R2NETTE_SYNC_URL`,
+`TAKATAK_R2NETTE_SYNC_CLIENT_ID`, `TAKATAK_R2NETTE_SYNC_WEBHOOK_SECRET`),
+`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `STRIPE_SECRET_KEY`,
 `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `GOOGLE_MAPS_API_KEY`,
 `EMAIL_API_URL`, `EMAIL_API_KEY`, `EMAIL_FROM`, `BACKUP_S3_*`, `ALERT_WEBHOOK_*`.
 After adding one, run **Server setup** again, then **Deploy**.
