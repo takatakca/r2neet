@@ -65,6 +65,14 @@ Before the latest booking-UI commits, PR #18 CI run #60 was fully green:
 
 The newest UI commits should continue through the normal repository CI after push/merge. Do not disable production safety, migration, secret or deployment gates.
 
+## Latest booking completion
+
+- Connected the existing ADD_ONS backend catalogue to the public booking catalogue.
+- Added optional extras selection directly under frequency to avoid an unnecessary extra booking step.
+- Extra prices come from the server catalogue; totals/taxes remain authoritative server quote output.
+- Quantity controls respect each add-on's backend max quantity.
+- Selected extras are persisted as non-sensitive draft state and shown in the live booking summary.
+
 ## Current active task
 
 Booking UX phase 2 is now active after PR #18 merged to main. Live booking summary surfaces were added on desktop and mobile so customers can always see and edit the service, property, frequency/products, address and time they selected.
