@@ -1,6 +1,6 @@
 # R2NETTE -> TAKATAK integration
 
-Status: code implemented on the R2NETTE feature branch; production activation is deliberately disabled until the matching TAKATAK receiver is merged, configured and verified.
+Status (2026-10-14): the signed outbox implementation and database migration are present in R2NETTE `main`, but production delivery remains deliberately disabled. The TAKATAK receiving PR `takatakca/takatak-v1#175` is still OPEN and must pass its independent release and signature checks before activation.
 
 ## Boundary
 

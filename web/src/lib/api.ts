@@ -487,6 +487,23 @@ function escapeIcsText(value: string): string {
     .replace(/,/g, '\\,');
 }
 
+/** RFC 5545 folds content lines at 75 UTF-8 octets, not 75 JS characters. */
+function foldIcsLine(line: string): string {
+  const encoder = new TextEncoder();
+  let result = '';
+  let octets = 0;
+  for (const char of line) {
+    const size = encoder.encode(char).byteLength;
+    if (octets + size > 75) {
+      result += '\r\n ';
+      octets = 1; // The continuation space counts toward the 75-octet limit.
+    }
+    result += char;
+    octets += size;
+  }
+  return result;
+}
+
 /** Build a calendar file from the PERSISTED booking, never a held time. */
 export function buildIcs(booking: Booking, summary: string, location: string): string {
   const stamp = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -504,5 +521,5 @@ export function buildIcs(booking: Booking, summary: string, location: string): s
     `DESCRIPTION:R2NETTE booking ${escapeIcsText(booking.bookingNumber)}`,
     'END:VEVENT',
     'END:VCALENDAR',
-  ].join('\r\n');
+  ].map(foldIcsLine).join('\r\n');
 }
