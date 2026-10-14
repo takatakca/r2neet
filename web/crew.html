@@ -82,6 +82,16 @@ header .sub{opacity:.72;font-size:14px;margin-top:4px}
 let STAFF_ID = '';
 const time = iso => new Intl.DateTimeFormat('en-CA',{timeZone:'America/Toronto',hour:'numeric',minute:'2-digit'}).format(new Date(iso));
 const esc = s => String(s ?? '').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const propertyContext = j => {
+  const d = j.serviceDetails || {};
+  const parts = [];
+  if(d.propertyType) parts.push(String(d.propertyType).replace(/\b\w/g,m=>m.toUpperCase()));
+  if(d.propertySize) parts.push(d.propertySize);
+  if(d.isShortTermRental) parts.push('Short-term rental');
+  if(Number.isFinite(d.bedrooms)) parts.push(`${d.bedrooms} bed`);
+  if(Number.isFinite(d.bathrooms)) parts.push(`${d.bathrooms} bath`);
+  return parts.join(' · ');
+};
 let jobs = [];
 
 async function api(path, opts={}){
@@ -169,6 +179,8 @@ window.openJob = (id) => {
     <div class="detail">
       <div class="row"><span class="k">Customer</span><span class="v">${esc(j.customerFirstName)}</span></div>
       <div class="row"><span class="k">Address</span><span class="v">${esc(j.address)}${j.unit?`<br>Unit ${esc(j.unit)}`:''}</span></div>
+      ${propertyContext(j) ? `<div class="row"><span class="k">Property</span><span class="v">${esc(propertyContext(j))}</span></div>` : ''}
+      ${j.serviceDetails?.serviceNotes ? `<div class="row"><span class="k">Service notes</span><span class="v">${esc(j.serviceDetails.serviceNotes)}</span></div>` : ''}
       <div class="row"><span class="k">Crew</span><span class="v">${j.crewSize} cleaner${j.crewSize===1?'':'s'}</span></div>
       <div class="row"><span class="k">Status</span><span class="v">${j.status.replace('_',' ')}</span></div>
       <div class="row"><span class="k">Job</span><span class="v mono" style="font-size:13px">${j.bookingNumber}</span></div>
