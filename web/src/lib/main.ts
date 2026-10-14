@@ -241,6 +241,11 @@ function applyLocale(): void {
     // Only replace when a translation exists, so fallback copy survives.
     if (value !== key) el.textContent = value;
   });
+  document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-t-placeholder]').forEach((el) => {
+    const key = el.dataset.tPlaceholder!;
+    const value = t(key);
+    if (value !== key) el.placeholder = value;
+  });
   document.querySelectorAll<HTMLElement>('.lang button').forEach((b) => {
     b.setAttribute('aria-pressed', String((b as HTMLElement).dataset.locale === locale));
   });
@@ -905,8 +910,10 @@ function renderDetails(): void {
   }
   const nm = $('nm') as HTMLInputElement | null;
   const em = $('em') as HTMLInputElement | null;
-  if (nm && c?.firstName && !nm.value) nm.value = c.firstName;
-  if (em && c?.email && !em.value) em.value = c.email;
+  if (nm && !nm.value) nm.value = S.name || c?.firstName || '';
+  if (em && !em.value) em.value = S.email || c?.email || '';
+  const notes = $('notes') as HTMLTextAreaElement | null;
+  if (notes && !notes.value && S.notes) notes.value = S.notes;
 }
 
 function readBookingContact(): {
@@ -1030,10 +1037,19 @@ function renderConfirmation(b: Booking): void {
   const box = $('confirmBody');
   if (!box) return;
   const paid = b.paymentStatus === 'SUCCEEDED';
+  const detail = b.serviceDetails;
+  const propertyLabel = detail?.propertyType
+    ? [
+        t(`property.${detail.propertyType}`),
+        detail.propertySize ?? null,
+        detail.isShortTermRental ? t('property.shortTermBadge') : null,
+      ].filter(Boolean).join(' · ')
+    : '';
   const rows: [string, string][] = [
     [t('confirm.date'), formatSlotDate(b.startAt, locale)],
     [t('confirm.time'), `${formatSlotTime(b.startAt, locale)} – ${formatSlotTime(b.endAt, locale)}`],
     [t('confirm.address'), S.addressSummary ?? ''],
+    ...(propertyLabel ? [[t('confirm.property'), propertyLabel] as [string, string]] : []),
     [t('confirm.crew'), String(b.crewSize)],
     [t('confirm.total'), formatMoney(b.grandTotalCents, locale)],
     [t('confirm.payment'), paid ? t('confirm.paid') : t('confirm.payLater')],
@@ -1376,10 +1392,14 @@ function renderLiveBookingSummary(): void {
   }
 
   if (S.propertyType) {
+    const propertyDetail = [
+      S.propertySize,
+      S.isShortTermRental ? t('property.shortTermBadge') : null,
+    ].filter(Boolean).join(' · ');
     rows.push({
       icon: '02',
       title: t(`property.${S.propertyType}`),
-      detail: S.propertySize ?? undefined,
+      detail: propertyDetail || undefined,
       step: 'property',
     });
   }
