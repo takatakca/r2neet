@@ -10,7 +10,8 @@ Snapshot: 2026-10-15. This documents existing repository policy and decisions, n
 6. **Operator resilience:** Off-host backups, retention, encryption-key custody, tested restores and functional paging are launch criteria, not optional paperwork. Existing code may degrade safely when a provider is absent, but an unconfigured integration is never represented as live.
 7. **Calendar exports:** Generate from a persisted booking, not from an unconfirmed hold; escape RFC 5545 TEXT values and fold long lines at 75 **UTF-8 octets** per physical line, without splitting multi-byte characters.
 8. **Browser draft privacy:** Store only explicit allowlisted non-identifying service/property selections. Never persist street address text, private saved-address identifiers, customer identity/notes or held slot times in shared browser storage. Historical drafts must be sanitized on reading; completed bookings must not be restored.
-9. **Agent continuity:** Keep `AGENTS.md`, `WORKLOG.md` and the five `docs/` status files current; never claim a deployment or test without SHA-linked evidence. Avoid force-pushes and conflicting work.
+9. **API error recovery:** Treat invalid JSON and HTML proxy error pages as safe typed API failures. Never render an upstream HTML response directly or hide an authoritative valid server error, including quote reprice data.
+10. **Agent continuity:** Keep `AGENTS.md`, `WORKLOG.md` and the five `docs/` status files current; never claim a deployment or test without SHA-linked evidence. Avoid force-pushes and conflicting work.
 
 References: `BRAND.md`, `RUN.md`, `docs/TAKATAK_INTEGRATION.md`, `docs/reservation-system/`, `docs/deployment/contabo-runbook.md`, [production readiness issue #25](https://github.com/takatakca/r2neet/issues/25).
 

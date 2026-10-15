@@ -20,7 +20,7 @@ import {
   emptyDraft,
   type Booking,
 } from '../web/src/lib/api.js';
-import { api } from '../web/src/lib/api.js';
+import { api, ApiError } from '../web/src/lib/api.js';
 
 /** Minimal localStorage for the node test environment. */
 function installStorage() {
@@ -332,6 +332,60 @@ describe('callback requests', () => {
         phoneE164: '+15145551234',
         delay: 'IN_FIVE_MINUTES',
       });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('API response recovery', () => {
+  it('converts a reverse-proxy HTML 502 into a safe structured API error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response('<html>upstream error</html>', { status: 502, headers: { 'Content-Type': 'text/html' } }),
+    ));
+    try {
+      await expect(api.health()).rejects.toMatchObject({
+        code: 'API_UNAVAILABLE', status: 502,
+      });
+      await expect(api.health()).rejects.toBeInstanceOf(ApiError);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('fails safely when a success response contains corrupted JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response('{broken', { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    ));
+    try {
+      await expect(api.health()).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE', status: 200,
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('preserves server error codes and the reprice payload for valid JSON errors', async () => {
+    const payload = { error: { code: 'QUOTE_REPRICE_REQUIRED', message: 'Please review your new total.' }, reprice: { grandTotalCents: 15995 } };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(payload), { status: 409, headers: { 'Content-Type': 'application/json' } }),
+    ));
+    try {
+      await expect(api.health()).rejects.toMatchObject({
+        code: 'QUOTE_REPRICE_REQUIRED', status: 409, reprice: { grandTotalCents: 15995 },
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('rejects primitive JSON success payloads instead of treating them as objects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response('null', { status: 200 }),
+    ));
+    try {
+      await expect(api.health()).rejects.toMatchObject({ code: 'INVALID_RESPONSE', status: 200 });
     } finally {
       vi.unstubAllGlobals();
     }

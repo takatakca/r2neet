@@ -1,6 +1,6 @@
 # R2NETTE — Project status
 
-Verified snapshot: **2026-10-15**. GitHub verified that `152ddf16016038339af1d265f6c8d29b1960a19a` passed CI #38613223891 and production Deploy #38614841577 on 2026-10-14; both `/healthz` and `/readyz` were verified. Latest verified *code merge* SHA: `39e10d165357c3882ed16f9e59b8ded986411719` (PR #26, CI green); matching deployment for this prior release is now verified. Repository: `takatakca/r2neet`; default publication branch: `main`. **This is not a 100%-complete production acceptance.**
+Verified snapshot: **2026-10-15**. GitHub verified that `152ddf16016038339af1d265f6c8d29b1960a19a` passed CI #38613223891 and production Deploy #38614841577 on 2026-10-14; both `/healthz` and `/readyz` were verified. Latest verified *code merge* SHA: `39e10d165357c3882ed16f9e59b8ded986411719` (PR #26, CI green); matching deployment for the earlier release is verified. Repository: `takatakca/r2neet`; default publication branch: `main`. **This is not a 100%-complete production acceptance.**
 
 ## Verified existing platform
 
@@ -9,6 +9,10 @@ Verified snapshot: **2026-10-15**. GitHub verified that `152ddf16016038339af1d26
 - Deployment uses GitHub Actions `CI` → `Deploy`, immutable SHA-tagged image, Docker Compose on Contabo at `/opt/r2nette`, health/readiness checks and rollback. The VPS uses the existing Coolify proxy when present.
 - **Latest verified production release:** `152ddf16016038339af1d265f6c8d29b1960a19a`, [CI #38613223891](https://github.com/takatakca/r2neet/actions/runs/38613223891), [Deploy #38614841577](https://github.com/takatakca/r2neet/actions/runs/38614841577) confirmed `/healthz ok`, `/readyz ok` and the exact SHA.
 - The domain/web DNS and email configuration remain administered through MochaHost; the actual app runs on Contabo. The deploy evidence does **not** prove each customer flow, provider, or external integration is enabled.
+
+## Latest independent code changes
+
+PR #27 has removed address identifiers and street-address summaries from persisted browser drafts and prevents stale booking/confirmation state from being restored. The current follow-up branch hardens malformed API responses. These changes need their own exact-SHA production rollout checks.
 
 ## Known production gaps
 
