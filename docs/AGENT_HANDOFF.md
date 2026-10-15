@@ -1,36 +1,37 @@
 # R2NETTE — Agent handoff
 
-Snapshot: 2026-10-15. Read `AGENTS.md`, `WORKLOG.md` and the other `docs/` status files before new development.
+Verified snapshot: **2026-10-15**. Always read `AGENTS.md`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, and the relevant runbooks before work.
 
-## Latest completed and deployed task
+## Last completed task
 
-Feature PR #26 (UTF-8 RFC 5545 calendar folding, tests and five continuity documents) was merged to `main`. The follow-up documentation commit `152ddf16016038339af1d265f6c8d29b1960a19a` passed [CI #38613223891](https://github.com/takatakca/r2neet/actions/runs/38613223891) and [production Deploy #38614841577](https://github.com/takatakca/r2neet/actions/runs/38614841577). The deployment log explicitly confirmed `Deploy verified for commit 152ddf16...`, `/healthz ok`, `/readyz ok`.
+PR #30 hardened the API rate limiter against spoofed `X-Forwarded-For` prefixes by using Express's configured trusted-proxy-derived `req.ip`. PR [#30](https://github.com/takatakca/r2neet/pull/30) passed [CI #38776981777](https://github.com/takatakca/r2neet/actions/runs/38776981777), merged into `main` as `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, and passed main [CI #38777285346](https://github.com/takatakca/r2neet/actions/runs/38777285346). **Deploy [#38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485) was still underway at this snapshot; do not claim it deployed before checking logs.**
 
-## Task currently being implemented
+Other verified releases: PR #28's `ce8eb68dbb49d67fd9c7949c700fd25261d66380` [Deploy #38776393992](https://github.com/takatakca/r2neet/actions/runs/38776393992) and PR #29's Docker retry `6a7f192e0ffb46deecde97a6e836ba88fc59e93a` [Deploy #38776842943](https://github.com/takatakca/r2neet/actions/runs/38776842943), each with `/healthz ok`, `/readyz ok` and exact-SHA verification. PR #27's privacy fix was included in these later deployed images.
 
-Privacy PR #27 (`c7a47233`) and API recovery PR #28 (`ce8eb68d`) passed CI and merged. `ce8eb68dbb49d67fd9c7949c700fd25261d66380` was VERIFIED in production via [Deploy #38776393992](https://github.com/takatakca/r2neet/actions/runs/38776393992), non-skipped VPS roll plus `/healthz` and `/readyz`. The c7a47233 first Deploy #38775849037 failed at npm registry ECONNRESET; one rerun published the image but correctly skipped the stale VPS roll. Docker install retry PR #29 passed CI and merged as `6a7f192e0ffb46deecde97a6e836ba88fc59e93a`, whose own main-branch deploy must still be verified. Current task: branch `chatgpt/trusted-proxy-rate-limits-20261015`, use trusted Express `req.ip` rather than untrusted raw X-Forwarded-For to prevent spoofed OTP throttle bypass.
+## Current task
 
-## Files modified in current task
+Branch `chatgpt/finalize-handoff-20261015`: reconcile the five durable project-status files with real PR, CI and release evidence. This is documentation, not a substitute for provider activation or live end-to-end smoke. Its own PR and deployment need verification.
 
-Current hardening task modifies `src/api/hardening.ts`, `tests/hardening.test.ts`, `WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DECISIONS.md`, `docs/DEPLOYMENT.md`. PR #29 previously modified Dockerfile and operational docs.
+## Modified files
 
-## Last pushed commit and verification
+`WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/PROJECT_STATUS.md`, `docs/TASK_QUEUE.md`, `docs/DEPLOYMENT.md`.
 
-- Last **verified production**: `ce8eb68dbb49d67fd9c7949c700fd25261d66380` ([Deploy #38776393992](https://github.com/takatakca/r2neet/actions/runs/38776393992), roll and both probes succeeded).
-- Feature branch PR SHA must be resolved from live GitHub before deployment; branch creation does **not** mean publication.
-- Inspected GitHub main, last commits, active PR #17, issue #25, CI/deploy logs, code, runbooks, and frontend persisted-draft flows. New regression tests are committed for GitHub CI; local `npm ci`, `npx prisma generate`, `npm run ci` were not yet run in this session.
-- Standard checks: `npm ci && npx prisma generate && npm run ci`; remote CI also applies migrations from scratch and builds Docker. Never claim success before the workflow reports it.
+## Last pushed SHA / checks executed
 
-## Known failures / blockers and permissions
+- Newest merged **functional** `main` commit: `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, CI passed.
+- Last **verified deployed** SHA: `6a7f192e0ffb46deecde97a6e836ba88fc59e93a` at this snapshot; verify `a46849b5` separately.
+- Checked GitHub commits/PRs/issues, GitHub CI and deploy jobs/logs; inspected frontend privacy/API handling, Docker retry and server rate-limiter code. CI suites include TypeScript, migrations from scratch, Vitest, security and container. No local `npm ci`, `npm run ci`, or production secrets were executed or exposed in chat.
+- Deployment logs for 6a7f192e: `Deploy verified for commit 6a7f192e...`, `/healthz ok`, `/readyz ok`.
 
-- Production logs still warn Stripe card payment, Twilio Voice/SMS, Google Maps, dispatch coordinates, off-host S3 backup, and alert webhook are unconfigured. Owner/provider access is required to supply real values via protected GitHub `production` environment and server setup, not chat/git. See [issue #25](https://github.com/takatakca/r2neet/issues/25).
-- TAKATAK receiver [PR #175](https://github.com/takatakca/takatak-v1/pull/175) is still open. Keep R2NETTE → TAKATAK sync disabled until deployed receiver verifies signed events.
-- Historical open PR #17 supplies useful 2026-10-08 production/auth acceptance records; review separately before merging to avoid stale launch claims.
-- No destructive force-push or bypass of required CI/deploy gates.
+## Known blockers / required access
 
-## Exact next step
+- [Issue #25](https://github.com/takatakca/r2neet/issues/25): provider credentials for Stripe (including signed webhook), Twilio, Google Maps, dispatch origin, off-host S3 backup and alert webhook are missing in production; the owner/provider admin must place them through protected environments. No guessed secrets or fake payment tests.
+- TAKATAK receiving [PR #175](https://github.com/takatakca/takatak-v1/pull/175) was OPEN on latest check. Keep synchronization disabled pending approved receiver deployment and HMAC verification.
+- [PR #17](https://github.com/takatakca/r2neet/pull/17) contains dated 2026-10-08 auth/production acceptance history; review separately, do not overwrite fresher release evidence or merge unexamined.
+- Full real SMS/Google login, payments, cancellation and staff/worker smoke tests remain unverified.
 
-1. Verify `chatgpt/trusted-proxy-rate-limits-20261015` PR CI and the spoofed-header rate limiter tests; correct failures and merge only after full CI passes.
-2. Check matching latest `main` SHA in GitHub Actions CI and a non-skipped Deploy, including `Deploy verified for commit ...`, `/healthz`, `/readyz`.
-3. Update `docs/AGENT_HANDOFF.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, `WORKLOG.md` with exact verified released SHA; continue issue #25 and end-to-end smoke when real provider credentials exist.
+## Exact next action
 
+1. Check the `a46849b5` main [Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485) and its job logs. Confirm non-skipped VPS roll and `Deploy verified for commit a46849b5...` plus `/healthz`, `/readyz`; if failed, inspect exact failure.
+2. Bring this documentation branch up to the observed deployment SHA and finalize CI, then merge only after checks. Verify the resulting docs-only main CI and deployment separately.
+3. Continue the next executable item in `docs/TASK_QUEUE.md`, prioritizing proof of real provider setup, backups, alerts and auth/payment flows, and keep TAKATAK sync gated.
