@@ -15,7 +15,7 @@ Deploy [#38775849037](https://github.com/takatakca/r2neet/actions/runs/387758490
 
 ## Next publication
 
-Feature `a46849b5` has verified CI and deployment. The handoff documentation branch is NOT a published release until it passes its own PR/main CI and a **non-skipped** Deploy matching the resulting merge SHA.
+Feature `a46849b5` has verified CI and deployment. PR #31 handoff documentation passed PR CI and merged as `b845e0f189b9a19b3edd164cdd8ecae8250839f3`. A subsequent closure commit adjusts status files on main. The current main HEAD is NOT verified in production until it passes its own CI and **non-skipped** Deploy, with exact-SHA and health checks.
 
 ## Operational steps
 1. Review `AGENTS.md`, recent PRs/issues and `WORKLOG.md`; ensure no conflicting ongoing task.

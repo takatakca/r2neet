@@ -1,6 +1,6 @@
 # R2NETTE — Project status
 
-Verified snapshot: **2026-10-15**. Repo `takatakca/r2neet` branch `main`; latest merged functional SHA `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, main CI #38777285346 passed. Last **verified non-skipped production** SHA: `a46849b5e29619a7ee8fd14469e2a98d70b6b28c` ([Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485), probes healthy and exact SHA verified). This project is **not yet 100% production-accepted**.
+Verified snapshot: **2026-10-15**. Continuity update PR #31 passed CI and was merged into main as `b845e0f189b9a19b3edd164cdd8ecae8250839f3`; final docs-only main CI/deploy still need separate confirmation. Repo `takatakca/r2neet` branch `main`; latest merged functional SHA `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, main CI #38777285346 passed. Last **verified non-skipped production** SHA: `a46849b5e29619a7ee8fd14469e2a98d70b6b28c` ([Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485), probes healthy and exact SHA verified). This project is **not yet 100% production-accepted**.
 
 ## Completed new code (GitHub-verified)
 

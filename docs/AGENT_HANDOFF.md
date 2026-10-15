@@ -10,7 +10,7 @@ Other verified releases: PR #28's `ce8eb68dbb49d67fd9c7949c700fd25261d66380` [De
 
 ## Current task
 
-Branch `chatgpt/finalize-handoff-20261015`: reconcile the five durable project-status files with real PR, CI and release evidence. This is documentation, not a substitute for provider activation or live end-to-end smoke. Its own PR and deployment need verification.
+PR #31 reconciled five durable status files, passed [PR CI #38778002480](https://github.com/takatakca/r2neet/actions/runs/38778002480) and merged into `main` as `b845e0f189b9a19b3edd164cdd8ecae8250839f3`. This follow-up closure commit updates WORKLOG and handoff on `main`. **Its exact SHA must be resolved from current GitHub HEAD; do not mistake PR merge SHA for the later closure commit.** Main CI/Deploy for the final HEAD remain to be verified.
 
 ## Modified files
 
@@ -32,6 +32,6 @@ Branch `chatgpt/finalize-handoff-20261015`: reconcile the five durable project-s
 
 ## Exact next action
 
-1. Verify this documentation branch's PR #31 CI, resolve any failures, merge after passing, and record its merge SHA in WORKLOG.
-2. Verify **the docs-only commit's** independent main CI and non-skipped deployment, including `/healthz`, `/readyz` and `Deploy verified for commit <sha>`.
+1. Get the current `main` SHA (post-merge handoff closure), verify its CI and **non-skipped** Deploy job. Confirm `/healthz ok`, `/readyz ok`, and `Deploy verified for commit <sha>` in job logs.
+2. If CI/deploy fails, inspect the exact job, correct on a new branch, and update WORKLOG. If green, document the observed production SHA and proceed to the remaining operational blockers.
 3. Continue the next executable item in `docs/TASK_QUEUE.md`, prioritizing proof of real provider setup, backups, alerts and auth/payment flows, and keep TAKATAK sync gated.

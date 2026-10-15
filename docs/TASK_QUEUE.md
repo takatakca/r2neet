@@ -17,7 +17,7 @@ Last reviewed: 2026-10-15. Do not reset completed work. Respect `AGENTS.md` clai
 | P1 | Full booking/customer/crew/payment browser smoke | TODO, blocked on provider readiness | FR+EN, mobile, quote total from server, confirmed slot, staff scopes, cancel/reschedule/recurrence |
 | P1 | Verify production alerting, scheduled worker history and key-recovery documentation | TODO | Owner sees verified worker successes and actual incident alerts |
 | P2 | Reconcile open production-roll documentation PR #17 | TODO: check proposed text before merging | Accurate release evidence; avoid resurrecting stale claims |
-| P2 | Keep five agent handoff/status documents current | IN PROGRESS: chatgpt/finalize-handoff-20261015 | Update SHA and real deployment/worker statuses after every release |
+| P2 | Keep five agent handoff/status documents current | PR #31 merged (b845e0f1); ONGOING after each release | Update SHA and real deployment/worker statuses after every release |
 
 Each task needs implementation **and** passing required checks; statuses must change only on evidence. For blocked work, continue independent tasks and record the exact dependency. Do not put credentials in git, issues, CI logs or handoffs.
 
