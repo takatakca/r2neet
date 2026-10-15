@@ -42,8 +42,32 @@ async function call<T>(
     throw new ApiError('NETWORK', 'Network request failed', 0);
   }
 
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
+  // Reverse proxies and CDNs can return HTML/empty bodies during an outage.
+  // Never let JSON.parse throw a raw SyntaxError into the booking UI or
+  // display a proxy error page as if it came from our API.
+  let text: string;
+  try {
+    text = await res.text();
+  } catch {
+    throw new ApiError('NETWORK', 'Network request failed', 0);
+  }
+
+  let json: unknown = {};
+  if (text) {
+    try {
+      json = JSON.parse(text) as unknown;
+    } catch {
+      throw new ApiError(
+        res.ok ? 'INVALID_RESPONSE' : 'API_UNAVAILABLE',
+        res.ok ? 'The server returned an invalid response.' : 'The service is temporarily unavailable.',
+        res.status,
+      );
+    }
+  }
+  if (!json || typeof json !== 'object' || Array.isArray(json)) {
+    throw new ApiError('INVALID_RESPONSE', 'The server returned an invalid response.', res.status);
+  }
+
   if (!res.ok) {
     const parsed = json as { error?: { code?: string; message?: string }; reprice?: unknown };
     throw new ApiError(

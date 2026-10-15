@@ -8,11 +8,11 @@ Feature PR #26 (UTF-8 RFC 5545 calendar folding, tests and five continuity docum
 
 ## Task currently being implemented
 
-Branch `chatgpt/privacy-safe-booking-draft-20261015`: make browser draft storage explicitly allowlist-only, drop persisted address IDs and formatted street addresses, drop expired slot state, safely resume at the address step, rewrite historic potentially identifying draft keys, and keep completed bookings from reappearing. Regression tests in `tests/frontend.test.ts` must pass before merging. No production keys or migrations are needed.
+PR #27 (`c7a472336c440ac30953522daf78d381274494e8`) merged after [successful PR CI #38775267147](https://github.com/takatakca/r2neet/actions/runs/38775267147). The new task in branch `chatgpt/api-response-hardening-20261015` handles malformed/non-JSON proxy/API replies without leaking raw pages or breaking the booking UI. TypeScript and Vitest regression tests in `tests/frontend.test.ts` must pass before merge. The `c7a47233` main-branch CI/deployment is still to be verified; do not call it deployed yet.
 
 ## Files modified in current task
 
-`web/src/lib/api.ts`; `tests/frontend.test.ts`; `WORKLOG.md`; `docs/AGENT_HANDOFF.md`; `docs/PROJECT_STATUS.md`; `docs/TASK_QUEUE.md`; `docs/DEPLOYMENT.md`; `docs/DECISIONS.md`.
+New API-response task: `web/src/lib/api.ts`, `tests/frontend.test.ts`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, `docs/AGENT_HANDOFF.md`, `docs/DECISIONS.md`. Previous privacy PR #27 changed the same frontend module and its tests, plus status docs.
 
 ## Last pushed commit and verification
 
@@ -30,7 +30,7 @@ Branch `chatgpt/privacy-safe-booking-draft-20261015`: make browser draft storage
 
 ## Exact next step
 
-1. Resolve CI for `chatgpt/privacy-safe-booking-draft-20261015`, fix any failure, and merge the green PR to `main`.
-2. Verify the matching `main` SHA, successful CI, successful **non-skipped** deploy, and `Deploy verified for commit <sha>` with `/healthz` and `/readyz`.
-3. Update these docs to the **observed** release SHA and continue the first feasible task in `docs/TASK_QUEUE.md`, especially robust API failure handling and production smoke coverage; do not claim issue #25 complete without providers.
+1. Verify `chatgpt/api-response-hardening-20261015` PR CI and fix specific failed jobs; merge a green PR into `main`.
+2. Verify the most recent matching main-branch CI and non-skipped Contabo deployment with `/healthz`, `/readyz`, and exact release SHA.
+3. Update `docs/AGENT_HANDOFF.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md` and `WORKLOG.md` with observed deployment, then continue issue #25 or an independent production smoke task.
 
