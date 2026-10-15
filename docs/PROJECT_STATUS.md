@@ -14,6 +14,10 @@ Verified snapshot: **2026-10-15**. GitHub verified that `152ddf16016038339af1d26
 
 PR #27 has removed address identifiers and street-address summaries from persisted browser drafts and prevents stale booking/confirmation state from being restored. The current follow-up branch hardens malformed API responses. These changes need their own exact-SHA production rollout checks.
 
+## Latest delivery blocker
+
+Deploy [#38775849037](https://github.com/takatakca/r2neet/actions/runs/38775849037) for PR #27's merged SHA `c7a47233` failed at Docker `RUN npm ci` because the npm registry connection reset (`ECONNRESET`), not because the application tests failed. A bounded Docker dependency-fetch retry is now being developed. Until a newer release is independently verified, `152ddf16` remains the last proven production SHA.
+
 ## Known production gaps
 
 The verified deploy log warned of missing configuration for **Stripe** card payments, **Twilio Voice/SMS**, **Google Maps**, business dispatch origin coordinates, **off-host S3 backups**, and **alert webhooks**. Phone/Google sign-in and all workflows still require controlled end-to-end confirmation. See [issue #25](https://github.com/takatakca/r2neet/issues/25).

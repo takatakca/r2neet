@@ -9,6 +9,10 @@ Snapshot: 2026-10-15. Detailed canonical procedure: [Contabo runbook](deployment
 - GitHub Actions: `CI` must pass on the pushed `main` SHA; `Deploy` builds/pushes a tagged image and rolls the VPS, performs health/readiness and rollback checks. Its workflow skips superseded commits before build and again before the server roll.
 - Last verified production deployment: `152ddf16016038339af1d265f6c8d29b1960a19a`, [CI #38613223891](https://github.com/takatakca/r2neet/actions/runs/38613223891), [Deploy #38614841577](https://github.com/takatakca/r2neet/actions/runs/38614841577), successful non-skipped VPS roll. Log: `/healthz ok`, `/readyz ok`, `Deploy verified for commit 152ddf16...`.
 
+## Deployment failure to recover
+
+[Deploy #38775849037](https://github.com/takatakca/r2neet/actions/runs/38775849037) for `c7a47233` failed at Docker build dependency installation (`npm error network read ECONNRESET`); it did not reach VPS roll. A single retry of failed jobs was requested. The branch `chatgpt/docker-npm-network-recovery-20261015` introduces bounded retries for `npm ci`; do not claim the new code is deployed until its **exact** SHA has a successful non-skipped Deploy with both probes.
+
 ## Next publication
 
 The code for the privacy-safe browser draft is on branch `chatgpt/privacy-safe-booking-draft-20261015` pending PR CI and merge. Do not treat that change as deployed until its own matching SHA has a successful non-skipped Deploy log.

@@ -3,7 +3,9 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
-- 2026-10-15 | ChatGPT | chatgpt/api-response-hardening-20261015 → PR pending | active | Fail safely on non-JSON proxy errors and invalid API bodies; preserve typed server errors | review CI, merge, verify deploy
+- 2026-10-15 | ChatGPT | chatgpt/docker-npm-network-recovery-20261015 → PR pending | active | Harden Docker npm ci against bounded ECONNRESET retry; failed Deploy #38775849037 at npm ci | pass CI then merge and verify deploy
+
+- 2026-10-15 | ChatGPT | chatgpt/api-response-hardening-20261015 → PR #28 | done | Fail safely on non-JSON proxy errors and invalid API bodies; preserve typed server errors | PR CI #38775884609 passed; merged as ce8eb68d; main deploy pending
 
 - 2026-10-15 | ChatGPT | chatgpt/privacy-safe-booking-draft-20261015 → PR #27 | done | Remove sensitive address/slot context from browser draft, migrate legacy storage, avoid resurrecting confirmed booking | PR CI #38775267147 passed; merged as c7a47233; main deployment pending
 

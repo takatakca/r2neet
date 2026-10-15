@@ -8,11 +8,11 @@ Feature PR #26 (UTF-8 RFC 5545 calendar folding, tests and five continuity docum
 
 ## Task currently being implemented
 
-PR #27 (`c7a472336c440ac30953522daf78d381274494e8`) merged after [successful PR CI #38775267147](https://github.com/takatakca/r2neet/actions/runs/38775267147). The new task in branch `chatgpt/api-response-hardening-20261015` handles malformed/non-JSON proxy/API replies without leaking raw pages or breaking the booking UI. TypeScript and Vitest regression tests in `tests/frontend.test.ts` must pass before merge. The `c7a47233` main-branch CI/deployment is still to be verified; do not call it deployed yet.
+PR #27 was merged as `c7a472336c440ac30953522daf78d381274494e8` (CI green). PR #28 API response recovery passed CI #38775884609 and merged as `ce8eb68dbb49d67fd9c7949c700fd25261d66380`. IMPORTANT: c7a47233 production Deploy #38775849037 FAILED during Docker `RUN npm ci` with npm `ECONNRESET`; one failed-jobs retry was started, but is not a deployment success. Current task in branch `chatgpt/docker-npm-network-recovery-20261015`: bounded recovery from transient npm registry failures in Dockerfile, preserving deterministic install and failing after three attempts.
 
 ## Files modified in current task
 
-New API-response task: `web/src/lib/api.ts`, `tests/frontend.test.ts`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, `docs/AGENT_HANDOFF.md`, `docs/DECISIONS.md`. Previous privacy PR #27 changed the same frontend module and its tests, plus status docs.
+Current infrastructure task: `Dockerfile`, `WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`. Earlier PR #28 changed the API client, frontend tests, and continuity docs.
 
 ## Last pushed commit and verification
 
@@ -30,7 +30,7 @@ New API-response task: `web/src/lib/api.ts`, `tests/frontend.test.ts`, `WORKLOG.
 
 ## Exact next step
 
-1. Verify `chatgpt/api-response-hardening-20261015` PR CI and fix specific failed jobs; merge a green PR into `main`.
-2. Verify the most recent matching main-branch CI and non-skipped Contabo deployment with `/healthz`, `/readyz`, and exact release SHA.
-3. Update `docs/AGENT_HANDOFF.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md` and `WORKLOG.md` with observed deployment, then continue issue #25 or an independent production smoke task.
+1. Inspect `chatgpt/docker-npm-network-recovery-20261015` PR CI (Docker build is critical), fix any failing job and merge a green PR.
+2. Verify the most recent `main` CI and matching **non-skipped** Deploy; read `Build and push` and `Roll the VPS` logs, `/healthz`, `/readyz`, and exact released SHA. An npm registry ECONNRESET must not be reported as a successful deploy.
+3. Record SHA and verified deployment in this file, `docs/DEPLOYMENT.md` and `WORKLOG.md`; then pursue external integrations in issue #25 only when owner credentials exist.
 
