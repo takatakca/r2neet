@@ -2,6 +2,8 @@
 
 Snapshot: 2026-10-15. Detailed canonical procedure: [Contabo runbook](deployment/contabo-runbook.md). **Do not mistake MochaHost DNS/mail for the app host.**
 
+**Latest verified production:** `2ca571afeddd6920edf86f36bfee5fac06e505e6` — [Deploy #38778654257](https://github.com/takatakca/r2neet/actions/runs/38778654257) performed a real VPS roll, reported `/healthz ok`, `/readyz ok` and `Deploy verified for commit 2ca571afeddd6920edf86f36bfee5fac06e505e6`; main CI #38778348493 passed. Prior releases below are historical.
+
 ## Verified environment
 
 - `takatakca/r2neet` deploys `main` to the Contabo VPS through CI-gated SHA-tagged Docker Compose in `/opt/r2nette`; Coolify hosts the reverse proxy as documented. DNS and email stay with MochaHost.

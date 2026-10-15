@@ -2,6 +2,10 @@
 
 Verified snapshot: **2026-10-15**. Always read `AGENTS.md`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, and the relevant runbooks before work.
 
+## Latest verified production release
+
+On 2026-10-15, GitHub main CI #38778348493 passed for `2ca571afeddd6920edf86f36bfee5fac06e505e6`; [Deploy #38778654257](https://github.com/takatakca/r2neet/actions/runs/38778654257) performed a **non-skipped** Contabo VPS roll and logged `/healthz ok`, `/readyz ok`, and `Deploy verified for commit 2ca571afeddd6920edf86f36bfee5fac06e505e6`. This supersedes older deployment statuses elsewhere in this file. No provider activation or customer payment smoke was demonstrated by this release.
+
 ## Last completed task
 
 PR #30 hardened the API rate limiter against spoofed `X-Forwarded-For` prefixes by using Express's configured trusted-proxy-derived `req.ip`. PR [#30](https://github.com/takatakca/r2neet/pull/30) passed [CI #38776981777](https://github.com/takatakca/r2neet/actions/runs/38776981777), merged into `main` as `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, and passed main [CI #38777285346](https://github.com/takatakca/r2neet/actions/runs/38777285346). **Production [Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485) succeeded**: non-skipped VPS roll, `/healthz ok`, `/readyz ok`, and `Deploy verified for commit a46849b5e29619a7ee8fd14469e2a98d70b6b28c`.
@@ -29,6 +33,10 @@ PR #31 reconciled five durable status files, passed [PR CI #38778002480](https:/
 - TAKATAK receiving [PR #175](https://github.com/takatakca/takatak-v1/pull/175) was OPEN on latest check. Keep synchronization disabled pending approved receiver deployment and HMAC verification.
 - [PR #17](https://github.com/takatakca/r2neet/pull/17) contains dated 2026-10-08 auth/production acceptance history; review separately, do not overwrite fresher release evidence or merge unexamined.
 - Full real SMS/Google login, payments, cancellation and staff/worker smoke tests remain unverified.
+
+## Current priority after verified deploy
+
+Continue issue #25: configure protected provider settings, then verify real backup restore, alert delivery, phone/Google authentication, booking/Stripe webhook and worker health. Keep TAKATAK receiver sync disabled until PR #175 has been approved and deployed. No production credentials are in this handoff.
 
 ## Exact next action
 
