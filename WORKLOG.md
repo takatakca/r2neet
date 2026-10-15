@@ -3,6 +3,8 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-10-15 | ChatGPT | chatgpt/privacy-safe-booking-draft-20261015 → PR pending | active | Remove sensitive address/slot context from browser draft, migrate legacy storage, avoid resurrecting confirmed booking | await PR CI, merge then verify matching deploy
+
 - 2026-10-14 | ChatGPT | chatgpt/r2nette-handoff-ics-20261014 → PR #26 | done | Fold RFC5545 UTF-8 ICS lines + regression test; added five durable agent files and corrected TAKATAK gate | PR CI #38612761806 passed; merged to main as 39e10d16, verify matching main deployment
 
 - 2026-10-14 | ChatGPT | main (docs) | done | Replaced outdated phase-1 README with current platform features, deployment and configuration boundaries | continue configuring optional live integrations and verifying end-to-end flows

@@ -409,24 +409,72 @@ export const emptyDraft: BookingDraft = {
 const DRAFT_KEY = 'r2n_draft';
 
 /**
- * Persist only non-sensitive selections, so a session expiring mid-booking
- * does not destroy someone's progress. No phone, email, address text or
- * payment data goes to storage.
+ * The draft is shared browser storage, not a private authenticated session.
+ * Persist only an explicit allowlist of non-identifying selections. In
+ * particular, a street address, an address ID or a previous held slot must
+ * never outlive the current in-memory booking flow.
  */
+const RESUMABLE_STEPS: Step[] = [
+  'service', 'identity', 'welcome', 'property', 'products', 'frequency', 'address',
+];
+
+function safeDraftSelections(d: Partial<BookingDraft>): Partial<BookingDraft> {
+  const step: Step = d.step && RESUMABLE_STEPS.includes(d.step) ? d.step
+    : d.step === 'slots' || d.step === 'details' || d.step === 'checkout'
+      ? 'address'
+      : 'service';
+  const addOns = Object.fromEntries(
+    Object.entries(d.addOns ?? {}).filter(([, quantity]) =>
+      typeof quantity === 'number' && Number.isSafeInteger(quantity) && quantity > 0),
+  );
+
+  return {
+    step,
+    serviceOptionId: typeof d.serviceOptionId === 'string' ? d.serviceOptionId : null,
+    propertyType: typeof d.propertyType === 'string' ? d.propertyType : null,
+    propertySize: typeof d.propertySize === 'string' ? d.propertySize : null,
+    isShortTermRental: d.isShortTermRental === true,
+    bedrooms: Number.isSafeInteger(d.bedrooms) && (d.bedrooms ?? -1) >= 0 ? d.bedrooms : 2,
+    bathrooms: Number.isSafeInteger(d.bathrooms) && (d.bathrooms ?? -1) >= 0 ? d.bathrooms : 1,
+    productSupplyOption: typeof d.productSupplyOption === 'string' ? d.productSupplyOption : null,
+    frequency: typeof d.frequency === 'string' ? d.frequency : null,
+    addOns,
+  };
+}
+
 export function saveDraft(d: BookingDraft): void {
   try {
-    const { name, email, notes, ...safe } = d;
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(safe));
+    // Confirmation is terminal: never resurrect a finished booking.
+    if (d.step === 'confirmation') {
+      clearDraft();
+      return;
+    }
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(safeDraftSelections(d)));
   } catch {
-    /* ignore */
+    /* unavailable storage must not prevent booking */
   }
 }
 
 export function loadDraft(): Partial<BookingDraft> | null {
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
-    return raw ? (JSON.parse(raw) as Partial<BookingDraft>) : null;
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      clearDraft();
+      return null;
+    }
+    const d = parsed as Partial<BookingDraft>;
+    if (d.step === 'confirmation') {
+      clearDraft();
+      return null;
+    }
+    const safe = safeDraftSelections(d);
+    // Rewrite legacy drafts that previously contained address text or PII.
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(safe));
+    return safe;
   } catch {
+    clearDraft();
     return null;
   }
 }

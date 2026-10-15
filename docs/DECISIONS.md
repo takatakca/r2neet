@@ -1,6 +1,6 @@
 # R2NETTE — Recorded architectural and release decisions
 
-Snapshot: 2026-10-14. This documents existing repository policy and decisions, not new approval to activate providers.
+Snapshot: 2026-10-15. This documents existing repository policy and decisions, not new approval to activate providers.
 
 1. **Preserve the product:** R2NETTE remains a separate cleaning/reservation application with its own UI, branding and operational booking database. TAKATAK master identity is integrated only through approved tenant-scoped contracts; never place R2NETTE workflows inside the generic TAKATAK dashboard.
 2. **Money:** The backend is the authority for service options, quote totals, GST/QST, discounts, products, frequency and payment state. Browser fields transmit user selections only. Stripe webhook receipts are validated server-side and live cards require complete provider configuration.
@@ -9,7 +9,8 @@ Snapshot: 2026-10-14. This documents existing repository policy and decisions, n
 5. **Publishing:** `main` CI must pass before GitHub Actions deploys SHA-tagged immutable images to Contabo. Deployer skips obsolete releases and verifies live health and readiness. DNS/email stay with MochaHost. No bypass of branch protections.
 6. **Operator resilience:** Off-host backups, retention, encryption-key custody, tested restores and functional paging are launch criteria, not optional paperwork. Existing code may degrade safely when a provider is absent, but an unconfigured integration is never represented as live.
 7. **Calendar exports:** Generate from a persisted booking, not from an unconfirmed hold; escape RFC 5545 TEXT values and fold long lines at 75 **UTF-8 octets** per physical line, without splitting multi-byte characters.
-8. **Agent continuity:** Keep `AGENTS.md`, `WORKLOG.md` and the five `docs/` status files current; never claim a deployment or test without SHA-linked evidence. Avoid force-pushes and conflicting work.
+8. **Browser draft privacy:** Store only explicit allowlisted non-identifying service/property selections. Never persist street address text, private saved-address identifiers, customer identity/notes or held slot times in shared browser storage. Historical drafts must be sanitized on reading; completed bookings must not be restored.
+9. **Agent continuity:** Keep `AGENTS.md`, `WORKLOG.md` and the five `docs/` status files current; never claim a deployment or test without SHA-linked evidence. Avoid force-pushes and conflicting work.
 
 References: `BRAND.md`, `RUN.md`, `docs/TAKATAK_INTEGRATION.md`, `docs/reservation-system/`, `docs/deployment/contabo-runbook.md`, [production readiness issue #25](https://github.com/takatakca/r2neet/issues/25).
 

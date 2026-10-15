@@ -1,17 +1,17 @@
 # R2NETTE — Deployment state and runbook
 
-Snapshot: 2026-10-14. Detailed canonical procedure: [Contabo runbook](deployment/contabo-runbook.md). **Do not mistake MochaHost DNS/mail for the app host.**
+Snapshot: 2026-10-15. Detailed canonical procedure: [Contabo runbook](deployment/contabo-runbook.md). **Do not mistake MochaHost DNS/mail for the app host.**
 
 ## Verified environment
 - Repository: `takatakca/r2neet`, publication branch `main`.
 - App: Contabo VPS, Docker Compose project at `/opt/r2nette`, Coolify proxy when detected; public domain `https://r2nette.ca`.
 - Domain DNS/email: MochaHost. Preserve MX, SPF, DKIM, `mail` host and existing cPanel mail.
 - GitHub Actions: `CI` must pass on the pushed `main` SHA; `Deploy` builds/pushes a tagged image and rolls the VPS, performs health/readiness and rollback checks. Its workflow skips superseded commits before build and again before the server roll.
-- Last verified production deployment (before the new release): `fea51644ecee9e8ed600a72915dfb72425daae66`, [run #38611624915](https://github.com/takatakca/r2neet/actions/runs/38611624915), status success. Deployment log: `/healthz ok`, `/readyz ok`, `Deploy verified for commit fea51644...`.
+- Last verified production deployment: `152ddf16016038339af1d265f6c8d29b1960a19a`, [CI #38613223891](https://github.com/takatakca/r2neet/actions/runs/38613223891), [Deploy #38614841577](https://github.com/takatakca/r2neet/actions/runs/38614841577), successful non-skipped VPS roll. Log: `/healthz ok`, `/readyz ok`, `Deploy verified for commit 152ddf16...`.
 
 ## Next publication
 
-Feature [PR #26](https://github.com/takatakca/r2neet/pull/26) is merged as `39e10d165357c3882ed16f9e59b8ded986411719` and its PR CI was green. The independent `main` CI and corresponding deployment must still be checked for this and the subsequent documentation maintenance commit. A merged SHA is **not** a verified deployed SHA.
+The code for the privacy-safe browser draft is on branch `chatgpt/privacy-safe-booking-draft-20261015` pending PR CI and merge. Do not treat that change as deployed until its own matching SHA has a successful non-skipped Deploy log.
 
 ## Operational steps
 1. Review `AGENTS.md`, recent PRs/issues and `WORKLOG.md`; ensure no conflicting ongoing task.
