@@ -5,7 +5,7 @@ Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
 - 2026-10-15 | ChatGPT | chatgpt/finalize-handoff-20261015 → PR pending | active | Reconcile real CI/deploy SHAs for privacy, API resilience, Docker and trusted-proxy releases in five status files | check a46849b5 deploy, verify docs CI and merge
 
-- 2026-10-15 | ChatGPT | chatgpt/trusted-proxy-rate-limits-20261015 → PR #30 | done | Block X-Forwarded-For spoofing from bypassing SMS/auth request throttling | PR CI #38776981777 green; merged as a46849b5; main CI #38777285346 green, deploy in progress
+- 2026-10-15 | ChatGPT | chatgpt/trusted-proxy-rate-limits-20261015 → PR #30 | done | Block X-Forwarded-For spoofing from bypassing SMS/auth request throttling | PR CI #38776981777 and main CI #38777285346 green; merged a46849b5; Deploy #38777515485 verified /healthz and /readyz
 
 - 2026-10-15 | ChatGPT | chatgpt/docker-npm-network-recovery-20261015 → PR #29 | done | Harden Docker npm ci against bounded ECONNRESET retry; failed Deploy #38775849037 at npm ci | PR CI #38776351883 green, merged as 6a7f192e; main CI #38776617739 + Deploy #38776842943 verified 6a7f192e, health and readiness OK
 

@@ -4,7 +4,7 @@ Verified snapshot: **2026-10-15**. Always read `AGENTS.md`, `WORKLOG.md`, `docs/
 
 ## Last completed task
 
-PR #30 hardened the API rate limiter against spoofed `X-Forwarded-For` prefixes by using Express's configured trusted-proxy-derived `req.ip`. PR [#30](https://github.com/takatakca/r2neet/pull/30) passed [CI #38776981777](https://github.com/takatakca/r2neet/actions/runs/38776981777), merged into `main` as `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, and passed main [CI #38777285346](https://github.com/takatakca/r2neet/actions/runs/38777285346). **Deploy [#38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485) was still underway at this snapshot; do not claim it deployed before checking logs.**
+PR #30 hardened the API rate limiter against spoofed `X-Forwarded-For` prefixes by using Express's configured trusted-proxy-derived `req.ip`. PR [#30](https://github.com/takatakca/r2neet/pull/30) passed [CI #38776981777](https://github.com/takatakca/r2neet/actions/runs/38776981777), merged into `main` as `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, and passed main [CI #38777285346](https://github.com/takatakca/r2neet/actions/runs/38777285346). **Production [Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485) succeeded**: non-skipped VPS roll, `/healthz ok`, `/readyz ok`, and `Deploy verified for commit a46849b5e29619a7ee8fd14469e2a98d70b6b28c`.
 
 Other verified releases: PR #28's `ce8eb68dbb49d67fd9c7949c700fd25261d66380` [Deploy #38776393992](https://github.com/takatakca/r2neet/actions/runs/38776393992) and PR #29's Docker retry `6a7f192e0ffb46deecde97a6e836ba88fc59e93a` [Deploy #38776842943](https://github.com/takatakca/r2neet/actions/runs/38776842943), each with `/healthz ok`, `/readyz ok` and exact-SHA verification. PR #27's privacy fix was included in these later deployed images.
 
@@ -19,9 +19,9 @@ Branch `chatgpt/finalize-handoff-20261015`: reconcile the five durable project-s
 ## Last pushed SHA / checks executed
 
 - Newest merged **functional** `main` commit: `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, CI passed.
-- Last **verified deployed** SHA: `6a7f192e0ffb46deecde97a6e836ba88fc59e93a` at this snapshot; verify `a46849b5` separately.
+- Last **verified deployed** SHA: `a46849b5e29619a7ee8fd14469e2a98d70b6b28c` ([Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485), probes and roll passed).
 - Checked GitHub commits/PRs/issues, GitHub CI and deploy jobs/logs; inspected frontend privacy/API handling, Docker retry and server rate-limiter code. CI suites include TypeScript, migrations from scratch, Vitest, security and container. No local `npm ci`, `npm run ci`, or production secrets were executed or exposed in chat.
-- Deployment logs for 6a7f192e: `Deploy verified for commit 6a7f192e...`, `/healthz ok`, `/readyz ok`.
+- Deployment logs for a46849b5: `Deploy verified for commit a46849b5...`, `/healthz ok`, `/readyz ok`.
 
 ## Known blockers / required access
 
@@ -32,6 +32,6 @@ Branch `chatgpt/finalize-handoff-20261015`: reconcile the five durable project-s
 
 ## Exact next action
 
-1. Check the `a46849b5` main [Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485) and its job logs. Confirm non-skipped VPS roll and `Deploy verified for commit a46849b5...` plus `/healthz`, `/readyz`; if failed, inspect exact failure.
-2. Bring this documentation branch up to the observed deployment SHA and finalize CI, then merge only after checks. Verify the resulting docs-only main CI and deployment separately.
+1. Verify this documentation branch's PR #31 CI, resolve any failures, merge after passing, and record its merge SHA in WORKLOG.
+2. Verify **the docs-only commit's** independent main CI and non-skipped deployment, including `/healthz`, `/readyz` and `Deploy verified for commit <sha>`.
 3. Continue the next executable item in `docs/TASK_QUEUE.md`, prioritizing proof of real provider setup, backups, alerts and auth/payment flows, and keep TAKATAK sync gated.

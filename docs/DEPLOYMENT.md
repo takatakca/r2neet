@@ -6,8 +6,8 @@ Snapshot: 2026-10-15. Detailed canonical procedure: [Contabo runbook](deployment
 
 - `takatakca/r2neet` deploys `main` to the Contabo VPS through CI-gated SHA-tagged Docker Compose in `/opt/r2nette`; Coolify hosts the reverse proxy as documented. DNS and email stay with MochaHost.
 - Successful non-skipped release [#38776393992](https://github.com/takatakca/r2neet/actions/runs/38776393992): `ce8eb68dbb49d67fd9c7949c700fd25261d66380`, `/healthz ok`, `/readyz ok`.
-- **Last verified production:** successful non-skipped release [#38776842943](https://github.com/takatakca/r2neet/actions/runs/38776842943): `6a7f192e0ffb46deecde97a6e836ba88fc59e93a`, liveness/readiness OK, exact SHA confirmed.
-- Newest merge `a46849b5e29619a7ee8fd14469e2a98d70b6b28c` passed [CI #38777285346](https://github.com/takatakca/r2neet/actions/runs/38777285346); inspect [Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485) before calling it live.
+- **Last verified production:** successful non-skipped release [#38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485): `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, `/healthz ok`, `/readyz ok`, exact SHA confirmed.
+- Latest functional merge `a46849b5e29619a7ee8fd14469e2a98d70b6b28c` passed [CI #38777285346](https://github.com/takatakca/r2neet/actions/runs/38777285346) and [Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485), including health/readiness and exact-SHA checks.
 
 ## Incidents and recovery
 
@@ -15,7 +15,7 @@ Deploy [#38775849037](https://github.com/takatakca/r2neet/actions/runs/387758490
 
 ## Next publication
 
-Verify latest merged code `a46849b5` against CI+Deploy logs. The handoff documentation branch is not a published release until its own green main CI and successful non-skipped deployment.
+Feature `a46849b5` has verified CI and deployment. The handoff documentation branch is NOT a published release until it passes its own PR/main CI and a **non-skipped** Deploy matching the resulting merge SHA.
 
 ## Operational steps
 1. Review `AGENTS.md`, recent PRs/issues and `WORKLOG.md`; ensure no conflicting ongoing task.
