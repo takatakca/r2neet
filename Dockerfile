@@ -27,7 +27,23 @@ RUN set -eu \
 FROM base AS deps
 COPY package*.json ./
 COPY prisma ./prisma
-RUN npm ci
+# A short registry/transport reset must not abort production publishing.
+# npm's own fetch retry plus a bounded outer retry handles ECONNRESET,
+# without masking a persistent bad lockfile or broken dependency.
+RUN set -eu; \
+    attempt=1; \
+    while [ "$attempt" -le 3 ]; do \
+      if npm ci --fetch-retries=4 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=60000; then \
+        break; \
+      fi; \
+      if [ "$attempt" -eq 3 ]; then \
+        echo "npm ci failed after 3 attempts" >&2; \
+        exit 1; \
+      fi; \
+      echo "npm ci failed due to a temporary issue; retrying (attempt $attempt/3)" >&2; \
+      sleep $((attempt * 5)); \
+      attempt=$((attempt + 1)); \
+    done
 
 FROM deps AS build
 COPY . .
