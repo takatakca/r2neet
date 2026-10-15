@@ -3,23 +3,19 @@
 Snapshot: 2026-10-15. Detailed canonical procedure: [Contabo runbook](deployment/contabo-runbook.md). **Do not mistake MochaHost DNS/mail for the app host.**
 
 ## Verified environment
-- Repository: `takatakca/r2neet`, publication branch `main`.
-- App: Contabo VPS, Docker Compose project at `/opt/r2nette`, Coolify proxy when detected; public domain `https://r2nette.ca`.
-- Domain DNS/email: MochaHost. Preserve MX, SPF, DKIM, `mail` host and existing cPanel mail.
-- GitHub Actions: `CI` must pass on the pushed `main` SHA; `Deploy` builds/pushes a tagged image and rolls the VPS, performs health/readiness and rollback checks. Its workflow skips superseded commits before build and again before the server roll.
-- Last verified production deployment: `152ddf16016038339af1d265f6c8d29b1960a19a`, [CI #38613223891](https://github.com/takatakca/r2neet/actions/runs/38613223891), [Deploy #38614841577](https://github.com/takatakca/r2neet/actions/runs/38614841577), successful non-skipped VPS roll. Log: `/healthz ok`, `/readyz ok`, `Deploy verified for commit 152ddf16...`.
 
-## Deployment failure to recover
+- `takatakca/r2neet` deploys `main` to the Contabo VPS through CI-gated SHA-tagged Docker Compose in `/opt/r2nette`; Coolify hosts the reverse proxy as documented. DNS and email stay with MochaHost.
+- Successful non-skipped release [#38776393992](https://github.com/takatakca/r2neet/actions/runs/38776393992): `ce8eb68dbb49d67fd9c7949c700fd25261d66380`, `/healthz ok`, `/readyz ok`.
+- **Last verified production:** successful non-skipped release [#38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485): `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, `/healthz ok`, `/readyz ok`, exact SHA confirmed.
+- Latest functional merge `a46849b5e29619a7ee8fd14469e2a98d70b6b28c` passed [CI #38777285346](https://github.com/takatakca/r2neet/actions/runs/38777285346) and [Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485), including health/readiness and exact-SHA checks.
 
-[Deploy #38775849037](https://github.com/takatakca/r2neet/actions/runs/38775849037) for `c7a47233` failed at Docker build dependency installation (`npm error network read ECONNRESET`); it did not reach VPS roll. A single retry built the image but correctly skipped the obsolete VPS roll after main advanced. The branch `chatgpt/docker-npm-network-recovery-20261015` introduces bounded retries for `npm ci`; do not claim the new code is deployed until its **exact** SHA has a successful non-skipped Deploy with both probes.
+## Incidents and recovery
 
-## Most recent successful rollout
-
-[Deploy #38776393992](https://github.com/takatakca/r2neet/actions/runs/38776393992) successfully rolled `ce8eb68dbb49d67fd9c7949c700fd25261d66380` and logged `/healthz ok`, `/readyz ok`, and the exact SHA. Docker retry PR #29 (`6a7f192e`) subsequently merged; do not assume its own production rollout until the matching deploy is checked.
+Deploy [#38775849037](https://github.com/takatakca/r2neet/actions/runs/38775849037) initially failed on npm registry `ECONNRESET`. Its single retry published the image but deliberately **skipped** a now-stale VPS roll. Bounded install retries entered production with `6a7f192e`. Never equate a green job that skipped rolling the VPS with a deployed release.
 
 ## Next publication
 
-The code for the privacy-safe browser draft is on branch `chatgpt/privacy-safe-booking-draft-20261015` pending PR CI and merge. Do not treat that change as deployed until its own matching SHA has a successful non-skipped Deploy log.
+Feature `a46849b5` has verified CI and deployment. The handoff documentation branch is NOT a published release until it passes its own PR/main CI and a **non-skipped** Deploy matching the resulting merge SHA.
 
 ## Operational steps
 1. Review `AGENTS.md`, recent PRs/issues and `WORKLOG.md`; ensure no conflicting ongoing task.

@@ -1,26 +1,21 @@
 # R2NETTE — Project status
 
-Verified snapshot: **2026-10-15**. GitHub verified that `152ddf16016038339af1d265f6c8d29b1960a19a` passed CI #38613223891 and production Deploy #38614841577 on 2026-10-14; both `/healthz` and `/readyz` were verified. Latest verified *code merge* SHA: `39e10d165357c3882ed16f9e59b8ded986411719` (PR #26, CI green); matching deployment for the earlier release is verified. Repository: `takatakca/r2neet`; default publication branch: `main`. **This is not a 100%-complete production acceptance.**
+Verified snapshot: **2026-10-15**. Repo `takatakca/r2neet` branch `main`; latest merged functional SHA `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, main CI #38777285346 passed. Last **verified non-skipped production** SHA: `a46849b5e29619a7ee8fd14469e2a98d70b6b28c` ([Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485), probes healthy and exact SHA verified). This project is **not yet 100% production-accepted**.
+
+## Completed new code (GitHub-verified)
+
+- PR #27: browser storage now excludes saved street address, address identifiers, contact information and held slots; sanitizes historical drafts and refuses to resurrect confirmed bookings.
+- PR #28: safe structured API errors for HTML proxy failures/corrupt JSON; preserves valid pricing/reprice errors. Deployed in `ce8eb68d` (Deploy #38776393992).
+- PR #29: bounded npm install retry on transient Docker registry errors, without masking broken dependency installs. Deployed in `6a7f192e` (Deploy #38776842943).
+- PR #30: rate-limit client IP is derived from Express's immediate trusted proxy, not untrusted raw X-Forwarded-For; spoofed-prefix regression tests. Merged `a46849b5`, CI and production Deploy #38777515485 verified.
 
 ## Verified existing platform
 
 - RFC 5545 calendar exports now fold Unicode content lines at 75 UTF-8 octets; [PR #26](https://github.com/takatakca/r2neet/pull/26) passed its CI and merged to `main`.
 - Customer booking flow, account portal, staff roles/admin/crew, backend pricing engine and quotes, PostgreSQL/Prisma, slot holds and scheduling, recurring visits, payment and notification integrations in code.
 - Deployment uses GitHub Actions `CI` → `Deploy`, immutable SHA-tagged image, Docker Compose on Contabo at `/opt/r2nette`, health/readiness checks and rollback. The VPS uses the existing Coolify proxy when present.
-- **Latest verified production release:** `152ddf16016038339af1d265f6c8d29b1960a19a`, [CI #38613223891](https://github.com/takatakca/r2neet/actions/runs/38613223891), [Deploy #38614841577](https://github.com/takatakca/r2neet/actions/runs/38614841577) confirmed `/healthz ok`, `/readyz ok` and the exact SHA.
+- **Latest verified production:** `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, [CI #38777285346](https://github.com/takatakca/r2neet/actions/runs/38777285346) and [Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485) confirmed non-skipped roll, exact SHA, liveness and readiness.
 - The domain/web DNS and email configuration remain administered through MochaHost; the actual app runs on Contabo. The deploy evidence does **not** prove each customer flow, provider, or external integration is enabled.
-
-## Latest independent code changes
-
-PR #27 has removed address identifiers and street-address summaries from persisted browser drafts and prevents stale booking/confirmation state from being restored. The current follow-up branch hardens malformed API responses. These changes need their own exact-SHA production rollout checks.
-
-## Latest delivery blocker
-
-Deploy [#38775849037](https://github.com/takatakca/r2neet/actions/runs/38775849037) for PR #27's merged SHA `c7a47233` failed at Docker `RUN npm ci` because the npm registry connection reset (`ECONNRESET`), not because the application tests failed. A bounded Docker dependency-fetch retry is now being developed. After this initial failure, the successful non-skipped [Deploy #38776393992](https://github.com/takatakca/r2neet/actions/runs/38776393992) released `ce8eb68dbb49d67fd9c7949c700fd25261d66380` and passed both probes. Newer Docker retry PR #29 is merged but its release needs separate verification.
-
-## Proxy identity and rate limiting
-
-The active hardening work replaces use of the untrusted leftmost `X-Forwarded-For` value as a limiter key with Express's trusted one-hop `req.ip` (or socket fallback). Tests must prove that forged forwarded prefixes cannot bypass SMS rate limits.
 
 ## Known production gaps
 
