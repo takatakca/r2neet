@@ -246,6 +246,55 @@ describe('draft persistence', () => {
     expect(loaded.frequency).toBe('WEEKLY');
   });
 
+  it('never persists a saved address, address identifier or previously held slot', () => {
+    saveDraft({
+      ...emptyDraft,
+      step: 'details',
+      serviceOptionId: 'svc_basic_2x3',
+      addressId: 'private-address-record-id',
+      addressSummary: '124 Secret Street, Unit 22',
+      slotStartAt: '2026-10-21T14:00:00Z',
+    });
+    const raw = localStorage.getItem('r2n_draft')!;
+    expect(raw).not.toContain('Secret');
+    expect(raw).not.toContain('private-address');
+    expect(raw).not.toContain('2026-10-21');
+    expect(loadDraft()).toMatchObject({
+      step: 'address',
+      serviceOptionId: 'svc_basic_2x3',
+    });
+    expect(loadDraft()).not.toHaveProperty('addressId');
+    expect(loadDraft()).not.toHaveProperty('addressSummary');
+    expect(loadDraft()).not.toHaveProperty('slotStartAt');
+  });
+
+  it('scrubs legacy drafts that leaked identifiable data in browser storage', () => {
+    localStorage.setItem('r2n_draft', JSON.stringify({
+      ...emptyDraft,
+      step: 'checkout',
+      name: 'Private Name',
+      email: 'private@example.com',
+      notes: 'Door code 1234',
+      addressId: 'old-address-id',
+      addressSummary: '999 Confidential Avenue',
+      slotStartAt: '2026-10-21T14:00:00Z',
+      frequency: 'WEEKLY',
+    }));
+    expect(loadDraft()).toMatchObject({ step: 'address', frequency: 'WEEKLY' });
+    const raw = localStorage.getItem('r2n_draft')!;
+    for (const sensitive of ['Private Name', 'private@example.com', '1234', 'old-address-id', 'Confidential', '2026-10-21']) {
+      expect(raw).not.toContain(sensitive);
+    }
+  });
+
+  it('does not resurrect confirmed bookings after reload', () => {
+    saveDraft({ ...emptyDraft, step: 'confirmation', addressSummary: 'Sensitive address' });
+    expect(loadDraft()).toBeNull();
+    localStorage.setItem('r2n_draft', JSON.stringify({ ...emptyDraft, step: 'confirmation' }));
+    expect(loadDraft()).toBeNull();
+    expect(localStorage.getItem('r2n_draft')).toBeNull();
+  });
+
   it('never persists personal details', () => {
     saveDraft({
       ...emptyDraft,

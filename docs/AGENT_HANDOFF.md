@@ -1,38 +1,36 @@
 # R2NETTE — Agent handoff
 
-Snapshot: **2026-10-14**, from GitHub-connected review. Read `AGENTS.md` and the newest `WORKLOG.md` entries before modifying code.
+Snapshot: 2026-10-15. Read `AGENTS.md`, `WORKLOG.md` and the other `docs/` status files before new development.
 
-## Last completed task
+## Latest completed and deployed task
 
-Merged [PR #26](https://github.com/takatakca/r2neet/pull/26): RFC 5545 UTF-8 75-octet physical-line folding, Unicode regression test, five project continuity documents, accurate TAKATAK integration gate. Newest **feature merge** on `main`: `39e10d165357c3882ed16f9e59b8ded986411719`; PR CI [run #38612761806](https://github.com/takatakca/r2neet/actions/runs/38612761806) succeeded (typecheck/build, tests, safeguards, container, aggregate CI).
+Feature PR #26 (UTF-8 RFC 5545 calendar folding, tests and five continuity documents) was merged to `main`. The follow-up documentation commit `152ddf16016038339af1d265f6c8d29b1960a19a` passed [CI #38613223891](https://github.com/takatakca/r2neet/actions/runs/38613223891) and [production Deploy #38614841577](https://github.com/takatakca/r2neet/actions/runs/38614841577). The deployment log explicitly confirmed `Deploy verified for commit 152ddf16...`, `/healthz ok`, `/readyz ok`.
 
-## Task currently in progress
+## Task currently being implemented
 
-Check the exact `main` CI and **real Contabo deployment** for `39e10d16` and the later documentation-maintenance commit. Do not equate an approved PR with a deployed release. Then continue [production readiness issue #25](https://github.com/takatakca/r2neet/issues/25) with the independent tasks possible without new external credentials.
+Branch `chatgpt/privacy-safe-booking-draft-20261015`: make browser draft storage explicitly allowlist-only, drop persisted address IDs and formatted street addresses, drop expired slot state, safely resume at the address step, rewrite historic potentially identifying draft keys, and keep completed bookings from reappearing. Regression tests in `tests/frontend.test.ts` must pass before merging. No production keys or migrations are needed.
 
-## Files modified
+## Files modified in current task
 
-Feature PR #26: `web/src/lib/api.ts`, `tests/frontend.test.ts`, `docs/PROJECT_STATUS.md`, `docs/TASK_QUEUE.md`, `docs/AGENT_HANDOFF.md`, `docs/DEPLOYMENT.md`, `docs/DECISIONS.md`, `docs/TAKATAK_INTEGRATION.md`, `WORKLOG.md`.
+`web/src/lib/api.ts`; `tests/frontend.test.ts`; `WORKLOG.md`; `docs/AGENT_HANDOFF.md`; `docs/PROJECT_STATUS.md`; `docs/TASK_QUEUE.md`; `docs/DEPLOYMENT.md`; `docs/DECISIONS.md`.
 
-Current handoff update: `AGENTS.md`, `WORKLOG.md`, `docs/PROJECT_STATUS.md`, `docs/TASK_QUEUE.md`, `docs/AGENT_HANDOFF.md`, `docs/DEPLOYMENT.md`.
+## Last pushed commit and verification
 
-## Last pushed commit / verification executed
+- Last **verified production**: `152ddf16016038339af1d265f6c8d29b1960a19a` (CI success, Deploy success and both application probes).
+- Feature branch PR SHA must be resolved from live GitHub before deployment; branch creation does **not** mean publication.
+- Inspected GitHub main, last commits, active PR #17, issue #25, CI/deploy logs, code, runbooks, and frontend persisted-draft flows. New regression tests are committed for GitHub CI; local `npm ci`, `npx prisma generate`, `npm run ci` were not yet run in this session.
+- Standard checks: `npm ci && npx prisma generate && npm run ci`; remote CI also applies migrations from scratch and builds Docker. Never claim success before the workflow reports it.
 
-- Last merged *feature* SHA: `39e10d165357c3882ed16f9e59b8ded986411719`. This handoff update itself creates a later documentation commit; find its exact HEAD in GitHub instead of assuming the feature SHA is the current HEAD.
-- Latest verified production SHA **before this change**: `fea51644ecee9e8ed600a72915dfb72425daae66`; [Deploy #38611624915](https://github.com/takatakca/r2neet/actions/runs/38611624915) succeeded and logged `/healthz ok`, `/readyz ok`, `Deploy verified for commit fea51644...`.
-- Executed: GitHub repo/PR/open issue review, review of AGENTS/WORKLOG/RUN/deploy/monitoring docs, code inspection, GitHub code/tree commits and compare, PR CI inspection. Automated GitHub CI for feature PR #26 passed. Local `npm ci`, `npx prisma generate`, `npm run ci` and `npm run test:invariants` were **not executed locally** in this ChatGPT session (the remote CI ran its equivalent).
-- Next checks: GitHub Actions for the new `main` SHA, `Deploy verified for commit <sha>`, HTTP `/healthz`, `/readyz`, and separate external-service smoke tests; never assume a release succeeded until those logs confirm it.
+## Known failures / blockers and permissions
 
-## Known blockers / required access (never paste secret values)
-- [Issue #25](https://github.com/takatakca/r2neet/issues/25): Stripe live/test keys + webhook, Twilio credentials/numbers, Google Maps key + business origin, S3-compatible provider/retention/access, alert endpoint.
-- TAKATAK [PR #175](https://github.com/takatakca/takatak-v1/pull/175) is open; production synchronization MUST remain disabled.
-- Protected GitHub environment `production`, Contabo SSH deployment access, MochaHost domain/email and TAKATAK Supabase Auth provider admin access may require their respective authorized operators.
+- Production logs still warn Stripe card payment, Twilio Voice/SMS, Google Maps, dispatch coordinates, off-host S3 backup, and alert webhook are unconfigured. Owner/provider access is required to supply real values via protected GitHub `production` environment and server setup, not chat/git. See [issue #25](https://github.com/takatakca/r2neet/issues/25).
+- TAKATAK receiver [PR #175](https://github.com/takatakca/takatak-v1/pull/175) is still open. Keep R2NETTE → TAKATAK sync disabled until deployed receiver verifies signed events.
+- Historical open PR #17 supplies useful 2026-10-08 production/auth acceptance records; review separately before merging to avoid stale launch claims.
+- No destructive force-push or bypass of required CI/deploy gates.
 
-## Real deployment status
-Last proven production SHA is `fea51644` before the new release's deploy check, through Contabo Docker with existing Coolify proxy. The PR #26 code SHA is `39e10d16`, awaiting its own matching deployment verification. External provider readiness is **not proven** by health endpoints.
+## Exact next step
 
-## Exact next action
-1. Confirm the most recent `main` SHA in GitHub, its CI and **matching** Deploy workflow. Inspect actual rollout steps and logs, including `/healthz`, `/readyz` and `Deploy verified for commit <sha>`.
-2. If a job fails, read the specific failed step logs and correct the code in a new reviewable branch. If the deploy is green, record the exact released SHA and time in this file and `WORKLOG.md`.
-3. Resume issue #25: provider setup (Stripe webhook, Twilio, Google Maps, off-host S3, alert hook), controlled booking/payment smoke, and TAKATAK receiver PR #175 gate. Do not enable integrations without their credentials and verification.
+1. Resolve CI for `chatgpt/privacy-safe-booking-draft-20261015`, fix any failure, and merge the green PR to `main`.
+2. Verify the matching `main` SHA, successful CI, successful **non-skipped** deploy, and `Deploy verified for commit <sha>` with `/healthz` and `/readyz`.
+3. Update these docs to the **observed** release SHA and continue the first feasible task in `docs/TASK_QUEUE.md`, especially robust API failure handling and production smoke coverage; do not claim issue #25 complete without providers.
 
