@@ -195,10 +195,14 @@ export function classifyRoute(path: string, method: string): keyof typeof RATE_R
   return 'read';
 }
 
-/** Client key: the forwarded IP when behind a proxy, hashed so logs stay clean. */
+/**
+ * Derive the client key from Express's TRUSTED proxy chain, never from a
+ * caller-controlled leftmost X-Forwarded-For value. With TRUST_PROXY=true
+ * the app trusts only its immediate reverse proxy; Express selects the
+ * nearest untrusted hop. Without a trusted proxy it uses the socket IP.
+ */
 export function clientKey(req: Request): string {
-  const fwd = (req.header('x-forwarded-for') ?? '').split(',')[0]?.trim();
-  const ip = fwd || req.ip || 'unknown';
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
   return createHash('sha256').update(ip).digest('hex').slice(0, 16);
 }
 

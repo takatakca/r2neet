@@ -11,7 +11,11 @@ Snapshot: 2026-10-15. Detailed canonical procedure: [Contabo runbook](deployment
 
 ## Deployment failure to recover
 
-[Deploy #38775849037](https://github.com/takatakca/r2neet/actions/runs/38775849037) for `c7a47233` failed at Docker build dependency installation (`npm error network read ECONNRESET`); it did not reach VPS roll. A single retry of failed jobs was requested. The branch `chatgpt/docker-npm-network-recovery-20261015` introduces bounded retries for `npm ci`; do not claim the new code is deployed until its **exact** SHA has a successful non-skipped Deploy with both probes.
+[Deploy #38775849037](https://github.com/takatakca/r2neet/actions/runs/38775849037) for `c7a47233` failed at Docker build dependency installation (`npm error network read ECONNRESET`); it did not reach VPS roll. A single retry built the image but correctly skipped the obsolete VPS roll after main advanced. The branch `chatgpt/docker-npm-network-recovery-20261015` introduces bounded retries for `npm ci`; do not claim the new code is deployed until its **exact** SHA has a successful non-skipped Deploy with both probes.
+
+## Most recent successful rollout
+
+[Deploy #38776393992](https://github.com/takatakca/r2neet/actions/runs/38776393992) successfully rolled `ce8eb68dbb49d67fd9c7949c700fd25261d66380` and logged `/healthz ok`, `/readyz ok`, and the exact SHA. Docker retry PR #29 (`6a7f192e`) subsequently merged; do not assume its own production rollout until the matching deploy is checked.
 
 ## Next publication
 

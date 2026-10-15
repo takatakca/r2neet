@@ -16,7 +16,11 @@ PR #27 has removed address identifiers and street-address summaries from persist
 
 ## Latest delivery blocker
 
-Deploy [#38775849037](https://github.com/takatakca/r2neet/actions/runs/38775849037) for PR #27's merged SHA `c7a47233` failed at Docker `RUN npm ci` because the npm registry connection reset (`ECONNRESET`), not because the application tests failed. A bounded Docker dependency-fetch retry is now being developed. Until a newer release is independently verified, `152ddf16` remains the last proven production SHA.
+Deploy [#38775849037](https://github.com/takatakca/r2neet/actions/runs/38775849037) for PR #27's merged SHA `c7a47233` failed at Docker `RUN npm ci` because the npm registry connection reset (`ECONNRESET`), not because the application tests failed. A bounded Docker dependency-fetch retry is now being developed. After this initial failure, the successful non-skipped [Deploy #38776393992](https://github.com/takatakca/r2neet/actions/runs/38776393992) released `ce8eb68dbb49d67fd9c7949c700fd25261d66380` and passed both probes. Newer Docker retry PR #29 is merged but its release needs separate verification.
+
+## Proxy identity and rate limiting
+
+The active hardening work replaces use of the untrusted leftmost `X-Forwarded-For` value as a limiter key with Express's trusted one-hop `req.ip` (or socket fallback). Tests must prove that forged forwarded prefixes cannot bypass SMS rate limits.
 
 ## Known production gaps
 

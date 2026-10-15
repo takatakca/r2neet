@@ -9,7 +9,8 @@ Last reviewed: 2026-10-15. Do not reset completed work. Respect `AGENTS.md` clai
 | P0 | Configure phone/voice/SMS and verify identity | BLOCKED: Twilio/Supabase provider setup | OTP delivery and verification, no production mock/guest bypass, approved message routing |
 | P0 | TAKATAK synchronization | BLOCKED: takatak-v1 PR #175, receiver deployment and signed tests | Rejects invalid HMAC; test events accepted, tenant scoped; only then enable sender |
 | P1 | Google Maps/business origin | BLOCKED: key and confirmed coordinates | Address/dispatch and provider-failure paths verified |
-| P0 | Stabilize Docker image build on transient npm ECONNRESET | IN PROGRESS: `chatgpt/docker-npm-network-recovery-20261015` | Bounded npm ci retries in Dockerfile, Docker CI pass, non-skipped deployment verifies new image |
+| P0 | Stabilize Docker image build on transient npm ECONNRESET | DONE: PR #29 (CI green), production proof pending | Bounded npm ci retries in Dockerfile, Docker CI pass, non-skipped deployment verifies new image |
+| P0 | Protect OTP/auth rate limits against X-Forwarded-For spoofing | IN PROGRESS: `chatgpt/trusted-proxy-rate-limits-20261015` | Verify trusted proxy one-hop IP selection, reject spoofed per-client changes, CI and rollout |
 | P1 | Handle malformed and non-JSON API/proxy responses | DONE: PR #28, CI green | Structured non-leaky failures, retain official error codes and reprice payload; CI passes |
 | P1 | Privacy-safe booking draft and legacy browser-storage cleanup | DONE: PR #27, CI #38775267147 passed | Never persist address ID/text, identity, notes or hold; resume safely, clear confirmed bookings; CI regression tests |
 | P1 | Calendar export UTF-8 line folding | DONE: [PR #26](https://github.com/takatakca/r2neet/pull/26), CI green | RFC 5545 75-octet physical lines, Unicode round trip and event injection regression proven by CI |

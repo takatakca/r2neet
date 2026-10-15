@@ -125,6 +125,43 @@ describe('rate limiting', () => {
     expect(classifyRoute('/api/v1/bookings/abc', 'GET')).toBe('read');
   });
 
+  it('does not let forged forwarded IP prefixes evade OTP rate limits', async () => {
+    const a = express();
+    // Production trusts one proxy hop, not arbitrary client-supplied prefixes.
+    a.set('trust proxy', 1);
+    a.use(rateLimit(new RateLimiter(() => 0)));
+    a.post('/api/v1/auth/phone/send', (_req, res) => res.json({ ok: true }));
+
+    for (let i = 0; i < RATE_RULES.otp!.max; i++) {
+      const res = await request(a)
+        .post('/api/v1/auth/phone/send')
+        .set('X-Forwarded-For', `203.0.113.${i + 1}, 198.51.100.42`);
+      expect(res.status).toBe(200);
+    }
+    const denied = await request(a)
+      .post('/api/v1/auth/phone/send')
+      .set('X-Forwarded-For', '203.0.113.250, 198.51.100.42');
+    expect(denied.status).toBe(429);
+    expect(denied.body.error.code).toBe('RATE_LIMITED');
+  });
+
+  it('ignores forwarded headers entirely when no proxy is trusted', async () => {
+    const a = express();
+    a.use(rateLimit(new RateLimiter(() => 0)));
+    a.post('/api/v1/auth/phone/send', (_req, res) => res.json({ ok: true }));
+
+    for (let i = 0; i < RATE_RULES.otp!.max; i++) {
+      const res = await request(a)
+        .post('/api/v1/auth/phone/send')
+        .set('X-Forwarded-For', `203.0.113.${i + 1}`);
+      expect(res.status).toBe(200);
+    }
+    const denied = await request(a)
+      .post('/api/v1/auth/phone/send')
+      .set('X-Forwarded-For', '203.0.113.250');
+    expect(denied.status).toBe(429);
+  });
+
   it('is much stricter on SMS than on page reads', () => {
     expect(RATE_RULES.otp!.max).toBeLessThan(RATE_RULES.read!.max);
     expect(RATE_RULES.auth!.max).toBeLessThan(RATE_RULES.read!.max);
