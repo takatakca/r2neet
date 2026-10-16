@@ -234,6 +234,28 @@ describe('scheduler', () => {
     expect(runs).toBe(1);
   });
 
+  it('a failed daily backup does not retry every minute, but retries next day', async () => {
+    const clock = fixedClock('2026-07-15T11:30:00Z');
+    let attempts = 0;
+    const scheduler = new Scheduler(
+      [{ name: 'backup', dailyLocalAt: '07:00', run: async () => {
+        attempts++;
+        throw new Error('off-host unavailable');
+      }}],
+      () => undefined,
+      clock.now,
+    );
+    for (let i = 0; i < 20; i++) {
+      await scheduler.tick();
+      clock.advance(60);
+    }
+    expect(attempts).toBe(1);
+    expect(scheduler.recentRuns()[0]!.status).toBe('FAILED');
+    clock.advance(24 * 60 * 60);
+    await scheduler.tick();
+    expect(attempts).toBe(2);
+  });
+
   it('keeps a bounded history', async () => {
     const clock = fixedClock('2026-07-15T12:00:00Z');
     const s = new Scheduler(
