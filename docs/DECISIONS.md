@@ -1,6 +1,6 @@
 # R2NETTE — Recorded architectural and release decisions
 
-Snapshot: 2026-10-15. This documents existing repository policy and decisions, not new approval to activate providers.
+Snapshot: 2026-10-16. This documents existing repository policy and decisions, not new approval to activate providers.
 
 1. **Preserve the product:** R2NETTE remains a separate cleaning/reservation application with its own UI, branding and operational booking database. TAKATAK master identity is integrated only through approved tenant-scoped contracts; never place R2NETTE workflows inside the generic TAKATAK dashboard.
 2. **Money:** The backend is the authority for service options, quote totals, GST/QST, discounts, products, frequency and payment state. Browser fields transmit user selections only. Stripe webhook receipts are validated server-side and live cards require complete provider configuration.
@@ -13,7 +13,8 @@ Snapshot: 2026-10-15. This documents existing repository policy and decisions, n
 9. **API error recovery:** Treat invalid JSON and HTML proxy error pages as safe typed API failures. Never render an upstream HTML response directly or hide an authoritative valid server error, including quote reprice data.
 10. **Trusted proxy identity:** For per-client rate limiting and log client hashes, use Express `req.ip` with the approved immediate proxy trust (`TRUST_PROXY=true`, one hop). Never accept a raw, caller-controlled leftmost `X-Forwarded-For` address as an independent identity; test spoofed-prefix rejection.
 11. **Fail-closed backup scheduling:** A daily job attempts at most once per Toronto calendar day even on failure, preventing repeated unverified dumps during an outage. A local-only database dump is retained but NEVER logged as a successful disaster-recovery backup: open an operational incident and record FAILED until a verified off-host copy succeeds. An unconfigured alert sink must not transform the failure into success.
-12. **Agent continuity:** Keep `AGENTS.md`, `WORKLOG.md` and the five `docs/` status files current; never claim a deployment or test without SHA-linked evidence. Avoid force-pushes and conflicting work.
+12. **Subprocess secret protection:** Password-bearing PostgreSQL connection URLs must not be passed as `pg_dump` command-line arguments. Remove password from the URI and supply the decoded password only via the child process `PGPASSWORD` environment. Never log connection strings or that environment. PR #33 verified this change in production at `1c140ac1`.
+13. **Agent continuity:** Keep `AGENTS.md`, `WORKLOG.md` and the five `docs/` status files current; never claim a deployment or test without SHA-linked evidence. Avoid force-pushes and conflicting work.
 
 References: `BRAND.md`, `RUN.md`, `docs/TAKATAK_INTEGRATION.md`, `docs/reservation-system/`, `docs/deployment/contabo-runbook.md`, [production readiness issue #25](https://github.com/takatakca/r2neet/issues/25).
 

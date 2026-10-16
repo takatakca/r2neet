@@ -1,21 +1,24 @@
 # R2NETTE — Project status
 
-Snapshot: **2026-10-15**. Repository `takatakca/r2neet`; release branch `main`. **Not 100% production-accepted.**
+Snapshot: **2026-10-16**. Repository `takatakca/r2neet`; release branch `main`. **Not 100% production-accepted.**
 
 ## Confirmed running release
 
-- Latest verified main commit deployed: `10d11e89cfc496c58b4773735e60a43efab279ec`.
-- [CI #38792313100](https://github.com/takatakca/r2neet/actions/runs/38792313100) succeeded.
-- [Deploy #38792567205](https://github.com/takatakca/r2neet/actions/runs/38792567205) performed non-skipped Contabo roll and logged `/healthz ok`, `/readyz ok`, `Deploy verified for commit 10d11e89cfc496c58b4773735e60a43efab279ec`.
+- Latest verified main commit deployed: `1c140ac19682d238c2eef068370b9a8405d43a2d`.
+- [CI #38849296051](https://github.com/takatakca/r2neet/actions/runs/38849296051) succeeded.
+- [Deploy #38849434426](https://github.com/takatakca/r2neet/actions/runs/38849434426) performed non-skipped Contabo roll and logged `/healthz ok`, `/readyz ok`, `Deploy verified for commit 10d11e89cfc496c58b4773735e60a43efab279ec`.
 - Contabo VPS Docker Compose `/opt/r2nette`; Coolify proxy; MochaHost DNS/email. Do not mistake green Actions with a skipped roll for deployment proof.
 
 ## Implemented platform
 
 Server-controlled booking quotes and pricing, saved customer bookings/account, crew/staff session roles, PostgreSQL/Prisma, recurrence scheduling, notification/payment/provider integration **code**, durable TAKATAK signed outbox. Verified earlier improvements: PR #26 Unicode-safe ICS; #27 private browser draft sanitization; #28 structured API failure handling; #29 bounded Docker npm retries; #30 spoof-resistant rate limiter; #31 agent continuity reconciliation. Presence of provider integration code does **not** establish live provider availability.
 
-## Pending code — not a verified production feature
+## Newly completed hardening — deployed
 
-Branch `chatgpt/backup-daily-failure-hardening-20261015` adds one-attempt-per-local-day behavior for failed daily jobs, and makes missing off-host backup destinations raise an incident and return FAILED without deleting the local dump. Added scheduler and backup policy regression tests. Verify PR CI and non-skipped SHA release before moving this to “completed.”
+- PR #32: once-per-local-calendar-day attempts for failing daily workers; a local PostgreSQL dump with no off-host destination retains the file but logs FAILED and opens an incident. PR CI #38848750100, main CI #38848882332, non-skipped Deploy #38849030331 verified `aa51fd30`.
+- PR #33: password-bearing PostgreSQL URLs are scrubbed from `pg_dump` argv; `PGPASSWORD` passed to the child process. PR CI #38849124573, main CI #38849296051, non-skipped Deploy #38849434426 verified `1c140ac1`.
+
+Latest documentation closure commit after these releases is not itself a proven image until its matching CI/Deploy passes.
 
 ## External launch blockers
 
