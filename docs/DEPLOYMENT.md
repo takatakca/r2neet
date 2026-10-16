@@ -30,6 +30,11 @@ GitHub Actions `CI` on `main` must pass; `Deploy` builds an immutable Git SHA im
 
 Branch `chatgpt/s3-verified-backup-digest-20261016` adds a streaming signed S3 GET and compares SHA-256 with the original dump after PUT and HEAD. Unit tests cover same-length remote corruption, truncated GET and failed download. CI and deploy confirmation pending; do not claim a real provider has been tested or configured.
 
+## New release queue, not yet production-proven
+
+- PR #34 merged at `02b0653cfc33b6472879f7ac38268b3aa4efedb2` following PR CI #38853224241. It validates actual S3 remote SHA-256 via a streaming GET. Inspect main CI #38853348818 and a **non-skipped** deploy before marking the release done.
+- Branch `chatgpt/backup-local-retention-20261016` adds safe local fallback dump pruning after successful pg_dump even if S3 remains unavailable; PR CI/deploy pending. No off-host backup account has been configured by these changes.
+
 ## Environment and disaster recovery
 
 The 1c140ac1 deploy warned that Stripe card keys and signed webhook, Twilio Voice/SMS, Google Maps, dispatch coordinates, S3 off-host credentials and signed alert webhook are not configured. They must be set via approved protected production environment and an operator must verify receipts. [Production issue #25](https://github.com/takatakca/r2neet/issues/25) owns the acceptance checklist. TAKATAK integration stays disabled while receiver PR #175 is unmerged or unverified.

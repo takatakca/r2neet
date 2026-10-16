@@ -15,6 +15,7 @@ import { AlertService, WebhookAlertSink } from '../src/workers/health.js';
 import { unlinkSync } from 'node:fs';
 import { requireOffHostBackup } from '../src/workers/backup-policy.js';
 import { pgCommandConnection } from './pg-cli.js';
+import { parseBackupKeepDays, pruneLocalBackups } from './backup-retention.js';
 
 if (existsSync('.env')) {
   for (const line of readFileSync('.env', 'utf8').split('\n')) {
@@ -47,6 +48,11 @@ const scheduler = new Scheduler(
           stdio: ['ignore', 'inherit', 'inherit'],
           env: connection.env,
         });
+
+        // Apply bounded local retention *after* producing a fresh dump but
+        // *before* reporting a missing/unavailable S3 destination. Otherwise
+        // the failure path skips cleanup forever and fills the backup volume.
+        pruneLocalBackups(dir, parseBackupKeepDays(process.env.BACKUP_KEEP_DAYS));
 
         // Do not report a local-only dump as a successful backup. The local
         // file is deliberately retained and the missing target is alerted.
@@ -88,10 +94,6 @@ const scheduler = new Scheduler(
             throw e;
           }
         }
-
-        // Local retention. Off-host lifecycle is the bucket's job.
-        const keep = Number(process.env.BACKUP_KEEP_DAYS ?? 7);
-        execFileSync('find', [dir, '-name', '*.dump', '-mtime', `+${keep}`, '-delete']);
 
         return {
           file,
