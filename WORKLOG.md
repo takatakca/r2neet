@@ -3,6 +3,8 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-10-16 | ChatGPT | chatgpt/s3-verified-backup-digest-20261016 → PR pending | active | Verify S3 backup remote bytes with streaming SHA-256, not HEAD size alone; test same-length corruption, truncation, missing download | PR CI → green merge → exact-SHA production roll; provider credentials remain blocked
+
 - 2026-10-16 | ChatGPT | chatgpt/backup-pg-cli-secret-protection-20261015 → PR #33 | done | Strip database password from pg_dump argv and use child PGPASSWORD; regression tests | PR CI #38849124573, main CI #38849296051, Deploy #38849434426 all green; 1c140ac1 verified
 - 2026-10-16 | ChatGPT | chatgpt/backup-daily-failure-hardening-20261015 → PR #32 | done | Once-a-day retry after failed daily backup; local-only backup FAILS and opens incident | PR CI #38848750100, main CI #38848882332, Deploy #38849030331 verified aa51fd30
 

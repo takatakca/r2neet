@@ -4,9 +4,9 @@ Snapshot: **2026-10-16**. Repository `takatakca/r2neet`; release branch `main`. 
 
 ## Confirmed running release
 
-- Latest verified main commit deployed: `1c140ac19682d238c2eef068370b9a8405d43a2d`.
-- [CI #38849296051](https://github.com/takatakca/r2neet/actions/runs/38849296051) succeeded.
-- [Deploy #38849434426](https://github.com/takatakca/r2neet/actions/runs/38849434426) performed non-skipped Contabo roll and logged `/healthz ok`, `/readyz ok`, `Deploy verified for commit 10d11e89cfc496c58b4773735e60a43efab279ec`.
+- Latest verified main commit deployed: `f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31` (CI #38849810401, non-skipped Deploy #38849959878, both health probes).
+- [CI #38849810401](https://github.com/takatakca/r2neet/actions/runs/38849810401) succeeded.
+- [Deploy #38849959878](https://github.com/takatakca/r2neet/actions/runs/38849959878) performed non-skipped Contabo roll and logged `/healthz ok`, `/readyz ok`, `Deploy verified for commit f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31`.
 - Contabo VPS Docker Compose `/opt/r2nette`; Coolify proxy; MochaHost DNS/email. Do not mistake green Actions with a skipped roll for deployment proof.
 
 ## Implemented platform
@@ -18,7 +18,7 @@ Server-controlled booking quotes and pricing, saved customer bookings/account, c
 - PR #32: once-per-local-calendar-day attempts for failing daily workers; a local PostgreSQL dump with no off-host destination retains the file but logs FAILED and opens an incident. PR CI #38848750100, main CI #38848882332, non-skipped Deploy #38849030331 verified `aa51fd30`.
 - PR #33: password-bearing PostgreSQL URLs are scrubbed from `pg_dump` argv; `PGPASSWORD` passed to the child process. PR CI #38849124573, main CI #38849296051, non-skipped Deploy #38849434426 verified `1c140ac1`.
 
-Latest documentation closure commit after these releases is not itself a proven image until its matching CI/Deploy passes.
+Documentation closure commit `f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31` also passed CI and exact-SHA deployment. Current branch `chatgpt/s3-verified-backup-digest-20261016` adds streamed S3 remote SHA-256 verification; until its PR passes checks and is deployed, that behavior is **NOT** production-verified.
 
 ## External launch blockers
 

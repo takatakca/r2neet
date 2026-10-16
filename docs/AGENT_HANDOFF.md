@@ -10,11 +10,17 @@ Earlier this session: PR [#32](https://github.com/takatakca/r2neet/pull/32) fixe
 
 ## Current task
 
-No additional code change is in progress. Prioritize production readiness [issue #25](https://github.com/takatakca/r2neet/issues/25): configure a real S3-compatible off-host destination, verify stored-object checksum and scratch restore with encryption key, and configure an actual alert endpoint; then Stripe signed webhook, Twilio/Supabase OTP, dispatch/Maps, recurring worker and customer/staff end-to-end acceptance. Do not mark complete without real evidence. Unrelated historical [PR #17](https://github.com/takatakca/r2neet/pull/17) remains open; do not merge its older 2026-10-08 deployment claims into the canonical current state without review.
+Branch `chatgpt/s3-verified-backup-digest-20261016` addresses insufficient off-host backup verification: `src/workers/object-storage.ts` streams a signed GET and checks remote SHA-256 after PUT and HEAD; `tests/object-storage-integrity.test.ts` covers same-length corruption, truncated bytes and unavailable GET. WORKLOG and the five continuity docs have been updated on this branch. **This fix is not yet merged or production deployed.** Last pushed functional branch SHA before docs: `93417281752b3d198f98ba87a1cf47950e3a7373`. Next action: open PR, wait for green CI including TypeScript/Vitest/container, correct failures, merge green PR and verify non-skipped main CI/Deploy with exact SHA plus health probes.
+
+No provider account or external production secret is added. No real S3 object has been tested. A missing S3 target is still a P0 blocker in issue #25. Prioritize production readiness [issue #25](https://github.com/takatakca/r2neet/issues/25): configure a real S3-compatible off-host destination, verify stored-object checksum and scratch restore with encryption key, and configure an actual alert endpoint; then Stripe signed webhook, Twilio/Supabase OTP, dispatch/Maps, recurring worker and customer/staff end-to-end acceptance. Do not mark complete without real evidence. Unrelated historical [PR #17](https://github.com/takatakca/r2neet/pull/17) remains open; do not merge its older 2026-10-08 deployment claims into the canonical current state without review.
 
 ## Files modified in this session
 
 `src/workers/scheduler.ts`, `tests/scheduler.test.ts`, `scripts/loop-backup.ts`, `src/workers/backup-policy.ts`, `tests/backup-policy.test.ts`, `scripts/backup.ts`, `scripts/pg-cli.ts`, `tests/pg-cli.test.ts`, `WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, `docs/DECISIONS.md`.
+
+## Latest verified main release and checks
+
+On 2026-10-16, [CI #38849810401](https://github.com/takatakca/r2neet/actions/runs/38849810401) passed for `f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31`; [Deploy #38849959878](https://github.com/takatakca/r2neet/actions/runs/38849959878) performed non-skipped Contabo VPS roll, `/healthz ok`, `/readyz ok` and exact SHA confirmation. This supersedes older deployment references below. GitHub REST read the current main ref, CI/deploy, agent documents, worker backup/storage code, and TAKATAK PR #175 (still OPEN). Code changes pushed via GitHub Git objects; local npm/Prisma, live S3, restore and alert delivery have NOT been run in this session. After documentation commit, retrieve actual branch HEAD. No additional access required for code; protected S3/alert/Stripe/Twilio credentials and human controlled tests are needed for issue #25.
 
 ## Last pushed and verified SHA / checks executed
 

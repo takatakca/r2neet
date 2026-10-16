@@ -95,9 +95,13 @@ never overwrite production.
 
 ### Upload is verified, not assumed
 
-**A 200 from PUT is not proof the bytes landed.** After uploading, the backup
-job issues a HEAD and compares the stored size. Only then is the dump treated
-as stored off-host and the local copy removed.
+**A 200 from PUT or a matching HEAD size is not proof of data integrity.**
+The updated backup flow issues HEAD for presence and size, then streams a signed
+GET and hashes the **actual remote bytes** with SHA-256, comparing it with the
+original local dump. Equal-size corruption, a truncated GET and a failed
+verification download cause a failed backup and the local copy is preserved.
+The GET is streamed rather than buffered in full. This code change still needs
+its PR CI and rollout, and it does not prove a real S3 provider or restore drill.
 
 Proven against a deliberately lying endpoint that accepts every PUT and stores
 nothing:
