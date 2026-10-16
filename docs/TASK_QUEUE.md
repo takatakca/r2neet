@@ -5,6 +5,7 @@ Last reviewed: 2026-10-15. Do not reset completed work. Respect `AGENTS.md` clai
 | Priority | Work | State / owner | Acceptance |
 | --- | --- | --- | --- |
 | P0 | Activate Stripe server configuration + signed webhook | BLOCKED: secure production values | Controlled test verifies amount, idempotency, webhooks, refund and booking state; no card details stored |
+| P0 | Fail closed on local-only backups; prevent minute-by-minute failed daily attempts | PR in progress: chatgpt/backup-daily-failure-hardening-20261015 | Scheduler failure backoff + missing-target alert + failure persistence with regression tests; deploy proof pending |
 | P0 | Add off-host backup and alert destination | BLOCKED: provider choice and protected credentials | Scheduled backup verified by HEAD, off-host restore drill, matching encryption key and alert receipt |
 | P0 | Configure phone/voice/SMS and verify identity | BLOCKED: Twilio/Supabase provider setup | OTP delivery and verification, no production mock/guest bypass, approved message routing |
 | P0 | TAKATAK synchronization | BLOCKED: takatak-v1 PR #175, receiver deployment and signed tests | Rejects invalid HMAC; test events accepted, tenant scoped; only then enable sender |

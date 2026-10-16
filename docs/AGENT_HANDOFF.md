@@ -1,45 +1,33 @@
 # R2NETTE — Agent handoff
 
-Verified snapshot: **2026-10-15**. Always read `AGENTS.md`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, and the relevant runbooks before work.
+Updated: 2026-10-15. On restart read AGENTS.md, WORKLOG.md, docs/TASK_QUEUE.md, docs/PROJECT_STATUS.md, docs/DEPLOYMENT.md and docs/DECISIONS.md. Verify GitHub main and CI/deploy logs before any claims.
 
-## Latest verified production release
+## Last completed work
 
-On 2026-10-15, GitHub main CI #38778348493 passed for `2ca571afeddd6920edf86f36bfee5fac06e505e6`; [Deploy #38778654257](https://github.com/takatakca/r2neet/actions/runs/38778654257) performed a **non-skipped** Contabo VPS roll and logged `/healthz ok`, `/readyz ok`, and `Deploy verified for commit 2ca571afeddd6920edf86f36bfee5fac06e505e6`. This supersedes older deployment statuses elsewhere in this file. No provider activation or customer payment smoke was demonstrated by this release.
+PR #31 documentation was merged as b845e0f1; follow-up 2ca571af succeeded in production. The most recent main SHA, **10d11e89cfc496c58b4773735e60a43efab279ec**, passed [CI #38792313100](https://github.com/takatakca/r2neet/actions/runs/38792313100) and **actually rolled** on Contabo in [Deploy #38792567205](https://github.com/takatakca/r2neet/actions/runs/38792567205). Logs show both `/healthz ok`, `/readyz ok` and `Deploy verified for commit 10d11e89cfc496c58b4773735e60a43efab279ec`. This is the last verified deployed SHA until a newer non-skipped deployment is proven.
 
-## Last completed task
+Earlier verified hardening: PR #26 UTF-8 calendar export; #27 private browser draft cleanup; #28 API error resilience; #29 bounded Docker npm retry; #30 spoof-resistant trusted-proxy rate limits; #31 continuity docs. Do not redo them.
 
-PR #30 hardened the API rate limiter against spoofed `X-Forwarded-For` prefixes by using Express's configured trusted-proxy-derived `req.ip`. PR [#30](https://github.com/takatakca/r2neet/pull/30) passed [CI #38776981777](https://github.com/takatakca/r2neet/actions/runs/38776981777), merged into `main` as `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, and passed main [CI #38777285346](https://github.com/takatakca/r2neet/actions/runs/38777285346). **Production [Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485) succeeded**: non-skipped VPS roll, `/healthz ok`, `/readyz ok`, and `Deploy verified for commit a46849b5e29619a7ee8fd14469e2a98d70b6b28c`.
+## Current task / branch
 
-Other verified releases: PR #28's `ce8eb68dbb49d67fd9c7949c700fd25261d66380` [Deploy #38776393992](https://github.com/takatakca/r2neet/actions/runs/38776393992) and PR #29's Docker retry `6a7f192e0ffb46deecde97a6e836ba88fc59e93a` [Deploy #38776842943](https://github.com/takatakca/r2neet/actions/runs/38776842943), each with `/healthz ok`, `/readyz ok` and exact-SHA verification. PR #27's privacy fix was included in these later deployed images.
+`chatgpt/backup-daily-failure-hardening-20261015`: fix daily scheduler re-running failed jobs on every tick (which can exhaust backup volume); require off-host destination after a local dump or mark backup FAILED and create a backup incident. Preserve local file when missing off-host target, keep successful S3 verified upload path unchanged. Created/modified:
 
-## Current task
+- `src/workers/scheduler.ts`, `tests/scheduler.test.ts`
+- `scripts/loop-backup.ts`, `src/workers/backup-policy.ts`, `tests/backup-policy.test.ts`
+- `WORKLOG.md` and continuity documents.
 
-PR #31 reconciled five durable status files, passed [PR CI #38778002480](https://github.com/takatakca/r2neet/actions/runs/38778002480) and merged into `main` as `b845e0f189b9a19b3edd164cdd8ecae8250839f3`. This follow-up closure commit updates WORKLOG and handoff on `main`. **Its exact SHA must be resolved from current GitHub HEAD; do not mistake PR merge SHA for the later closure commit.** Main CI/Deploy for the final HEAD remain to be verified.
+Latest **functional branch** SHA before these docs: `c5a4bf77754db93097cf9b5fdbdfa1ece9d19104`. Resolve updated branch SHA after pushing documentation. Main still `10d11e89cfc496c58b4773735e60a43efab279ec` at task start. **The new fix has not yet passed CI or deployed**; treat PR status as pending until proven.
 
-## Modified files
+## Checks genuinely run
 
-`WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/PROJECT_STATUS.md`, `docs/TASK_QUEUE.md`, `docs/DEPLOYMENT.md`.
+GitHub API: read AGENTS, five status docs, WORKLOG, relevant source, tests, production Compose/workflows, issue #25 and open PR titles; validated main CI #38792313100; examined non-skipped deploy #38792567205 logs and exact SHA + health probes. Used GitHub Git tree/commit/ref writes on a separate branch. **No local npm, Vitest, DB drill, production secret check or real payment flow was run in chat.** Next check is GitHub PR CI (TypeScript, tests, migrations, image).
 
-## Last pushed SHA / checks executed
+## Known blockers and necessary access
 
-- Newest merged **functional** `main` commit: `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, CI passed.
-- Last **verified deployed** SHA: `a46849b5e29619a7ee8fd14469e2a98d70b6b28c` ([Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485), probes and roll passed).
-- Checked GitHub commits/PRs/issues, GitHub CI and deploy jobs/logs; inspected frontend privacy/API handling, Docker retry and server rate-limiter code. CI suites include TypeScript, migrations from scratch, Vitest, security and container. No local `npm ci`, `npm run ci`, or production secrets were executed or exposed in chat.
-- Deployment logs for a46849b5: `Deploy verified for commit a46849b5...`, `/healthz ok`, `/readyz ok`.
+Issue [#25](https://github.com/takatakca/r2neet/issues/25): missing Stripe live key/webhook, Twilio phone/Voice/SMS provider, Maps key/business dispatch coordinates, off-host S3 target, alert webhook, and actual booking/payment/worker/restore acceptance. Secrets must be provisioned through protected server environment, never in Git. TAKATAK receiver [PR #175](https://github.com/takatakca/takatak-v1/pull/175) remains OPEN, so `TAKATAK_R2NETTE_SYNC_ENABLED=false`. Old unrelated documentation PR #17 remains open and must not be blindly merged. No additional human access is needed for this PR; provider activation needs authorized owner credentials.
 
-## Known blockers / required access
+## Next exact action
 
-- [Issue #25](https://github.com/takatakca/r2neet/issues/25): provider credentials for Stripe (including signed webhook), Twilio, Google Maps, dispatch origin, off-host S3 backup and alert webhook are missing in production; the owner/provider admin must place them through protected environments. No guessed secrets or fake payment tests.
-- TAKATAK receiving [PR #175](https://github.com/takatakca/takatak-v1/pull/175) was OPEN on latest check. Keep synchronization disabled pending approved receiver deployment and HMAC verification.
-- [PR #17](https://github.com/takatakca/r2neet/pull/17) contains dated 2026-10-08 auth/production acceptance history; review separately, do not overwrite fresher release evidence or merge unexamined.
-- Full real SMS/Google login, payments, cancellation and staff/worker smoke tests remain unverified.
-
-## Current priority after verified deploy
-
-Continue issue #25: configure protected provider settings, then verify real backup restore, alert delivery, phone/Google authentication, booking/Stripe webhook and worker health. Keep TAKATAK receiver sync disabled until PR #175 has been approved and deployed. No production credentials are in this handoff.
-
-## Exact next action
-
-1. Get the current `main` SHA (post-merge handoff closure), verify its CI and **non-skipped** Deploy job. Confirm `/healthz ok`, `/readyz ok`, and `Deploy verified for commit <sha>` in job logs.
-2. If CI/deploy fails, inspect the exact job, correct on a new branch, and update WORKLOG. If green, document the observed production SHA and proceed to the remaining operational blockers.
-3. Continue the next executable item in `docs/TASK_QUEUE.md`, prioritizing proof of real provider setup, backups, alerts and auth/payment flows, and keep TAKATAK sync gated.
+1. Open the branch PR; monitor GitHub PR CI, correct any failure and merge only green checks.
+2. Verify `main` CI and the **non-skipped** Contabo roll with `Deploy verified for commit <actual merge SHA>`, `/healthz`, `/readyz`.
+3. Update the documented SHA and handoff again; continue issue #25 off-host restore/alerts as provider access allows, or move to another independent code task.
