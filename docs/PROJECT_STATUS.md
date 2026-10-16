@@ -2,6 +2,10 @@
 
 **Verified 2026-10-16** — `takatakca/r2neet`, release branch `main`. The application is running, **but the project is not 100% production-accepted**.
 
+## P0 incident — Contabo disk full
+
+PR #37 (`7d03a38522d82a45760aeb69e584d468128fad52`) passed main CI #38950346352, but Deploy #38950594071 FAILED: no space left on device while extracting a containerd image layer. The most recent verified deployed image remains `1a8de4abe8bf24dc0e5742070590d1fd974efe9b` (CI #38855018334, Deploy #38855160513, probes OK). PR #39 contains targeted pre-pull recovery: remove only obsolete R2NETTE immutable image tags while protecting current, rollback and target, other tenants and volumes. PR #38 PGDMP validation passed PR CI but remains open until disk recovery. Do not report the unverified SHA as live.
+
 ## Last verified production
 
 - Exact deployed SHA: `56cde1b6ddd98be1cb146c9d33fff3d91ca6d51d`.

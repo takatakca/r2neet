@@ -41,8 +41,13 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
+# Restore disk headroom before pulling the next immutable image. Historically
+# cleanup ran only *after* a successful deploy, so one failed pull could leave
+# Contabo out of space indefinitely. This only removes old R2NETTE images;
+# it never prunes shared Coolify images, containers, or Docker volumes.
 mkdir -p state logs
 chmod 700 state logs
+bash scripts/deploy/pre-pull-cleanup.sh "$image_owner" "$image_name" "$image"
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 log="logs/deploy-${stamp}.log"
 exec > >(bash scripts/deploy/redact-stream.sh | tee -a "$log") 2>&1
@@ -146,12 +151,6 @@ printf '%s\n' "$caddyfile_hash" > state/caddyfile.sha256
 chmod 600 state/caddyfile.sha256
 echo "Deploy verified for commit ${SHA}."
 
-# Every deploy pulls a new SHA-tagged image. Keep the running one and the
-# rollback target; remove older ones so the disk does not fill up.
-keep_previous="$(cat state/previous-image-ref 2>/dev/null || true)"
-docker image ls --format '{{.Repository}}:{{.Tag}}' "ghcr.io/${image_owner}/${image_name}" \
-  | while read -r old; do
-      if [[ "$old" != "$image" && "$old" != "$keep_previous" ]]; then
-        docker image rm "$old" >/dev/null 2>&1 || true
-      fi
-    done
+# Reuse the same scoped cleanup after successful promotion. It retains the
+# new running SHA plus the rollback image and does not affect other apps.
+bash scripts/deploy/pre-pull-cleanup.sh "$image_owner" "$image_name" "$image"
