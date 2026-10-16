@@ -4,6 +4,8 @@ Snapshot: **2026-10-16**. Canonical instructions: [Contabo runbook](deployment/c
 
 ## Last verified production image
 
+Latest full release evidence: `f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31` passed [CI #38849810401](https://github.com/takatakca/r2neet/actions/runs/38849810401) and [Deploy #38849959878](https://github.com/takatakca/r2neet/actions/runs/38849959878) performed a **non-skipped** VPS roll with exact-SHA marker and `/healthz ok`, `/readyz ok`. Older verified releases listed below are historical.
+
 - SHA `1c140ac19682d238c2eef068370b9a8405d43a2d` — [CI #38849296051](https://github.com/takatakca/r2neet/actions/runs/38849296051) passed and [Deploy #38849434426](https://github.com/takatakca/r2neet/actions/runs/38849434426) performed a real Contabo roll.
 - VPS rollout log: `/healthz ok`, `/readyz ok`, `Deploy verified for commit 1c140ac19682d238c2eef068370b9a8405d43a2d`.
 - This does not verify payments, OTP, maps, alarms, backup restore or business workflows.
@@ -23,6 +25,10 @@ GitHub Actions `CI` on `main` must pass; `Deploy` builds an immutable Git SHA im
 - PR #32: scheduler backup fail-closed changes merged as `aa51fd30d8ef3eff44130b806f15029cdf8bb568` and deployed [#38849030331](https://github.com/takatakca/r2neet/actions/runs/38849030331) with probes OK.
 - PR #33: scrub PostgreSQL password from `pg_dump` arguments, merged `1c140ac19682d238c2eef068370b9a8405d43a2d` and deployed [#38849434426](https://github.com/takatakca/r2neet/actions/runs/38849434426) with probes OK.
 - Documentation-only handoff commits following this section are pending their own matching CI/deploy verification; do not mistake prior verified production SHA for current main HEAD.
+
+## Pending new verification code
+
+Branch `chatgpt/s3-verified-backup-digest-20261016` adds a streaming signed S3 GET and compares SHA-256 with the original dump after PUT and HEAD. Unit tests cover same-length remote corruption, truncated GET and failed download. CI and deploy confirmation pending; do not claim a real provider has been tested or configured.
 
 ## Environment and disaster recovery
 
