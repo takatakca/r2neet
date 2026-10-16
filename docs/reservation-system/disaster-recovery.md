@@ -90,6 +90,10 @@ Restore into a **scratch** database first, every time. Then point a
 throwaway application instance at it and confirm an owner can sign in — an
 untested backup is a guess.
 
+## Local fallback retention on an S3 outage
+
+A new code branch `chatgpt/backup-local-retention-20261016` makes the scheduled backup prune expired local `r2nette-*.dump` files **only after creating a fresh dump**, even if the later S3 upload fails or the destination is missing. `BACKUP_KEEP_DAYS` defaults to 7, and only accepts whole numbers 1–365. This reduces VPS disk-exhaustion risk, but does **not** make local-only copies disaster recovery. Branch CI and production rollout are pending.
+
 ## Still to arrange
 
 - Automated scheduling of `db:backup` on the deployment platform

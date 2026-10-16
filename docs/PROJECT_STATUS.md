@@ -18,7 +18,7 @@ Server-controlled booking quotes and pricing, saved customer bookings/account, c
 - PR #32: once-per-local-calendar-day attempts for failing daily workers; a local PostgreSQL dump with no off-host destination retains the file but logs FAILED and opens an incident. PR CI #38848750100, main CI #38848882332, non-skipped Deploy #38849030331 verified `aa51fd30`.
 - PR #33: password-bearing PostgreSQL URLs are scrubbed from `pg_dump` argv; `PGPASSWORD` passed to the child process. PR CI #38849124573, main CI #38849296051, non-skipped Deploy #38849434426 verified `1c140ac1`.
 
-Documentation closure commit `f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31` also passed CI and exact-SHA deployment. Current branch `chatgpt/s3-verified-backup-digest-20261016` adds streamed S3 remote SHA-256 verification; until its PR passes checks and is deployed, that behavior is **NOT** production-verified.
+Documentation closure `f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31` passed CI and exact-SHA deployment. PR #34 added signed streamed S3 GET and remote SHA-256 verification, passed PR CI #38853224241 and merged as `02b0653cfc33b6472879f7ac38268b3aa4efedb2`; matching main CI and non-skipped Contabo deployment have not yet been proven in this snapshot. Branch `chatgpt/backup-local-retention-20261016` adds safe local fallback retention on S3 outage; that feature remains CI/deploy pending.
 
 ## External launch blockers
 
