@@ -192,7 +192,10 @@ export class WebhookAlertSink implements AlertSink {
   private readonly url?: string;
   private readonly secret?: string;
 
-  constructor(env: Record<string, string | undefined> = process.env) {
+  constructor(
+    env: Record<string, string | undefined> = process.env,
+    private readonly timeoutMs = 10_000,
+  ) {
     this.url = env.ALERT_WEBHOOK_URL;
     this.secret = env.ALERT_WEBHOOK_SECRET;
   }
@@ -212,7 +215,15 @@ export class WebhookAlertSink implements AlertSink {
         'sha256=' + createHmac('sha256', this.secret).update(body).digest('hex');
     }
 
-    const res = await fetch(this.url, { method: 'POST', headers, body });
+    // A stalled alert receiver must not stall the scheduler, backup failure
+    // handling or operational history forever. Abort the request after a
+    // bounded deadline; AlertService records FAILED and keeps the incident.
+    const res = await fetch(this.url, {
+      method: 'POST',
+      headers,
+      body,
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
     if (!res.ok) throw new Error(`Alert webhook returned ${res.status}`);
   }
 }
