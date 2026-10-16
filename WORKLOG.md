@@ -3,6 +3,10 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-10-16 | ChatGPT | chatgpt/contabo-disk-recovery-20261016 → PR #39 | active/P0 | Fix VPS ENOSPC image pulls with R2NETTE-only pre-pull cleanup; do not touch running/rollback, other sites or volumes | CI, merge, verify non-skipped deployment
+- 2026-10-16 | ChatGPT | chatgpt/pgdump-artifact-validation-20261016 → PR #38 | green CI, pending merge | Validate PostgreSQL custom dump before S3 upload or fallback purge | after recovery
+- 2026-10-16 | ChatGPT | chatgpt/s3-stream-upload-20261016 → PR #37 | merged, DEPLOY FAILED ENOSPC | Stream signed S3 PUT; main CI #38950346352 green, Deploy #38950594071 failed | recover disk safely, then deploy
+
 - 2026-10-16 | ChatGPT | chatgpt/s3-stream-upload-20261016 → PR pending | active | Stream S3 backup uploads in bounded memory with two-pass SigV4 hashing, reject single PUT >5 GiB; add tests | PR CI → green merge → non-skipped Contabo deploy; S3 credentials/restore still blocked
 
 - 2026-10-16 | ChatGPT | chatgpt/alert-webhook-deadline-20261016 → PR #36 | done | 10-second alert webhook deadline prevents indefinite worker stall | PR CI #38854212430, main CI #38854383066, non-skipped Deploy #38854525800 verified 56cde1b6
