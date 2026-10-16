@@ -3,8 +3,9 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
-- 2026-10-16 | ChatGPT | chatgpt/pgdump-artifact-validation-20261016 → PR pending | active | Validate PGDMP signature and minimum size of scheduled/manual database dumps before off-host upload and retention | PR CI, green merge, non-skipped SHA deploy
-- 2026-10-16 | ChatGPT | chatgpt/s3-stream-upload-20261016 → PR #37 | merged, production pending | Two-pass SHA-256 and streaming signed S3 PUT, no whole-file buffering | PR CI #38950086842 passed; merged 7d03a385; main CI #38950346352 pending
+- 2026-10-16 | ChatGPT | chatgpt/contabo-disk-recovery-20261016 → PR #39 | merged deb7dd26, deploy FAILED ENOSPC; incident #40 | Fix VPS ENOSPC image pulls with R2NETTE-only pre-pull cleanup; do not touch running/rollback, other sites or volumes | CI, merge, verify non-skipped deployment
+- 2026-10-16 | ChatGPT | chatgpt/pgdump-artifact-validation-20261016 → PR #38 | CI green; conflict reconciled on new base, deployment blocked by disk incident #40 | Validate PostgreSQL custom dump before S3 upload or fallback purge | after recovery
+- 2026-10-16 | ChatGPT | chatgpt/s3-stream-upload-20261016 → PR #37 | merged, DEPLOY FAILED ENOSPC | Stream signed S3 PUT; main CI #38950346352 green, Deploy #38950594071 failed | recover disk safely, then deploy
 
 - 2026-10-16 | ChatGPT | chatgpt/s3-stream-upload-20261016 → PR pending | active | Stream S3 backup uploads in bounded memory with two-pass SigV4 hashing, reject single PUT >5 GiB; add tests | PR CI → green merge → non-skipped Contabo deploy; S3 credentials/restore still blocked
 

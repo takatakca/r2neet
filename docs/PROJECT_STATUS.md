@@ -2,6 +2,12 @@
 
 **Verified 2026-10-16** — `takatakca/r2neet`, release branch `main`. The application is running, **but the project is not 100% production-accepted**.
 
+## P0 incident — Contabo disk full
+
+PR #37 (`7d03a38522d82a45760aeb69e584d468128fad52`) passed main CI #38950346352, but Deploy #38950594071 FAILED: no space left on device while extracting a containerd image layer. The most recent verified deployed image remains `1a8de4abe8bf24dc0e5742070590d1fd974efe9b` (CI #38855018334, Deploy #38855160513, probes OK). PR #39 contains targeted pre-pull recovery: remove only obsolete R2NETTE immutable image tags while protecting current, rollback and target, other tenants and volumes. PR #38 PGDMP validation passed PR CI but remains open until disk recovery. Do not report the unverified SHA as live.
+
+Disk cleanup hotfix PR #39 merged at `deb7dd2680e1e0f8ae8a59e6a99d7c2576936c52` with main CI #38952475969 passed, but [Deploy #38952711773](https://github.com/takatakca/r2neet/actions/runs/38952711773) also FAILED: `Removed 0 unused old R2NETTE image tags`, `/dev/sda1` 96G used/96G with only 550M available. [Incident #40](https://github.com/takatakca/r2neet/issues/40) records safe operator disk-inspection steps. No additional automated image pulls should be triggered until storage is available. PR #38 was reconciled to the current main on this branch and must stay OPEN pending disk recovery.
+
 ## Last verified production
 
 - Exact deployed SHA: `56cde1b6ddd98be1cb146c9d33fff3d91ca6d51d`.
@@ -21,12 +27,6 @@
 `chatgpt/s3-stream-upload-20261016` replaces the in-memory `readFileSync` backup upload with SHA-256 hashing in a bounded read stream followed by a signed stream PUT; files above the S3 5 GiB single-operation limit fail safely. New `tests/object-storage-stream.test.ts` covers request signature equivalence, streamed bytes, upload errors, and oversized file rejection. This is pending PR CI, merge, and release verification. No real off-host destination has been configured by the change.
 
 The last verified main release is **`1a8de4abe8bf24dc0e5742070590d1fd974efe9b`**, supported by [CI #38855018334](https://github.com/takatakca/r2neet/actions/runs/38855018334) and [non-skipped Deploy #38855160513](https://github.com/takatakca/r2neet/actions/runs/38855160513) with both health probes and exact SHA proof.
-
-## New independent safeguard in review
-
-Branch `chatgpt/pgdump-artifact-validation-20261016` adds shared `scripts/backup-validation.ts` checks for PGDMP custom-format header and minimum size, invoked by both scheduled and manual pg_dump. Files failing validation remain on disk; scheduled backup does not upload or prune before validation. Tests in `tests/backup-validation.test.ts`. PR CI, merge, and deployment are NOT verified.
-
-PR #37 merged at `7d03a38522d82a45760aeb69e584d468128fad52` after green PR CI #38950086842. Main CI #38950346352 and an actual matching Contabo deploy still need verification before calling it deployed.
 
 ## Operational blockers — no false successes
 

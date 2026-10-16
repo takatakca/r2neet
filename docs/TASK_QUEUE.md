@@ -4,6 +4,8 @@ Reviewed: **2026-10-16**. Continue from `AGENTS.md`, `WORKLOG.md` and `docs/AGEN
 
 | Priority | Work | State | Acceptance |
 | --- | --- | --- | --- |
+| P0 | Contabo disk full; restore safe image deployment | BLOCKED: PR #39 merged but Deploy #38952711773 failed, issue #40 | Reclaim old R2NETTE SHA images only, preserve current/rollback, other apps and all volumes; verify actual roll |
+| P1 | PostgreSQL dump PGDMP header/size guard | PR #38 OPEN, conflict reconciled and CI rerun pending, deployment blocked by #40 | Both manual and scheduled archive validation before off-host upload or retention |
 | P0 | Real Stripe keys and signed webhook | BLOCKED: protected provider configuration | Server amount + tax, idempotent signed event, real state and refund end-to-end |
 | P0 | Off-host S3 account, alerts and recovery | BLOCKED: provider choice/secure credentials | Actual PUT/HEAD/GET digest, object retention, scratch restore with FIELD_ENCRYPTION_KEY, alert receipt |
 | P0 | Twilio/Supabase real phone authentication | BLOCKED: provider setup | Verified OTP delivery and auth, no production bypass |
@@ -15,8 +17,6 @@ Reviewed: **2026-10-16**. Continue from `AGENTS.md`, `WORKLOG.md` and `docs/AGEN
 | P2 | Keep five agent docs and WORKLOG current | ONGOING | Correct latest SHA, non-skipped deployment proof and next action |
 
 | P1 | Bound database dump upload memory for large PostgreSQL backups | IN PROGRESS: chatgpt/s3-stream-upload-20261016 | Signed two-pass streamed PUT, 5 GiB single-PUT limit and streaming regression tests; CI/roll pending |
-
-| P1 | Reject incomplete or wrong-format pg_dump artifacts before treating backups as valid | IN PROGRESS: chatgpt/pgdump-artifact-validation-20261016 | PGDMP magic and minimum size for manual/scheduled paths, tests, CI and verified roll |
 
 ## Completed and deployed
 
