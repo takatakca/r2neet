@@ -5,7 +5,7 @@
  * nightly by local wall-clock time and records the outcome so a silent
  * failure becomes visible.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { PrismaClient } from '@prisma/client';
 import { Scheduler } from '../src/workers/scheduler.js';
@@ -13,6 +13,7 @@ import { keyFingerprint } from '../src/auth/encryption.js';
 import { loadS3Config, S3Storage } from '../src/workers/object-storage.js';
 import { AlertService, WebhookAlertSink } from '../src/workers/health.js';
 import { unlinkSync } from 'node:fs';
+import { requireOffHostBackup } from '../src/workers/backup-policy.js';
 
 if (existsSync('.env')) {
   for (const line of readFileSync('.env', 'utf8').split('\n')) {
@@ -37,11 +38,22 @@ const scheduler = new Scheduler(
       expectedWithinSeconds: 129600,
       run: async () => {
         const dir = process.env.BACKUP_DIR ?? 'backups';
+        mkdirSync(dir, { recursive: true });
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
         const file = `${dir}/r2nette-${stamp}.dump`;
         execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-acl', '--file', file, url!], {
           stdio: ['ignore', 'inherit', 'inherit'],
         });
+
+        // Do not report a local-only dump as a successful backup. The local
+        // file is deliberately retained and the missing target is alerted.
+        await requireOffHostBackup(Boolean(storage), () => alerts.raise({
+          key: 'backup:off-host',
+          severity: 'CRITICAL',
+          category: 'BACKUP',
+          title: 'Off-host backup destination missing',
+          message: 'A local database dump exists but no off-host destination is configured.',
+        }));
 
         // Off-host copy. Without this the backup dies with the machine, so
         // a local-only dump is never reported as a completed backup.

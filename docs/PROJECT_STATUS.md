@@ -1,35 +1,28 @@
 # R2NETTE — Project status
 
-Verified snapshot: **2026-10-15**. **Latest verified production release:** `2ca571afeddd6920edf86f36bfee5fac06e505e6` ([Deploy #38778654257](https://github.com/takatakca/r2neet/actions/runs/38778654257), non-skipped VPS roll, `/healthz ok`, `/readyz ok`; main CI #38778348493 successful). Previous release references below are historical. Continuity update PR #31 passed CI and was merged into main as `b845e0f189b9a19b3edd164cdd8ecae8250839f3`; final docs-only main CI/deploy still need separate confirmation. Repo `takatakca/r2neet` branch `main`; latest merged functional SHA `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, main CI #38777285346 passed. Last **verified non-skipped production** SHA: `a46849b5e29619a7ee8fd14469e2a98d70b6b28c` ([Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485), probes healthy and exact SHA verified). This project is **not yet 100% production-accepted**.
+Snapshot: **2026-10-15**. Repository `takatakca/r2neet`; release branch `main`. **Not 100% production-accepted.**
 
-## Completed new code (GitHub-verified)
+## Confirmed running release
 
-- PR #27: browser storage now excludes saved street address, address identifiers, contact information and held slots; sanitizes historical drafts and refuses to resurrect confirmed bookings.
-- PR #28: safe structured API errors for HTML proxy failures/corrupt JSON; preserves valid pricing/reprice errors. Deployed in `ce8eb68d` (Deploy #38776393992).
-- PR #29: bounded npm install retry on transient Docker registry errors, without masking broken dependency installs. Deployed in `6a7f192e` (Deploy #38776842943).
-- PR #30: rate-limit client IP is derived from Express's immediate trusted proxy, not untrusted raw X-Forwarded-For; spoofed-prefix regression tests. Merged `a46849b5`, CI and production Deploy #38777515485 verified.
+- Latest verified main commit deployed: `10d11e89cfc496c58b4773735e60a43efab279ec`.
+- [CI #38792313100](https://github.com/takatakca/r2neet/actions/runs/38792313100) succeeded.
+- [Deploy #38792567205](https://github.com/takatakca/r2neet/actions/runs/38792567205) performed non-skipped Contabo roll and logged `/healthz ok`, `/readyz ok`, `Deploy verified for commit 10d11e89cfc496c58b4773735e60a43efab279ec`.
+- Contabo VPS Docker Compose `/opt/r2nette`; Coolify proxy; MochaHost DNS/email. Do not mistake green Actions with a skipped roll for deployment proof.
 
-## Verified existing platform
+## Implemented platform
 
-- RFC 5545 calendar exports now fold Unicode content lines at 75 UTF-8 octets; [PR #26](https://github.com/takatakca/r2neet/pull/26) passed its CI and merged to `main`.
-- Customer booking flow, account portal, staff roles/admin/crew, backend pricing engine and quotes, PostgreSQL/Prisma, slot holds and scheduling, recurring visits, payment and notification integrations in code.
-- Deployment uses GitHub Actions `CI` → `Deploy`, immutable SHA-tagged image, Docker Compose on Contabo at `/opt/r2nette`, health/readiness checks and rollback. The VPS uses the existing Coolify proxy when present.
-- **Latest verified production:** `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, [CI #38777285346](https://github.com/takatakca/r2neet/actions/runs/38777285346) and [Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485) confirmed non-skipped roll, exact SHA, liveness and readiness.
-- The domain/web DNS and email configuration remain administered through MochaHost; the actual app runs on Contabo. The deploy evidence does **not** prove each customer flow, provider, or external integration is enabled.
+Server-controlled booking quotes and pricing, saved customer bookings/account, crew/staff session roles, PostgreSQL/Prisma, recurrence scheduling, notification/payment/provider integration **code**, durable TAKATAK signed outbox. Verified earlier improvements: PR #26 Unicode-safe ICS; #27 private browser draft sanitization; #28 structured API failure handling; #29 bounded Docker npm retries; #30 spoof-resistant rate limiter; #31 agent continuity reconciliation. Presence of provider integration code does **not** establish live provider availability.
 
-## Known production gaps
+## Pending code — not a verified production feature
 
-The verified deploy log warned of missing configuration for **Stripe** card payments, **Twilio Voice/SMS**, **Google Maps**, business dispatch origin coordinates, **off-host S3 backups**, and **alert webhooks**. Phone/Google sign-in and all workflows still require controlled end-to-end confirmation. See [issue #25](https://github.com/takatakca/r2neet/issues/25).
+Branch `chatgpt/backup-daily-failure-hardening-20261015` adds one-attempt-per-local-day behavior for failed daily jobs, and makes missing off-host backup destinations raise an incident and return FAILED without deleting the local dump. Added scheduler and backup policy regression tests. Verify PR CI and non-skipped SHA release before moving this to “completed.”
 
-R2NETTE's TAKATAK event outbox and signed sender exist, but syncing must stay **disabled** until the receiver [TAKATAK PR #175](https://github.com/takatakca/takatak-v1/pull/175) is green, approved, merged, deployed and independently verified. This PR was still open on 2026-10-15. Never use a cross-tenant shortcut.
+## External launch blockers
 
-## Risks and acceptance
+The most recent deploy still warned that Stripe secret/publishable/webhook settings, Twilio Voice/SMS, Google Maps, dispatch origin, off-host S3 backups and alert webhook are absent. See [issue #25](https://github.com/takatakca/r2neet/issues/25). No real end-to-end charge, signed webhook, phone OTP, off-host restore, operational paging receipt or every-role booking smoke has been proven. Credentials belong in protected environments, not GitHub source, PRs or logs.
 
-- Missing verified off-host restore and alert routing means the project cannot be classified operationally complete.
-- Live billing must never be enabled with incomplete Stripe webhook configuration; no fabricated pricing or simulated successful charges.
-- Completion requires valid provider credentials in approved secret stores, worker health, signature handling, real customer and staff flows, recovery drill and evidence of the deployed SHA.
+TAKATAK receiver [PR #175](https://github.com/takatakca/takatak-v1/pull/175) is OPEN as of this snapshot; keep `TAKATAK_R2NETTE_SYNC_ENABLED=false` until reviewed, merged, deployed and signature/tenant verified. Preserve strict cross-business segregation and independent R2NETTE UI. Old historical documentation PR #17 needs review before merge.
 
-## Canonical references
+## Starting point
 
-`AGENTS.md`, `WORKLOG.md`, `RUN.md`, `BRAND.md`, `docs/TAKATAK_INTEGRATION.md`, `docs/reservation-system/`, and `docs/deployment/contabo-runbook.md`. See also `docs/TASK_QUEUE.md`, `docs/AGENT_HANDOFF.md`, `docs/DECISIONS.md` and `docs/DEPLOYMENT.md`.
-
+Read `AGENTS.md`, `WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/TASK_QUEUE.md`, `docs/DEPLOYMENT.md`, `docs/DECISIONS.md`; then inspect exact SHA-linked CI and deploy evidence. Canonical Contabo runbook: `docs/deployment/contabo-runbook.md`; recovery: `docs/reservation-system/disaster-recovery.md`.

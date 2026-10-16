@@ -163,7 +163,9 @@ export class Scheduler {
     // A failed run still counts as "attempted", so a persistently broken job
     // does not spin. Overdue detection uses successes only.
     this.lastRunAt.set(job.name, at.getTime());
-    if (job.dailyLocalAt && run.status === 'SUCCESS') {
+    // A failed daily attempt also counts today: never create a new backup dump
+    // on each tick after a provider outage. Worker history records FAILED.
+    if (job.dailyLocalAt) {
       this.lastDailyDate.set(job.name, localDateKey(at));
     }
     this.history.unshift(run);

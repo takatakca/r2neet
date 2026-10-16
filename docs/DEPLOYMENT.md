@@ -1,38 +1,29 @@
-# R2NETTE — Deployment state and runbook
+# R2NETTE — Deployment status
 
-Snapshot: 2026-10-15. Detailed canonical procedure: [Contabo runbook](deployment/contabo-runbook.md). **Do not mistake MochaHost DNS/mail for the app host.**
+Snapshot: **2026-10-15**. Canonical instructions: [Contabo runbook](deployment/contabo-runbook.md) and [disaster recovery](reservation-system/disaster-recovery.md).
 
-**Latest verified production:** `2ca571afeddd6920edf86f36bfee5fac06e505e6` — [Deploy #38778654257](https://github.com/takatakca/r2neet/actions/runs/38778654257) performed a real VPS roll, reported `/healthz ok`, `/readyz ok` and `Deploy verified for commit 2ca571afeddd6920edf86f36bfee5fac06e505e6`; main CI #38778348493 passed. Prior releases below are historical.
+## Last verified production image
 
-## Verified environment
+- SHA `10d11e89cfc496c58b4773735e60a43efab279ec` — [CI #38792313100](https://github.com/takatakca/r2neet/actions/runs/38792313100) passed and [Deploy #38792567205](https://github.com/takatakca/r2neet/actions/runs/38792567205) performed a real Contabo roll.
+- VPS rollout log: `/healthz ok`, `/readyz ok`, `Deploy verified for commit 10d11e89cfc496c58b4773735e60a43efab279ec`.
+- This does not verify payments, OTP, maps, alarms, backup restore or business workflows.
 
-- `takatakca/r2neet` deploys `main` to the Contabo VPS through CI-gated SHA-tagged Docker Compose in `/opt/r2nette`; Coolify hosts the reverse proxy as documented. DNS and email stay with MochaHost.
-- Successful non-skipped release [#38776393992](https://github.com/takatakca/r2neet/actions/runs/38776393992): `ce8eb68dbb49d67fd9c7949c700fd25261d66380`, `/healthz ok`, `/readyz ok`.
-- **Last verified production:** successful non-skipped release [#38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485): `a46849b5e29619a7ee8fd14469e2a98d70b6b28c`, `/healthz ok`, `/readyz ok`, exact SHA confirmed.
-- Latest functional merge `a46849b5e29619a7ee8fd14469e2a98d70b6b28c` passed [CI #38777285346](https://github.com/takatakca/r2neet/actions/runs/38777285346) and [Deploy #38777515485](https://github.com/takatakca/r2neet/actions/runs/38777515485), including health/readiness and exact-SHA checks.
+## Hosting and deployment contract
 
-## Incidents and recovery
+GitHub Actions `CI` on `main` must pass; `Deploy` builds an immutable Git SHA image and deploys Docker Compose to the Contabo VPS (`/opt/r2nette`), behind the documented existing Coolify proxy. MochaHost operates DNS/email, not the Node app. Workflow checks main again before rolling an image; jobs that skip obsolete SHAs are NOT deployment evidence.
 
-Deploy [#38775849037](https://github.com/takatakca/r2neet/actions/runs/38775849037) initially failed on npm registry `ECONNRESET`. Its single retry published the image but deliberately **skipped** a now-stale VPS roll. Bounded install retries entered production with `6a7f192e`. Never equate a green job that skipped rolling the VPS with a deployed release.
+1. Work on a branch and open PR; allow CI to run TypeScript, Vite, Vitest, migrations, safety and container checks. On failure inspect job logs and correct on that branch.
+2. Merge only passing PR to `main`, using expected head SHA if supported; never force push.
+3. Check main CI then non-skipped Deploy run matching the main commit. Inspect actual roll step and exact `Deploy verified for commit <sha>` marker plus both probes.
+4. Confirm public TLS and controlled customer/worker checks, then document exact release and known unresolved warnings.
+5. Roll back with `scripts/deploy/rollback.sh` when needed after reading the runbook; never restore to a production database without a scratch restore and key matching.
 
-## Next publication
+## Pending hardening release
 
-Feature `a46849b5` has verified CI and deployment. PR #31 handoff documentation passed PR CI and merged as `b845e0f189b9a19b3edd164cdd8ecae8250839f3`. A subsequent closure commit adjusts status files on main. The current main HEAD is NOT verified in production until it passes its own CI and **non-skipped** Deploy, with exact-SHA and health checks.
+Branch `chatgpt/backup-daily-failure-hardening-20261015` prevents per-minute retry of failed daily backup jobs and prevents local-only dumps reporting SUCCESS. Keep this marked pending until PR CI and actual image rollout verify it.
 
-## Operational steps
-1. Review `AGENTS.md`, recent PRs/issues and `WORKLOG.md`; ensure no conflicting ongoing task.
-2. Change code on a reviewable branch. Run `npm ci`, `npx prisma generate`, `npm run ci`, targeted regression tests, and check schema migrations from scratch when modified. Let GitHub CI validate.
-3. Merge a green PR, or push to `main` only within approved branch policy. Never force-push or skip required checks.
-4. Inspect the **matching SHA** in Actions `CI` and `Deploy`. Check `Deploy verified for commit <sha>` and both probes, not just a green shell command. A green job can legitimately skip an obsolete deployment.
-5. Confirm public `https://r2nette.ca` DNS/TLS and a controlled booking smoke, and preserve the last known good SHA for rollback.
-6. Update `docs/AGENT_HANDOFF.md` and `WORKLOG.md` with the **observed** SHA, checks and blockers.
+## Environment and disaster recovery
 
-## Service configuration (no values here)
-Use the protected `production` GitHub environment and `server-setup.yml`/documented server setup to configure Stripe (+ mandatory webhook), Twilio, TAKATAK Supabase Auth, Google Maps, S3 off-host backups and alert webhook. Run deployment after setup and verify again. Do not enable TAKATAK sync while its receiving PR #175 is unmerged/unreleased.
+The 10d11e89 deploy warned that Stripe card keys and signed webhook, Twilio Voice/SMS, Google Maps, dispatch coordinates, S3 off-host credentials and signed alert webhook are not configured. They must be set via approved protected production environment and an operator must verify receipts. [Production issue #25](https://github.com/takatakca/r2neet/issues/25) owns the acceptance checklist. TAKATAK integration stays disabled while receiver PR #175 is unmerged or unverified.
 
-## Known warning state
-As of the verified deploy log: Stripe card payments unavailable; Twilio Voice/SMS, Google Maps, dispatch origin, off-host backup and alert webhook were not configured. They are tracked in issue #25. These are **operational blockers**, not successful live integrations.
-
-## Rollback and recovery
-Existing `scripts/deploy/rollback.sh` and `scripts/deploy/healthcheck.sh` perform the guarded rollback/check steps. Review `docs/reservation-system/disaster-recovery.md` before restoring data: off-host dump **and** `FIELD_ENCRYPTION_KEY` are needed. Restore to a scratch DB, prove MFA and booking data integrity, then consider production restoration. Never run destructive migrations or test restores on the live DB.
-
+Local PostgreSQL dump does **not** prove disaster recovery. Verify off-host checksum/HEAD, retention, scratch restore, booking/MFA data, correct `FIELD_ENCRYPTION_KEY` (and any retired keys), alarm delivery, and worker history. Never claim a recovery drill on the real off-host object based only on the CI synthetic restore drill.

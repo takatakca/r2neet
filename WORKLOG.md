@@ -3,6 +3,8 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-10-15 | ChatGPT | chatgpt/backup-daily-failure-hardening-20261015 → PR pending | active | Failed daily jobs attempt once per Toronto calendar day; local-only backup dumps record FAILED + incident instead of SUCCESS | CI then deploy and verify
+
 - 2026-10-15 | ChatGPT | main | done | Verified CI #38778348493 and actual non-skipped Contabo deploy #38778654257 for 2ca571af with /healthz and /readyz OK | next: issue #25 provider setup and real end-to-end acceptance
 
 - 2026-10-15 | ChatGPT | chatgpt/finalize-handoff-20261015 → PR #31 | done | Reconcile real CI/deploy SHAs for privacy, API resilience, Docker and trusted-proxy releases in five status files | a46849b5 deployment verified, PR CI #38778002480 green; merged as b845e0f1
