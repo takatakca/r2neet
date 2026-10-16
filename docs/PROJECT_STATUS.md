@@ -6,6 +6,8 @@
 
 PR #37 (`7d03a38522d82a45760aeb69e584d468128fad52`) passed main CI #38950346352, but Deploy #38950594071 FAILED: no space left on device while extracting a containerd image layer. The most recent verified deployed image remains `1a8de4abe8bf24dc0e5742070590d1fd974efe9b` (CI #38855018334, Deploy #38855160513, probes OK). PR #39 contains targeted pre-pull recovery: remove only obsolete R2NETTE immutable image tags while protecting current, rollback and target, other tenants and volumes. PR #38 PGDMP validation passed PR CI but remains open until disk recovery. Do not report the unverified SHA as live.
 
+Disk cleanup hotfix PR #39 merged at `deb7dd2680e1e0f8ae8a59e6a99d7c2576936c52` with main CI #38952475969 passed, but [Deploy #38952711773](https://github.com/takatakca/r2neet/actions/runs/38952711773) also FAILED: `Removed 0 unused old R2NETTE image tags`, `/dev/sda1` 96G used/96G with only 550M available. [Incident #40](https://github.com/takatakca/r2neet/issues/40) records safe operator disk-inspection steps. No additional automated image pulls should be triggered until storage is available. PR #38 was reconciled to the current main on this branch and must stay OPEN pending disk recovery.
+
 ## Last verified production
 
 - Exact deployed SHA: `56cde1b6ddd98be1cb146c9d33fff3d91ca6d51d`.

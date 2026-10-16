@@ -11,10 +11,11 @@
  * FIELD_ENCRYPTION_KEY. A perfect restore without the key leaves every
  * two-factor account unusable.
  */
-import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { keyFingerprint } from '../src/auth/encryption.js';
 import { pgCommandConnection } from './pg-cli.js';
+import { validatePostgresDump } from './backup-validation.js';
 
 if (existsSync('.env')) {
   for (const line of readFileSync('.env', 'utf8').split('\n')) {
@@ -48,8 +49,7 @@ try {
     stdio: ['ignore', 'inherit', 'inherit'],
     env: connection.env,
   });
-  const bytes = statSync(file).size;
-  if (bytes < 1024) throw new Error(`Dump is suspiciously small (${bytes} bytes).`);
+  const bytes = validatePostgresDump(file);
 
   console.log(
     JSON.stringify({

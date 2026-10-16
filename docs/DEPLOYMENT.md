@@ -6,6 +6,8 @@ Snapshot: **2026-10-16**. Canonical instructions: [Contabo runbook](deployment/c
 
 Deploy #38950594071 for SHA `7d03a38522d82a45760aeb69e584d468128fad52` FAILED on Contabo ENOSPC (containerd overlayfs layer extraction). Repeated image pull did not resolve the issue. Do not delete PostgreSQL or Coolify volumes, and do not use global `docker system prune --volumes`. Hotfix PR #39 runs conservative R2NETTE-only old image cleanup BEFORE pull, keeping current and previous images, and other sites untouched. CI and successful actual rollout must be proven; if cleanup cannot free enough space, stop blind retries and request authorized operator storage inspection. Last verified SHA is `1a8de4abe8bf24dc0e5742070590d1fd974efe9b`, Deploy #38855160513.
 
+[Deploy #38952711773](https://github.com/takatakca/r2neet/actions/runs/38952711773) also FAILED after PR #39 target-only cleanup found zero obsolete R2NETTE image tags. Disk `/dev/sda1` showed 96G full with ~550M free. Follow [incident #40](https://github.com/takatakca/r2neet/issues/40) for read-only operator diagnostics; do not delete volumes or other tenants' images. PR #38 is conflict-reconciled but deliberately NOT merged while this P0 blocker remains.
+
 ## Last verified Contabo release
 
 - Actual deployed immutable image SHA: `56cde1b6ddd98be1cb146c9d33fff3d91ca6d51d`.

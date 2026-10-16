@@ -2,11 +2,13 @@
 
 Updated 2026-10-16. On restart read `AGENTS.md`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, and `docs/DECISIONS.md` and check GitHub open PRs before new work.
 
-## CURRENT P0 — disk exhaustion, hotfix PR #39
+## CURRENT P0 — disk exhaustion unresolved; PR #38 prepared but NOT deployed
 
 Last verified production: `1a8de4abe8bf24dc0e5742070590d1fd974efe9b`, non-skipped Deploy #38855160513 with `/healthz ok`, `/readyz ok` and exact SHA. PR #37 merged streamed S3 PUT at `7d03a38522d82a45760aeb69e584d468128fad52` and main CI #38950346352 passed, but Deploy #38950594071 FAILED extracting a containerd image layer with `No space left on device`. Do NOT assert PR #37 deployed. PR #38 PGDMP archive validation passed PR CI #38950701808 but should remain OPEN until recovery.
 
 Current branch `chatgpt/contabo-disk-recovery-20261016` and PR #39 modifies `scripts/deploy/remote-deploy.sh`, adds `scripts/deploy/pre-pull-cleanup.sh` and `tests/pre-pull-cleanup.test.ts`. Cleanup runs before pull and after successful promotion; it only deletes old R2NETTE SHA image tags, protecting current/previous/target and other applications/volumes. Last functional branch commit before docs: `cfce52ac848d1bb8e69c61b8962526280a48a7fe`. Actual branch HEAD must be checked after docs commit; CI, merge and production recovery not yet verified. No local SSH, df, Docker prune or actual VPS modifications performed here — reviewed GitHub Actions job log of failed Deploy #38950594071 and source/runbooks. Next exact action: require green PR #39 CI, fix failures, merge; verify non-skipped main deploy and exact SHA/health. If still ENOSPC, no blind retries: authorized server operator must inspect disk and approve any broader selective cleanup. After recovery, merge CI-green PR #38, verify deployment and reconcile docs. Provider issue #25 and TAKATAK receiver gate remain unresolved.
+
+Update on 2026-10-16: PR #39 code was merged as deb7dd2680e1e0f8ae8a59e6a99d7c2576936c52, main CI #38952475969 passed, but Deploy #38952711773 FAILED on ENOSPC. Scoped cleanup removed 0 old R2NETTE tags; `/dev/sda1` 96G/96G, ~550M free. [Issue #40](https://github.com/takatakca/r2neet/issues/40) holds verified incident evidence and read-only operator diagnostic commands. PR #38 now uses the latest main content in its tree and preserves every hotfix; its functional files are scripts/backup.ts, scripts/loop-backup.ts, scripts/backup-validation.ts, tests/backup-validation.test.ts and the disaster-recovery guide. PR #38 remains UNMERGED; do not trigger another doomed image pull before disk recovery. No SSH or privileged server cleanup executed directly by this agent. Next action: authorized disk audit, restore several GB of available disk safely, then verify new deployment of latest main; only then merge PR #38 and verify exact SHA and both probes.
 
 ### Historical sections below predate this current incident; prioritize P0 above
 

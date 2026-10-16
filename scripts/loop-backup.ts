@@ -16,6 +16,7 @@ import { unlinkSync } from 'node:fs';
 import { requireOffHostBackup } from '../src/workers/backup-policy.js';
 import { pgCommandConnection } from './pg-cli.js';
 import { parseBackupKeepDays, pruneLocalBackups } from './backup-retention.js';
+import { validatePostgresDump } from './backup-validation.js';
 
 if (existsSync('.env')) {
   for (const line of readFileSync('.env', 'utf8').split('\n')) {
@@ -48,6 +49,11 @@ const scheduler = new Scheduler(
           stdio: ['ignore', 'inherit', 'inherit'],
           env: connection.env,
         });
+
+        // A zero-exit pg_dump is not proof that a valid nontrivial custom
+        // dump was written. Never upload or purge fallback files until the
+        // PGDMP header and minimum dump size have passed validation.
+        validatePostgresDump(file);
 
         // Apply bounded local retention *after* producing a fresh dump but
         // *before* reporting a missing/unavailable S3 destination. Otherwise
