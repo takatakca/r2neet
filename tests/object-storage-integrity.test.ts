@@ -86,7 +86,7 @@ describe('S3 off-host backup end-to-end integrity', () => {
   it('rejects a truncated GET even when HEAD claims a matching size', async () => {
     const local = fixture('backup-original-12345');
     try {
-      fakeGateway('backup-ori');
+      fakeGateway('backup-ori', Buffer.byteLength('backup-original-12345'));
       await expect(new S3Storage(config).putAndVerify('a.dump', local.file)).rejects.toMatchObject({
         code: 'VERIFY_SIZE_MISMATCH',
       });
