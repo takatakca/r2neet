@@ -1,37 +1,27 @@
 # R2NETTE — Project status
 
-Snapshot: **2026-10-16**. Repository `takatakca/r2neet`; release branch `main`. **Not 100% production-accepted.**
+**Verified 2026-10-16** — `takatakca/r2neet`, release branch `main`. The application is running, **but the project is not 100% production-accepted**.
 
-## Confirmed running release
+## Last verified production
 
-- Latest verified main commit deployed: `f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31` (CI #38849810401, non-skipped Deploy #38849959878, both health probes).
-- [CI #38849810401](https://github.com/takatakca/r2neet/actions/runs/38849810401) succeeded.
-- [Deploy #38849959878](https://github.com/takatakca/r2neet/actions/runs/38849959878) performed non-skipped Contabo roll and logged `/healthz ok`, `/readyz ok`, `Deploy verified for commit f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31`.
-- Contabo VPS Docker Compose `/opt/r2nette`; Coolify proxy; MochaHost DNS/email. Do not mistake green Actions with a skipped roll for deployment proof.
+- Exact deployed SHA: `56cde1b6ddd98be1cb146c9d33fff3d91ca6d51d`.
+- [Main CI #38854383066](https://github.com/takatakca/r2neet/actions/runs/38854383066): passed (typecheck/build, tests, safety and container).
+- [Non-skipped Contabo Deploy #38854525800](https://github.com/takatakca/r2neet/actions/runs/38854525800): actual VPS roll, `/healthz ok`, `/readyz ok`, `Deploy verified for commit 56cde1b6ddd98be1cb146c9d33fff3d91ca6d51d`. This is the last verified live image until a newer matching release proves otherwise.
+- Runtime: Docker Compose at `/opt/r2nette` on Contabo, reverse-proxied by existing Coolify infrastructure; MochaHost retains DNS and email. No fresh functional customer browser smoke was run this session.
 
-## Implemented platform
+## Verified code changes this session
 
-Server-controlled booking quotes and pricing, saved customer bookings/account, crew/staff session roles, PostgreSQL/Prisma, recurrence scheduling, notification/payment/provider integration **code**, durable TAKATAK signed outbox. Verified earlier improvements: PR #26 Unicode-safe ICS; #27 private browser draft sanitization; #28 structured API failure handling; #29 bounded Docker npm retries; #30 spoof-resistant rate limiter; #31 agent continuity reconciliation. Presence of provider integration code does **not** establish live provider availability.
+- [PR #34](https://github.com/takatakca/r2neet/pull/34): signed streamed S3 GET verifies actual SHA-256/size against the dump, rejecting equal-length corruption, truncated objects and failed GET. Initial CI failed on a historical HEAD-only test fixture; corrected, PR CI #38853224241 and main CI #38853348818 passed. **[Deploy #38853464615](https://github.com/takatakca/r2neet/actions/runs/38853464615)** verified merge SHA `02b0653cfc33b6472879f7ac38268b3aa4efedb2`.
+- [PR #35](https://github.com/takatakca/r2neet/pull/35): local backup retention after successful fresh pg_dump but before S3 failures, with validated 1–365-day setting, no symlink or unrelated-file deletion. PR CI #38853550724, main CI #38853881854 passed; **[Deploy #38853994829](https://github.com/takatakca/r2neet/actions/runs/38853994829)** verified `46fa61d32d1ff8b973d2910f597c5cacd992948a`.
+- [PR #36](https://github.com/takatakca/r2neet/pull/36): alert webhooks have a bounded 10-second deadline; hung receivers cannot block failure reporting indefinitely. PR CI #38854212430 and main CI #38854383066 passed; **Deploy #38854525800** verified `56cde1b6`.
+- Earlier: PR #26 Unicode-safe ICS; #27 private draft storage; #28 HTTP error hardening; #29 Docker npm recovery; #30 rate-limiter trusted proxy; #32 backup fail-closed and once/day attempts; #33 pg_dump argv password protection. Preserve all prior work.
 
-## Newly completed hardening — deployed
+## Operational blockers — no false successes
 
-- PR #32: once-per-local-calendar-day attempts for failing daily workers; a local PostgreSQL dump with no off-host destination retains the file but logs FAILED and opens an incident. PR CI #38848750100, main CI #38848882332, non-skipped Deploy #38849030331 verified `aa51fd30`.
-- PR #33: password-bearing PostgreSQL URLs are scrubbed from `pg_dump` argv; `PGPASSWORD` passed to the child process. PR CI #38849124573, main CI #38849296051, non-skipped Deploy #38849434426 verified `1c140ac1`.
+[Issue #25](https://github.com/takatakca/r2neet/issues/25) remains open. Latest deployment still explicitly warns that Stripe live keys and signed webhook, Twilio Voice/SMS, Google Maps, dispatch origin, S3 off-host storage, and signed alert webhook are NOT configured. Phone/Google login, real card payments, off-host restore with matching encryption key, worker receipt monitoring, alert delivery and full customer/staff booking acceptance remain unproven. Integrations present in code are not evidence of activation.
 
-Documentation closure `f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31` passed CI and exact-SHA deployment. PR #34 added signed streamed S3 GET and remote SHA-256 verification, passed PR CI #38853224241 and merged as `02b0653cfc33b6472879f7ac38268b3aa4efedb2`; matching main CI and non-skipped Contabo deployment have not yet been proven in this snapshot. Branch `chatgpt/backup-local-retention-20261016` adds safe local fallback retention on S3 outage; that feature remains CI/deploy pending.
+The TAKATAK central identity receiver [PR #175](https://github.com/takatakca/takatak-v1/pull/175) was open at last check; keep `TAKATAK_R2NETTE_SYNC_ENABLED=false` until deployed HMAC/tenant testing passes. R2NETTE keeps independent UI and tenant boundaries.
 
-## Recent code merged, release pending
+## Canonical next step
 
-- PR #34: streamed actual S3 GET SHA-256 verification merged `02b0653c` (CI #38853348818 green); Deploy #38853464615 still in VPS roll at last check, so release unverified.
-- PR #35: local fallback dump retention after successful pg_dump and before any S3 failures merged `46fa61d3` (CI #38853881854 green); Deploy #38853994829 pending behind PR #34.
-- Branch `chatgpt/alert-webhook-deadline-20261016` adds 10-second alert webhook timeout, preventing a stalled sink from hanging backup workers. PR CI/deploy unverified.
-
-## External launch blockers
-
-The most recent deploy still warned that Stripe secret/publishable/webhook settings, Twilio Voice/SMS, Google Maps, dispatch origin, off-host S3 backups and alert webhook are absent. See [issue #25](https://github.com/takatakca/r2neet/issues/25). No real end-to-end charge, signed webhook, phone OTP, off-host restore, operational paging receipt or every-role booking smoke has been proven. Credentials belong in protected environments, not GitHub source, PRs or logs.
-
-TAKATAK receiver [PR #175](https://github.com/takatakca/takatak-v1/pull/175) is OPEN as of this snapshot; keep `TAKATAK_R2NETTE_SYNC_ENABLED=false` until reviewed, merged, deployed and signature/tenant verified. Preserve strict cross-business segregation and independent R2NETTE UI. Old historical documentation PR #17 needs review before merge.
-
-## Starting point
-
-Read `AGENTS.md`, `WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/TASK_QUEUE.md`, `docs/DEPLOYMENT.md`, `docs/DECISIONS.md`; then inspect exact SHA-linked CI and deploy evidence. Canonical Contabo runbook: `docs/deployment/contabo-runbook.md`; recovery: `docs/reservation-system/disaster-recovery.md`.
+Provision provider credentials **only through protected production environment** (no secrets in GitHub source, issues or chat), verify an actual off-host backup and restored PostgreSQL/MFA data in a scratch environment, confirm alert receipt, then Stripe signed webhook and genuine customer/crew/payment flows. See `docs/TASK_QUEUE.md`, `docs/AGENT_HANDOFF.md`, `docs/DEPLOYMENT.md` and `docs/DECISIONS.md`.

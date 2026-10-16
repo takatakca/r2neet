@@ -1,32 +1,36 @@
 # R2NETTE — Agent handoff
 
-Snapshot: **2026-10-16**. Restart by reading AGENTS.md, WORKLOG.md and all five docs/* continuity files. Recheck main HEAD, recent open PRs, main CI, deployed exact SHA; do not redo previous agents' work.
+Snapshot **2026-10-16**, repository `takatakca/r2neet`, branch `main`. **Begin by reading `AGENTS.md`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md` and `docs/DECISIONS.md`.** Check live GitHub HEAD and open PRs before editing.
 
-## Last completed change
+## Last completed task
 
-PR [#35](https://github.com/takatakca/r2neet/pull/35) adds safe local retention after a valid fresh pg_dump even when S3 is unavailable. PR CI #38853550724 passed and merge SHA is `46fa61d32d1ff8b973d2910f597c5cacd992948a`; main CI #38853881854 passed. Matching Deploy #38853994829 was **PENDING** behind the preceding release. The feature is merged but its VPS rollout is NOT yet verified.
+PR [#36](https://github.com/takatakca/r2neet/pull/36) bounds operational alert webhooks to 10 seconds to prevent indefinite backup/worker hangs. PR CI #38854212430 and main [CI #38854383066](https://github.com/takatakca/r2neet/actions/runs/38854383066) passed. Merge `56cde1b6ddd98be1cb146c9d33fff3d91ca6d51d`; [Deploy #38854525800](https://github.com/takatakca/r2neet/actions/runs/38854525800) **successfully rolled on Contabo**, and its actual job log says `/healthz ok`, `/readyz ok`, `Deploy verified for commit 56cde1b6ddd98be1cb146c9d33fff3d91ca6d51d`.
 
-PR [#34](https://github.com/takatakca/r2neet/pull/34) compares streamed S3 remote SHA-256 against local dump, catching same-length corruption; initial PR CI #38853010076 failed due a historical HEAD-only mock; corrected and PR CI #38853224241 passed. Merge `02b0653cfc33b6472879f7ac38268b3aa4efedb2`, main CI #38853348818 passed. [Deploy #38853464615](https://github.com/takatakca/r2neet/actions/runs/38853464615) was **IN PROGRESS, Roll the VPS to that image**, not yet a verified production release. Do not claim these code SHA releases deployed without successful non-skipped job logs and health probes.
+Other new code: PR [#34](https://github.com/takatakca/r2neet/pull/34) compares streamed S3 GET SHA-256 with local dump; CI #38853348818 and non-skipped Deploy #38853464615 proved `02b0653c`. An initial failed PR test #38853010076 was corrected by updating a legacy HEAD-only fixture, then PR CI #38853224241 passed. PR [#35](https://github.com/takatakca/r2neet/pull/35) prunes expired local backups on S3 outage after a fresh dump; CI #38853881854, non-skipped Deploy #38853994829 proved `46fa61d3`. Keep older completed improvements in WORKLOG.
 
 ## Current task
 
-Branch `"+branch+"` adds `AbortSignal.timeout(10000)` to signed operational webhook POST requests, ensuring an unresponsive alert receiver cannot indefinitely stall a worker or backup failure recording. New tests in `tests/alert-webhook-timeout.test.ts` cover a successful POST with signal, hanging fetch rejection, and HTTP 503 failure. PR CI and VPS deploy pending. Final branch pushed SHA before this documentation: `"+head+"` (resolve actual SHA after docs commit).
+No code PR remains in progress. Next P0 is [production issue #25](https://github.com/takatakca/r2neet/issues/25): configure a real S3-compatible backup destination and actual alert endpoint using protected credentials, then perform a remote digest/restore drill and prove the encryption key, alert receipt, and worker history. Stripe signed webhook, Twilio/Supabase phone OTP, Maps/dispatch and real booking/staff/payment acceptance also remain. If providers remain blocked, continue a different independent code issue without claiming them live.
 
-## Files modified
+## Modified files this session
 
-Current: `src/workers/health.ts`, `tests/alert-webhook-timeout.test.ts`, `WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, `docs/DECISIONS.md`.
-Prior session: `src/workers/object-storage.ts`, `tests/object-storage-integrity.test.ts`, `tests/infrastructure.test.ts`, `scripts/loop-backup.ts`, `scripts/backup-retention.ts`, `tests/backup-retention.test.ts` and recovery/monitoring docs.
+`src/workers/object-storage.ts`, `tests/object-storage-integrity.test.ts`, `tests/infrastructure.test.ts`, `scripts/loop-backup.ts`, `scripts/backup-retention.ts`, `tests/backup-retention.test.ts`, `src/workers/health.ts`, `tests/alert-webhook-timeout.test.ts`, `WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, `docs/DECISIONS.md`, `docs/reservation-system/monitoring.md`, `docs/reservation-system/disaster-recovery.md`.
 
-## Checks executed / last known deployed SHA
+## Last pushed SHA, checks actually executed, and production evidence
 
-On GitHub reviewed repo HEAD, open PRs, WORKLOG/AGENTS, backup and alert code, issues, CI and deployment status. PR #34 and #35 green CI, main #34 and #35 green CI. CI/deploy for this alert timeout code remain pending. No local `npm ci`, database changes, Stripe charge, Twilio OTP or real S3 restore were run. Most recent **independently verified production** image remains `f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31` ([CI #38849810401](https://github.com/takatakca/r2neet/actions/runs/38849810401), [Deploy #38849959878](https://github.com/takatakca/r2neet/actions/runs/38849959878), exact SHA, /healthz and /readyz). This may be superseded ONLY with new proven logs.
+Last **verified functional** `main` SHA and VPS image: `56cde1b6ddd98be1cb146c9d33fff3d91ca6d51d`; main CI #38854383066 and non-skipped Deploy #38854525800 succeeded. The **documentation-only closure commit containing this handoff** will have a newer Git SHA: immediately resolve `refs/heads/main` and check its own main CI plus non-skipped deployment before asserting that newer image runs. This distinction avoids creating a false self-referential SHA.
 
-## Known errors / access
+GitHub connector actually used to read source, AGENTS, status files, PRs/issues, Actions job summaries and completed deployment logs; created review branches/commits and merged only passing PR #34/#35/#36. CI ran TypeScript, Vite, Prisma migrations, 728+ Vitest tests/invariants, safety and container checks. No local `npm ci`, real provider payment, real SMS, real S3 storage/restore or paging receipt was run in this chat. The network browser could not independently open public /healthz; rely on the verified VPS job probes, not an invented external smoke.
 
-Deploy #38853464615 ran unusually long at its VPS rolling step. Its final job state and logs MUST be inspected. Missing actual production configuration per [issue #25](https://github.com/takatakca/r2neet/issues/25): Stripe live card and signed webhook, Twilio Voice/SMS and phone Auth, Google Maps, dispatch coordinates, off-host S3, alert webhook, real remote restore and worker/customer acceptance. No provider secrets have been installed. TAKATAK receiver [PR #175](https://github.com/takatakca/takatak-v1/pull/175) OPEN at last check: keep sender disabled; no cross-tenant shortcuts. Historical docs PR #17 remains unrelated/stale. Protected credentials from authorized owner needed for actual integration proof, not for these code fixes.
+## Known blockers, errors and required access
 
-## Exact next action
+- The real production deploy logs for #38854525800 warn missing Stripe keys/webhook, Twilio Voice/SMS, Maps, dispatch origin, S3 credentials, alert webhook. These require owner/provider admin to provision through the approved protected server/GitHub environment; **no secrets in GitHub, issues, or chat**.
+- TAKATAK receiving [PR #175](https://github.com/takatakca/takatak-v1/pull/175) was still OPEN as checked this session. Keep `TAKATAK_R2NETTE_SYNC_ENABLED=false` pending signed/HMAC tenant verification.
+- Historical docs PR #17 remains open with 2026-10-08 rollout evidence; do not blindly merge stale claims.
+- PR #34 initially failed one old HEAD-only test before correction. Corrected PR CI and all main CI passes; no unresolved test failure on latest verified functional release.
 
-1. Check Deploy #38853464615 for non-skipped success and `Deploy verified for commit 02b0653c...`; diagnose any failure rather than re-running blindly. Check queued Deploy #38853994829 and exact SHA health proof for `46fa61d3...`.
-2. Open this alert timeout branch PR; require complete green CI, fix failures and merge only passing changes.
-3. Check final main CI and non-skipped deployment, update WORKLOG and handoff with exact deployed SHA, then advance issue #25 provider/restore/alert acceptance or the next executable code defect.
+## Next exact action
+
+1. Check GitHub's current `main` SHA after this handoff docs commit, then verify matching CI and **non-skipped** Deploy; if failed inspect failing job and correct, keeping last known good `56cde1b6` reference.
+2. Work issue #25 with owner-provided protected access: configure real S3/alert, run and prove remote object integrity + scratch restore and MFA/key data + alert delivery. Then actual Stripe signed webhook and OTP/customer/staff acceptance; do not declare completion without proof.
+3. Keep `WORKLOG.md` and these five continuity files current after every subsequent release, without overwriting other agents' work.
