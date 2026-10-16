@@ -41,4 +41,12 @@ while IFS= read -r ref; do
     removed=$((removed + 1))
   fi
 done < <(docker image ls --format '{{.Repository}}:{{.Tag}}' "$repo")
+# Docker/containerd can retain dangling R2NETTE layers from earlier failed
+# pulls. This label-scoped prune removes only dangling R2NETTE images; it
+# cannot touch running images, volumes, or unrelated Coolify projects.
+docker image prune --force --filter "label=org.opencontainers.image.title=r2nette" >/dev/null 2>&1 || true
 echo "Removed $removed unused old R2NETTE image tags; protected active/rollback and shared images."
+if [[ -d /var/lib/containerd ]]; then
+  echo "Contabo containerd filesystem headroom:"
+  df -h /var/lib/containerd || true
+fi
