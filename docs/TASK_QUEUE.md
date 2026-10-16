@@ -1,11 +1,11 @@
 # R2NETTE — Task queue
 
-Last reviewed: 2026-10-15. Do not reset completed work. Respect `AGENTS.md` claims and open PRs.
+Last reviewed: 2026-10-16. Do not reset completed work. Respect `AGENTS.md` claims and open PRs.
 
 | Priority | Work | State / owner | Acceptance |
 | --- | --- | --- | --- |
 | P0 | Activate Stripe server configuration + signed webhook | BLOCKED: secure production values | Controlled test verifies amount, idempotency, webhooks, refund and booking state; no card details stored |
-| P0 | Fail closed on local-only backups; prevent minute-by-minute failed daily attempts | DONE: PR #32; deployed aa51fd30 | Scheduler failure backoff + missing-target alert + failure persistence with regression tests; deploy proof pending |
+| P0 | Fail closed on local-only backups; prevent minute-by-minute failed daily attempts | DONE: PR #32; deployed aa51fd30 | Scheduler failure backoff + missing-target alert + failure persistence with regression tests; CI #38848882332 and non-skipped Deploy #38849030331 verified |
 | P1 | Prevent PostgreSQL backup passwords leaking into process arguments | DONE: PR #33; deployed 1c140ac1 | Password removed from pg_dump argv, PGPASSWORD provided to child; regression tests and exact-SHA deployment verified |
 | P0 | Add off-host backup and alert destination | BLOCKED: provider choice and protected credentials | Scheduled backup verified by HEAD, off-host restore drill, matching encryption key and alert receipt |
 | P0 | Configure phone/voice/SMS and verify identity | BLOCKED: Twilio/Supabase provider setup | OTP delivery and verification, no production mock/guest bypass, approved message routing |
