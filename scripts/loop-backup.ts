@@ -14,6 +14,7 @@ import { loadS3Config, S3Storage } from '../src/workers/object-storage.js';
 import { AlertService, WebhookAlertSink } from '../src/workers/health.js';
 import { unlinkSync } from 'node:fs';
 import { requireOffHostBackup } from '../src/workers/backup-policy.js';
+import { pgCommandConnection } from './pg-cli.js';
 
 if (existsSync('.env')) {
   for (const line of readFileSync('.env', 'utf8').split('\n')) {
@@ -41,8 +42,10 @@ const scheduler = new Scheduler(
         mkdirSync(dir, { recursive: true });
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
         const file = `${dir}/r2nette-${stamp}.dump`;
-        execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-acl', '--file', file, url!], {
+        const connection = pgCommandConnection(url!);
+        execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-acl', '--file', file, connection.url], {
           stdio: ['ignore', 'inherit', 'inherit'],
+          env: connection.env,
         });
 
         // Do not report a local-only dump as a successful backup. The local
