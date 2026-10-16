@@ -20,6 +20,12 @@ Server-controlled booking quotes and pricing, saved customer bookings/account, c
 
 Documentation closure `f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31` passed CI and exact-SHA deployment. PR #34 added signed streamed S3 GET and remote SHA-256 verification, passed PR CI #38853224241 and merged as `02b0653cfc33b6472879f7ac38268b3aa4efedb2`; matching main CI and non-skipped Contabo deployment have not yet been proven in this snapshot. Branch `chatgpt/backup-local-retention-20261016` adds safe local fallback retention on S3 outage; that feature remains CI/deploy pending.
 
+## Recent code merged, release pending
+
+- PR #34: streamed actual S3 GET SHA-256 verification merged `02b0653c` (CI #38853348818 green); Deploy #38853464615 still in VPS roll at last check, so release unverified.
+- PR #35: local fallback dump retention after successful pg_dump and before any S3 failures merged `46fa61d3` (CI #38853881854 green); Deploy #38853994829 pending behind PR #34.
+- Branch `chatgpt/alert-webhook-deadline-20261016` adds 10-second alert webhook timeout, preventing a stalled sink from hanging backup workers. PR CI/deploy unverified.
+
 ## External launch blockers
 
 The most recent deploy still warned that Stripe secret/publishable/webhook settings, Twilio Voice/SMS, Google Maps, dispatch origin, off-host S3 backups and alert webhook are absent. See [issue #25](https://github.com/takatakca/r2neet/issues/25). No real end-to-end charge, signed webhook, phone OTP, off-host restore, operational paging receipt or every-role booking smoke has been proven. Credentials belong in protected environments, not GitHub source, PRs or logs.

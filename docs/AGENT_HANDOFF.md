@@ -1,34 +1,32 @@
 # R2NETTE — Agent handoff
 
-Snapshot: **2026-10-16**. Read AGENTS.md, WORKLOG.md, docs/TASK_QUEUE.md, docs/PROJECT_STATUS.md, docs/DEPLOYMENT.md and docs/DECISIONS.md before changes. Respect current GitHub HEAD and open PRs.
+Snapshot: **2026-10-16**. Restart by reading AGENTS.md, WORKLOG.md and all five docs/* continuity files. Recheck main HEAD, recent open PRs, main CI, deployed exact SHA; do not redo previous agents' work.
 
-## Last completed work
+## Last completed change
 
-PR #34 `chatgpt/s3-verified-backup-digest-20261016`: signed streamed GET calculates SHA-256 of S3 remote object after PUT/HEAD and compares with local hash/size. Earlier PR CI #38853010076 failed because an old test fixture simulated only PUT/HEAD. Fixed legacy fixture, added five fake-gateway regression tests, then PR CI [#38853224241](https://github.com/takatakca/r2neet/actions/runs/38853224241) passed. PR [#34](https://github.com/takatakca/r2neet/pull/34) squash-merged as `02b0653cfc33b6472879f7ac38268b3aa4efedb2`. Main CI [#38853348818](https://github.com/takatakca/r2neet/actions/runs/38853348818) was in progress at snapshot; **do not mark this SHA deployed until a matching non-skipped Deploy and exact health probes are observed**.
+PR [#35](https://github.com/takatakca/r2neet/pull/35) adds safe local retention after a valid fresh pg_dump even when S3 is unavailable. PR CI #38853550724 passed and merge SHA is `46fa61d32d1ff8b973d2910f597c5cacd992948a`; main CI #38853881854 passed. Matching Deploy #38853994829 was **PENDING** behind the preceding release. The feature is merged but its VPS rollout is NOT yet verified.
 
-Earlier PR #33 scrubbed DB passwords from pg_dump process arguments, PR #32 bounded daily failed backup retries. Both deployed and verified; see WORKLOG.
+PR [#34](https://github.com/takatakca/r2neet/pull/34) compares streamed S3 remote SHA-256 against local dump, catching same-length corruption; initial PR CI #38853010076 failed due a historical HEAD-only mock; corrected and PR CI #38853224241 passed. Merge `02b0653cfc33b6472879f7ac38268b3aa4efedb2`, main CI #38853348818 passed. [Deploy #38853464615](https://github.com/takatakca/r2neet/actions/runs/38853464615) was **IN PROGRESS, Roll the VPS to that image**, not yet a verified production release. Do not claim these code SHA releases deployed without successful non-skipped job logs and health probes.
 
 ## Current task
 
-Branch `"+branch+"`: after a successful fresh PostgreSQL dump, prune only expired regular local fallback files even if off-host S3 upload later fails. Existing retention was after successful S3 and never executed on failure, potentially filling the disk during prolonged outages. Adds `scripts/backup-retention.ts`, modifies `scripts/loop-backup.ts`, and adds `tests/backup-retention.test.ts`. Validate `BACKUP_KEEP_DAYS` (1–365), ignore unrelated files/symlinks, keep fresh dump. **PR CI and production deployment pending.**
+Branch `"+branch+"` adds `AbortSignal.timeout(10000)` to signed operational webhook POST requests, ensuring an unresponsive alert receiver cannot indefinitely stall a worker or backup failure recording. New tests in `tests/alert-webhook-timeout.test.ts` cover a successful POST with signal, hanging fetch rejection, and HTTP 503 failure. PR CI and VPS deploy pending. Final branch pushed SHA before this documentation: `"+head+"` (resolve actual SHA after docs commit).
 
 ## Files modified
 
-This task: `scripts/loop-backup.ts`, `scripts/backup-retention.ts`, `tests/backup-retention.test.ts`, `WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, `docs/DECISIONS.md`, `docs/reservation-system/disaster-recovery.md`.
-Previous PR #34: `src/workers/object-storage.ts`, `tests/object-storage-integrity.test.ts`, `tests/infrastructure.test.ts`, and agent docs.
+Current: `src/workers/health.ts`, `tests/alert-webhook-timeout.test.ts`, `WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, `docs/DECISIONS.md`.
+Prior session: `src/workers/object-storage.ts`, `tests/object-storage-integrity.test.ts`, `tests/infrastructure.test.ts`, `scripts/loop-backup.ts`, `scripts/backup-retention.ts`, `tests/backup-retention.test.ts` and recovery/monitoring docs.
 
-## Latest pushed SHA / actually run checks
+## Checks executed / last known deployed SHA
 
-Branch last functional commit before these docs: `"+head+"`. Resolve final branch HEAD after docs push. Main HEAD at branch start: `02b0653cfc33b6472879f7ac38268b3aa4efedb2` (PR #34 merge). Latest **verified deployed** release at start: `f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31` ([CI #38849810401](https://github.com/takatakca/r2neet/actions/runs/38849810401), [Deploy #38849959878](https://github.com/takatakca/r2neet/actions/runs/38849959878); /healthz, /readyz and exact SHA passed). Later releases must be separately verified.
+On GitHub reviewed repo HEAD, open PRs, WORKLOG/AGENTS, backup and alert code, issues, CI and deployment status. PR #34 and #35 green CI, main #34 and #35 green CI. CI/deploy for this alert timeout code remain pending. No local `npm ci`, database changes, Stripe charge, Twilio OTP or real S3 restore were run. Most recent **independently verified production** image remains `f1d56bf6c6ea0e14955d78cf52e5c167a48cdc31` ([CI #38849810401](https://github.com/takatakca/r2neet/actions/runs/38849810401), [Deploy #38849959878](https://github.com/takatakca/r2neet/actions/runs/38849959878), exact SHA, /healthz and /readyz). This may be superseded ONLY with new proven logs.
 
-GitHub actions executed: read files/PRs/issues/CI and deployments; wrote GitHub branch trees/commits, reviewed CI log for failed old PUT/HEAD test and corrected it; verified PR #34 tests passed. No local `npm ci`, live S3 provider, Stripe charge, OTP SMS or real restore drill executed.
+## Known errors / access
 
-## Problems, errors, access
+Deploy #38853464615 ran unusually long at its VPS rolling step. Its final job state and logs MUST be inspected. Missing actual production configuration per [issue #25](https://github.com/takatakca/r2neet/issues/25): Stripe live card and signed webhook, Twilio Voice/SMS and phone Auth, Google Maps, dispatch coordinates, off-host S3, alert webhook, real remote restore and worker/customer acceptance. No provider secrets have been installed. TAKATAK receiver [PR #175](https://github.com/takatakca/takatak-v1/pull/175) OPEN at last check: keep sender disabled; no cross-tenant shortcuts. Historical docs PR #17 remains unrelated/stale. Protected credentials from authorized owner needed for actual integration proof, not for these code fixes.
 
-Issue [#25](https://github.com/takatakca/r2neet/issues/25) still needs real Stripe keys and signed webhook, Twilio/Supabase phone provider, Maps/dispatch origin, S3 credentials, alert webhook, off-host scratch restore and real end-to-end smoke. No secrets were added. TAKATAK receiver [PR #175](https://github.com/takatakca/takatak-v1/pull/175) was still OPEN at last check; sync stays disabled. Historical PR #17 is stale; do not overwrite later deployment evidence.
+## Exact next action
 
-## Next exact step
-
-1. Verify PR #34 **main CI #38853348818** and matching **non-skipped Deploy** for `02b0653c...`, including `/healthz ok`, `/readyz ok`, and `Deploy verified for commit 02b0653c...`.
-2. Open the new local-retention PR and wait for CI. Fix any failing tests before merging. Do not merge prematurely if doing so would intentionally skip an in-flight prior deployment.
-3. After this PR passes and merges, check its own main CI and non-skipped deploy; update exact SHA in this handoff. Continue issue #25 S3/alert/restore when protected credentials are supplied.
+1. Check Deploy #38853464615 for non-skipped success and `Deploy verified for commit 02b0653c...`; diagnose any failure rather than re-running blindly. Check queued Deploy #38853994829 and exact SHA health proof for `46fa61d3...`.
+2. Open this alert timeout branch PR; require complete green CI, fix failures and merge only passing changes.
+3. Check final main CI and non-skipped deployment, update WORKLOG and handoff with exact deployed SHA, then advance issue #25 provider/restore/alert acceptance or the next executable code defect.
