@@ -16,6 +16,12 @@
 - [PR #36](https://github.com/takatakca/r2neet/pull/36): alert webhooks have a bounded 10-second deadline; hung receivers cannot block failure reporting indefinitely. PR CI #38854212430 and main CI #38854383066 passed; **Deploy #38854525800** verified `56cde1b6`.
 - Earlier: PR #26 Unicode-safe ICS; #27 private draft storage; #28 HTTP error hardening; #29 Docker npm recovery; #30 rate-limiter trusted proxy; #32 backup fail-closed and once/day attempts; #33 pg_dump argv password protection. Preserve all prior work.
 
+## Current branch (NOT deployed)
+
+`chatgpt/s3-stream-upload-20261016` replaces the in-memory `readFileSync` backup upload with SHA-256 hashing in a bounded read stream followed by a signed stream PUT; files above the S3 5 GiB single-operation limit fail safely. New `tests/object-storage-stream.test.ts` covers request signature equivalence, streamed bytes, upload errors, and oversized file rejection. This is pending PR CI, merge, and release verification. No real off-host destination has been configured by the change.
+
+The last verified main release is **`1a8de4abe8bf24dc0e5742070590d1fd974efe9b`**, supported by [CI #38855018334](https://github.com/takatakca/r2neet/actions/runs/38855018334) and [non-skipped Deploy #38855160513](https://github.com/takatakca/r2neet/actions/runs/38855160513) with both health probes and exact SHA proof.
+
 ## Operational blockers — no false successes
 
 [Issue #25](https://github.com/takatakca/r2neet/issues/25) remains open. Latest deployment still explicitly warns that Stripe live keys and signed webhook, Twilio Voice/SMS, Google Maps, dispatch origin, S3 off-host storage, and signed alert webhook are NOT configured. Phone/Google login, real card payments, off-host restore with matching encryption key, worker receipt monitoring, alert delivery and full customer/staff booking acceptance remain unproven. Integrations present in code are not evidence of activation.

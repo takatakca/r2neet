@@ -117,6 +117,10 @@ local-only dump is never recorded as a completed backup.
 Each run records the encryption key id the dump requires — a restore can
 confirm it holds matching key material before trusting the file.
 
+## Memory-safe S3 backup uploads (new code, release pending)
+
+Branch `chatgpt/s3-stream-upload-20261016` computes SHA-256 by sequentially streaming a PostgreSQL dump, then streams the signed PUT from disk without loading the dump into process heap. Objects over the 5 GiB single-PUT limit fail closed with an actionable error; multipart upload is not yet implemented. Remote HEAD and signed GET verification remains required. The PR and exact-SHA production rollout have not been confirmed, and actual S3 provider credentials plus scratch restore are still outstanding.
+
 ## Still needs a decision from the owner
 
 - Which S3-compatible provider, and its credentials
