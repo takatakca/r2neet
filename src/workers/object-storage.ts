@@ -1,5 +1,6 @@
 import { createHash, createHmac } from 'node:crypto';
-import { readFileSync, statSync } from 'node:fs';
+import { createReadStream, statSync } from 'node:fs';
+import { Readable } from 'node:stream';
 
 /**
  * Off-host backup storage over the S3 API.
@@ -69,12 +70,21 @@ export interface SignedRequest {
   headers: Record<string, string>;
 }
 
+/** A precomputed digest signs large files without buffering them in memory. */
+export interface SignedPayloadDigest {
+  sha256: string;
+  size: number;
+}
+
+/** A single S3 PUT is limited to 5 GiB. Larger dumps require multipart upload. */
+export const MAX_SINGLE_PUT_BYTES = 5 * 1024 ** 3;
+
 /** Build a signed S3 request. Exposed so the signing can be tested directly. */
 export function signRequest(
   config: S3Config,
   method: string,
   key: string,
-  payload: Buffer | null,
+  payload: Buffer | SignedPayloadDigest | null,
   at: Date = new Date(),
 ): SignedRequest {
   const amzDate = at.toISOString().replace(/[:-]|\.\d{3}/g, '');
@@ -97,7 +107,10 @@ export function signRequest(
       ? `${base}${path}`
       : `https://${config.bucket}.s3.${config.region}.amazonaws.com/${encodedKey}`;
 
-  const payloadHash = payload ? sha256Hex(payload) : sha256Hex('');
+  const payloadHash = payload === null
+    ? sha256Hex('')
+    : Buffer.isBuffer(payload) ? sha256Hex(payload) : payload.sha256;
+  const payloadSize = payload === null ? 0 : Buffer.isBuffer(payload) ? payload.length : payload.size;
   const signedHost = config.endpoint || config.forcePathStyle ? host : new URL(url).host;
 
   const headers: Record<string, string> = {
@@ -105,7 +118,7 @@ export function signRequest(
     'x-amz-content-sha256': payloadHash,
     'x-amz-date': amzDate,
   };
-  if (payload) headers['content-length'] = String(payload.length);
+  if (payload !== null) headers['content-length'] = String(payloadSize);
 
   const signedHeaderNames = Object.keys(headers).sort();
   const canonicalHeaders = signedHeaderNames.map((h) => `${h}:${headers[h]}\n`).join('');
@@ -168,21 +181,43 @@ export class S3Storage {
   }
 
   async putFile(key: string, filePath: string): Promise<{ key: string; size: number; sha256: string }> {
-    const body = readFileSync(filePath);
-    const sha256 = createHash('sha256').update(body).digest('hex');
-    const { url, headers } = signRequest(this.config, 'PUT', key, body);
-
-    // Not signed (S3 does not require it), but real gateways and proxies
-    // expect a content type on a binary upload.
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: { ...headers, 'content-type': 'application/octet-stream' },
-      body: new Uint8Array(body),
-    });
-    if (!res.ok) {
-      throw new StorageError(`Upload failed with ${res.status}.`, 'UPLOAD_FAILED');
+    const size = statSync(filePath).size;
+    if (size > MAX_SINGLE_PUT_BYTES) {
+      throw new StorageError('Backup exceeds the S3 single-PUT limit; multipart upload is required.', 'UPLOAD_TOO_LARGE');
     }
-    return { key, size: statSync(filePath).size, sha256 };
+
+    // SigV4 needs the payload hash *before* sending a request. Hash the file
+    // once in bounded chunks, then stream it from disk on the second pass.
+    // Never allocate a Buffer proportional to the size of the database dump.
+    const hash = createHash('sha256');
+    let hashedBytes = 0;
+    for await (const chunk of createReadStream(filePath)) {
+      hash.update(chunk);
+      hashedBytes += (chunk as Buffer).byteLength;
+    }
+    if (hashedBytes !== size) {
+      throw new StorageError('Backup changed while hashing; refusing an unverifiable upload.', 'UPLOAD_FILE_CHANGED');
+    }
+    const sha256 = hash.digest('hex');
+    const { url, headers } = signRequest(this.config, 'PUT', key, { sha256, size });
+
+    // Node fetch requires duplex:'half' for streamed request bodies. The
+    // gateway validates the signed SHA-256 of the exact uploaded bytes.
+    const body = createReadStream(filePath);
+    try {
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { ...headers, 'content-type': 'application/octet-stream' },
+        body: Readable.toWeb(body) as unknown as BodyInit,
+        duplex: 'half',
+      } as RequestInit & { duplex: 'half' });
+      if (!res.ok) {
+        throw new StorageError(`Upload failed with ${res.status}.`, 'UPLOAD_FAILED');
+      }
+    } finally {
+      body.destroy();
+    }
+    return { key, size, sha256 };
   }
 
   /**
