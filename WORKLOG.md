@@ -3,6 +3,10 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-10-16 | ChatGPT | chatgpt/alert-webhook-deadline-20261016 → PR pending | active | Abort hung alert webhook requests after 10 seconds so failed backup/worker reporting never hangs indefinitely | PR CI; merge green; exact SHA/health deploy
+- 2026-10-16 | ChatGPT | chatgpt/backup-local-retention-20261016 → PR #35 | merged, deploy pending | Prune expired local dumps after fresh pg_dump even when S3 unavailable | PR CI #38853550724, main CI #38853881854 green; merged 46fa61d3; Deploy #38853994829 queued behind PR34 rollout
+- 2026-10-16 | ChatGPT | chatgpt/s3-verified-backup-digest-20261016 → PR #34 | merged, deploy pending | Remote streamed GET checksum verifies actual S3 bytes; old HEAD-only test fixture corrected | PR CI #38853224241, main CI #38853348818 green; merged 02b0653c; Deploy #38853464615 still rolling as checked
+
 - 2026-10-16 | ChatGPT | chatgpt/backup-local-retention-20261016 → PR pending | active | Prevent failed S3/local-only backups skipping retention indefinitely; bounded safe local file pruning after fresh pg_dump | CI → green merge → non-skipped deploy after PR #34 release
 - 2026-10-16 | ChatGPT | chatgpt/s3-verified-backup-digest-20261016 → PR #34 | merged; deploy pending | Signed streaming GET hashes remote S3 object, rejects same-size corruption/truncation; fixed legacy HEAD fixture | PR CI #38853224241 green; merged 02b0653c, main CI #38853348818 pending
 
