@@ -19,6 +19,12 @@ GitHub `main` triggers CI and then SHA-tagged Docker Compose Deploy on the Conta
 3. Merge only green PR. Confirm matching main CI and exact-SHA Deploy log, **including** an executed `Roll the VPS to that image` step, `/healthz ok`, `/readyz ok`, and `Deploy verified for commit <sha>`. A green skipped deployment is not a release.
 4. Verify public TLS, actual operation/worker evidence and customer smoke before declaring business acceptance. Track previous known-good SHA for rollback; read the runbook before destructive or recovery commands.
 
+## Latest verified handoff closure
+
+The docs closure commit `1a8de4abe8bf24dc0e5742070590d1fd974efe9b` also passed [CI #38855018334](https://github.com/takatakca/r2neet/actions/runs/38855018334) and **non-skipped** [Deploy #38855160513](https://github.com/takatakca/r2neet/actions/runs/38855160513), including `/healthz ok`, `/readyz ok` and exact SHA log. This is the latest proven running image before the streaming-upload PR.
+
+Pending branch `chatgpt/s3-stream-upload-20261016`: two-pass streaming SHA-256 + signed S3 PUT removes full dump allocation and guards >5 GiB single PUT requests. PR CI, merge and non-skipped VPS roll are still required; never call provider backups operational based only on unit tests.
+
 ## Known missing production configuration
 
 The newest deploy still warns: Stripe cards and signed webhook, Twilio Voice/SMS, Maps, dispatch origin, off-host S3 backup and alert webhook have no protected production configuration. Source code defaults to safe degraded behavior. Real S3 restore and alert receipt NOT verified. Real Stripe payment, OTP, authenticated customer/crew workflows NOT verified. Issue [#25](https://github.com/takatakca/r2neet/issues/25) owns acceptance. Keep TAKATAK event synchronization **disabled** while receiver PR #175 remains unverified. Protected secrets must not enter source, logs, or chat.

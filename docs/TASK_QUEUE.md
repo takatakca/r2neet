@@ -14,6 +14,8 @@ Reviewed: **2026-10-16**. Continue from `AGENTS.md`, `WORKLOG.md` and `docs/AGEN
 | P2 | Review historical PR #17 | OPEN, unrelated 2026-10-08 rollout notes | Retain history without replacing newer evidence |
 | P2 | Keep five agent docs and WORKLOG current | ONGOING | Correct latest SHA, non-skipped deployment proof and next action |
 
+| P1 | Bound database dump upload memory for large PostgreSQL backups | IN PROGRESS: chatgpt/s3-stream-upload-20261016 | Signed two-pass streamed PUT, 5 GiB single-PUT limit and streaming regression tests; CI/roll pending |
+
 ## Completed and deployed
 
 - PR #34 S3 streamed remote SHA-256 verification, CI #38853348818, Deploy #38853464615 (`02b0653c`).
