@@ -14,6 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { keyFingerprint } from '../src/auth/encryption.js';
+import { pgCommandConnection } from './pg-cli.js';
 
 if (existsSync('.env')) {
   for (const line of readFileSync('.env', 'utf8').split('\n')) {
@@ -42,8 +43,10 @@ const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const file = `${dir}/r2nette-${stamp}.dump`;
 
 try {
-  execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-acl', '--file', file, url], {
+  const connection = pgCommandConnection(url);
+  execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-acl', '--file', file, connection.url], {
     stdio: ['ignore', 'inherit', 'inherit'],
+    env: connection.env,
   });
   const bytes = statSync(file).size;
   if (bytes < 1024) throw new Error(`Dump is suspiciously small (${bytes} bytes).`);
