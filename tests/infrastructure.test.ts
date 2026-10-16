@@ -416,6 +416,13 @@ describe('off-host upload verification', () => {
     };
     (s3 as unknown as { head: unknown }).head = async (key: string) =>
       stored.has(key) ? { key, size: stored.get(key)! } : null;
+    // This fixture only exercises existence/size. The new integration-style
+    // tests in object-storage-integrity.test.ts exercise signed GET and hash
+    // verification, including equal-size corruption and truncated payloads.
+    (s3 as unknown as { digest: unknown }).digest = async (key: string) => ({
+      size: stored.get(key) ?? 0,
+      sha256: 'abc',
+    });
     return s3;
   }
 
