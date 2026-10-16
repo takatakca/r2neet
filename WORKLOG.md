@@ -3,6 +3,9 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-10-16 | ChatGPT | chatgpt/backup-pg-cli-secret-protection-20261015 → PR #33 | done | Strip database password from pg_dump argv and use child PGPASSWORD; regression tests | PR CI #38849124573, main CI #38849296051, Deploy #38849434426 all green; 1c140ac1 verified
+- 2026-10-16 | ChatGPT | chatgpt/backup-daily-failure-hardening-20261015 → PR #32 | done | Once-a-day retry after failed daily backup; local-only backup FAILS and opens incident | PR CI #38848750100, main CI #38848882332, Deploy #38849030331 verified aa51fd30
+
 - 2026-10-15 | ChatGPT | chatgpt/backup-daily-failure-hardening-20261015 → PR pending | active | Failed daily jobs attempt once per Toronto calendar day; local-only backup dumps record FAILED + incident instead of SUCCESS | CI then deploy and verify
 
 - 2026-10-15 | ChatGPT | main | done | Verified CI #38778348493 and actual non-skipped Contabo deploy #38778654257 for 2ca571af with /healthz and /readyz OK | next: issue #25 provider setup and real end-to-end acceptance
