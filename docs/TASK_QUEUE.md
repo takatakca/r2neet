@@ -16,6 +16,8 @@ Reviewed: **2026-10-16**. Continue from `AGENTS.md`, `WORKLOG.md` and `docs/AGEN
 
 | P1 | Bound database dump upload memory for large PostgreSQL backups | IN PROGRESS: chatgpt/s3-stream-upload-20261016 | Signed two-pass streamed PUT, 5 GiB single-PUT limit and streaming regression tests; CI/roll pending |
 
+| P1 | Reject incomplete or wrong-format pg_dump artifacts before treating backups as valid | IN PROGRESS: chatgpt/pgdump-artifact-validation-20261016 | PGDMP magic and minimum size for manual/scheduled paths, tests, CI and verified roll |
+
 ## Completed and deployed
 
 - PR #34 S3 streamed remote SHA-256 verification, CI #38853348818, Deploy #38853464615 (`02b0653c`).

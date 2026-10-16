@@ -25,6 +25,11 @@ The docs closure commit `1a8de4abe8bf24dc0e5742070590d1fd974efe9b` also passed [
 
 Pending branch `chatgpt/s3-stream-upload-20261016`: two-pass streaming SHA-256 + signed S3 PUT removes full dump allocation and guards >5 GiB single PUT requests. PR CI, merge and non-skipped VPS roll are still required; never call provider backups operational based only on unit tests.
 
+## Current release queue, not yet fully verified
+
+- PR #37 streamed signed S3 upload merged at `7d03a38522d82a45760aeb69e584d468128fad52`; PR CI #38950086842 passed. Main CI #38950346352 and non-skipped matching Deploy remain to be verified.
+- Branch `chatgpt/pgdump-artifact-validation-20261016` adds PGDMP header/size artifact validation to manual and nightly backups. PR CI, main merge and SHA-linked deploy are pending.
+
 ## Known missing production configuration
 
 The newest deploy still warns: Stripe cards and signed webhook, Twilio Voice/SMS, Maps, dispatch origin, off-host S3 backup and alert webhook have no protected production configuration. Source code defaults to safe degraded behavior. Real S3 restore and alert receipt NOT verified. Real Stripe payment, OTP, authenticated customer/crew workflows NOT verified. Issue [#25](https://github.com/takatakca/r2neet/issues/25) owns acceptance. Keep TAKATAK event synchronization **disabled** while receiver PR #175 remains unverified. Protected secrets must not enter source, logs, or chat.

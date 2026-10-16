@@ -22,6 +22,12 @@
 
 The last verified main release is **`1a8de4abe8bf24dc0e5742070590d1fd974efe9b`**, supported by [CI #38855018334](https://github.com/takatakca/r2neet/actions/runs/38855018334) and [non-skipped Deploy #38855160513](https://github.com/takatakca/r2neet/actions/runs/38855160513) with both health probes and exact SHA proof.
 
+## New independent safeguard in review
+
+Branch `chatgpt/pgdump-artifact-validation-20261016` adds shared `scripts/backup-validation.ts` checks for PGDMP custom-format header and minimum size, invoked by both scheduled and manual pg_dump. Files failing validation remain on disk; scheduled backup does not upload or prune before validation. Tests in `tests/backup-validation.test.ts`. PR CI, merge, and deployment are NOT verified.
+
+PR #37 merged at `7d03a38522d82a45760aeb69e584d468128fad52` after green PR CI #38950086842. Main CI #38950346352 and an actual matching Contabo deploy still need verification before calling it deployed.
+
 ## Operational blockers — no false successes
 
 [Issue #25](https://github.com/takatakca/r2neet/issues/25) remains open. Latest deployment still explicitly warns that Stripe live keys and signed webhook, Twilio Voice/SMS, Google Maps, dispatch origin, S3 off-host storage, and signed alert webhook are NOT configured. Phone/Google login, real card payments, off-host restore with matching encryption key, worker receipt monitoring, alert delivery and full customer/staff booking acceptance remain unproven. Integrations present in code are not evidence of activation.

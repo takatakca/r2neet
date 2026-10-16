@@ -1,33 +1,31 @@
 # R2NETTE — Agent handoff
 
-Updated 2026-10-16. On restart read `AGENTS.md`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, and `docs/DECISIONS.md` and check GitHub open PRs before new work.
+Snapshot **2026-10-16**. Read AGENTS.md, WORKLOG.md and docs/TASK_QUEUE.md, docs/PROJECT_STATUS.md, docs/DEPLOYMENT.md, docs/DECISIONS.md on every reactivation. GitHub main and exact deploy logs, not prior agent claims, are authoritative.
 
-## Last completed and deployed task
+## Last completed code change
 
-PR #36 bounded alert webhook delivery to ten seconds; main CI #38854383066 passed and Deploy #38854525800 performed an actual Contabo roll with `/healthz` and `/readyz` OK. PR #34 streamed S3 remote GET SHA-256 verification, non-skipped Deploy #38853464615; PR #35 bounded local backup retention, Deploy #38853994829. All are deployed. Prior authentication, ICS and backup fixes remain intact.
+PR [#37](https://github.com/takatakca/r2neet/pull/37) replaces in-memory PostgreSQL dump reads during S3 PUT with two-pass incremental SHA-256 hashing plus streamed signed PUT; rejects >5 GiB single PUT. PR CI [#38950086842](https://github.com/takatakca/r2neet/actions/runs/38950086842) passed. Merged as `7d03a38522d82a45760aeb69e584d468128fad52`; main CI [#38950346352](https://github.com/takatakca/r2neet/actions/runs/38950346352) was pending at last check, with NO matching production deployment confirmed yet. Do not assert PR #37 deployed without exact-SHA non-skipped deploy proof.
 
-The most recent **exactly verified production** release is `1a8de4abe8bf24dc0e5742070590d1fd974efe9b`. [CI #38855018334](https://github.com/takatakca/r2neet/actions/runs/38855018334) succeeded and the **non-skipped** [Deploy #38855160513](https://github.com/takatakca/r2neet/actions/runs/38855160513) shows `/healthz ok`, `/readyz ok`, `Deploy verified for commit 1a8de4abe8bf24dc0e5742070590d1fd974efe9b`. Don't infer deployment of later branch SHAs from CI alone.
+Most recent actually verified production image at start: `1a8de4abe8bf24dc0e5742070590d1fd974efe9b`, main CI #38855018334 success, non-skipped [Deploy #38855160513](https://github.com/takatakca/r2neet/actions/runs/38855160513) success with `/healthz ok`, `/readyz ok`, exact SHA marker. Earlier PRs #34/#35/#36 merged and verified on Contabo; see WORKLOG.
 
-## Current task and scope
+## Current task
 
-Branch `chatgpt/s3-stream-upload-20261016` fixes the S3 upload path that previously used `readFileSync(filePath)` and buffered entire PostgreSQL dumps. `src/workers/object-storage.ts` now first hashes the dump in bounded chunks and then streams a signed PUT with explicit Node fetch `duplex: 'half'`. The unchanged HEAD + signed streamed GET verification must still match remote SHA-256. Files exceeding S3's 5 GiB limit for a single PUT fail with `UPLOAD_TOO_LARGE` (multipart upload is not yet implemented). Added `tests/object-storage-stream.test.ts` with digest equivalence, streamed payload verification, failure and oversized-file cases.
+Branch `"+branch+"` protects manual and nightly backups from obviously invalid custom-format dump files even when pg_dump returns zero exit status. It implements `validatePostgresDump(file)` in `scripts/backup-validation.ts`, checks `PGDMP` magic + at least 1024 bytes, and calls the guard in `scripts/backup.ts` and `scripts/loop-backup.ts` **before** deleting any old fallback dumps or uploading off-host. Invalid local files remain for diagnostics. New `tests/backup-validation.test.ts` checks valid/malformed/empty/missing files. Last functional branch SHA before docs `"+head+"`; resolve final SHA after docs commit. **PR/CI/deploy pending**; do not claim code shipped.
 
-Last functional branch commit before docs update: `8c84a31d824ef3d2e52d4c68525200062fef6c19`. Resolve actual branch HEAD after the docs commit. This task has NOT yet passed CI or been deployed. Do not claim memory-safe uploads in production until a matching non-skipped rollout and health checks pass.
+## Files modified
 
-## Files modified in this session
+`scripts/backup.ts`, `scripts/loop-backup.ts`, `scripts/backup-validation.ts`, `tests/backup-validation.test.ts`, `WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, `docs/DECISIONS.md`, `docs/reservation-system/disaster-recovery.md`.
 
-`src/workers/object-storage.ts`, `tests/object-storage-stream.test.ts`, `WORKLOG.md`, `docs/AGENT_HANDOFF.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, `docs/DECISIONS.md`, `docs/reservation-system/monitoring.md`.
+## Evidence and actual checks executed
 
-## Checks actually executed
+GitHub connector read latest main refs, job status/log for existing release, PRs, issue #25, code for backup/storage and security tests; created GitHub branch and commits. PR #37 checks passed and merged, its new main CI and deployment remain to be verified. No local npm/Prisma command, live S3 backup, real payment, OTP or real restore has been performed during this task. The PGDMP check is a guard, NOT proof of a restorable database.
 
-GitHub API: read all agent continuity documents, main ref, latest CI/deploy summaries and **job log** #38855160513, open PR titles and issue #25, important backup/storage source, test and workflow files. Used GitHub Git tree/commit/ref writes to a new branch. **No local `npm ci`, production database copy, live S3 operation, stripe charge or real SMS authentication was performed.** Next technical validation is GitHub PR CI (TypeScript/build/Prisma/Vitest/security/container), then main CI and non-skipped VPS rollout.
+## Blockers/access
 
-## Known problems, access and security
-
-[Issue #25](https://github.com/takatakca/r2neet/issues/25) remains open: missing protected S3 destination and real restore, alert webhook/delivery, Stripe signed webhook/card policy, Twilio Voice/SMS and phone OTP, Maps/dispatch origin, end-to-end customer/staff acceptance. A real provider account/secure keys are necessary to validate operations; no new billable account or secret has been created. `takatakca/takatak-v1#175` receiver is still unproven; keep TAKATAK sync disabled and tenant boundaries intact. Historical docs PR #17 remains open and outdated. Provider secrets must never appear in GitHub comments/logs/docs.
+[Issue #25](https://github.com/takatakca/r2neet/issues/25): protected off-host S3 credentials and real scratch restore with matching encryption key, alert endpoint and receipt, Stripe live signed webhook, Twilio phone/SMS, Maps/dispatch and end-to-end booking/customer/staff acceptance remain unresolved. TAKATAK central receiver `takatakca/takatak-v1#175` not confirmed merged/deployed; keep sender disabled and preserve tenant isolation. Historical PR #17 is old rollout documentation; do not blindly merge. Never put secrets in source, logs or issues.
 
 ## Exact next action
 
-1. Open a PR for `chatgpt/s3-stream-upload-20261016`; watch CI, correct TypeScript/Vitest failures on the branch. If CI green and PR mergeable, squash merge to `main`.
-2. Verify the resulting main SHA CI, non-skipped Contabo Deploy, and exact `Deploy verified for commit <sha>`, `/healthz`, `/readyz`. Do not mistake a skipped release for a deployment.
-3. Update all five continuity files / WORKLOG with actual verified SHA, or move to an independent code task if the provider-dependent P0 acceptance remains blocked. Avoid documentation-only chains if they would cause unnecessary image rollouts.
+1. Check main CI #38950346352 and matching non-skipped Deploy for `7d03a385...`; log `Deploy verified for commit <sha>`, `/healthz ok` and `/readyz ok` must be seen before reporting success.
+2. Open current branch PR, run CI and fix any test failure, then merge if green. Check its main CI and actual VPS release as above; do not bypass protections.
+3. Reconcile WORKLOG and all five docs to latest verified SHA before ending. If provider credentials unavailable, continue independent source fixes without claiming 100% ready.

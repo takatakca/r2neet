@@ -3,6 +3,9 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-10-16 | ChatGPT | chatgpt/pgdump-artifact-validation-20261016 → PR pending | active | Validate PGDMP signature and minimum size of scheduled/manual database dumps before off-host upload and retention | PR CI, green merge, non-skipped SHA deploy
+- 2026-10-16 | ChatGPT | chatgpt/s3-stream-upload-20261016 → PR #37 | merged, production pending | Two-pass SHA-256 and streaming signed S3 PUT, no whole-file buffering | PR CI #38950086842 passed; merged 7d03a385; main CI #38950346352 pending
+
 - 2026-10-16 | ChatGPT | chatgpt/s3-stream-upload-20261016 → PR pending | active | Stream S3 backup uploads in bounded memory with two-pass SigV4 hashing, reject single PUT >5 GiB; add tests | PR CI → green merge → non-skipped Contabo deploy; S3 credentials/restore still blocked
 
 - 2026-10-16 | ChatGPT | chatgpt/alert-webhook-deadline-20261016 → PR #36 | done | 10-second alert webhook deadline prevents indefinite worker stall | PR CI #38854212430, main CI #38854383066, non-skipped Deploy #38854525800 verified 56cde1b6
