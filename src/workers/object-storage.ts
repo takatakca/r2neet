@@ -203,6 +203,38 @@ export class S3Storage {
     };
   }
 
+  /**
+   * Stream a remote GET into a SHA-256 digest. HEAD size alone can falsely
+   * accept a corrupt object with the exact same length, while ETag is not a
+   * reliable SHA-256 (multipart uploads and S3-compatible providers vary).
+   * Never buffer a second full database dump in memory just to verify it.
+   */
+  async digest(key: string): Promise<{ size: number; sha256: string }> {
+    const { url, headers } = signRequest(this.config, 'GET', key, null);
+    const res = await fetch(url, { method: 'GET', headers });
+    if (!res.ok) {
+      throw new StorageError(`Verification download failed with ${res.status}.`, 'VERIFY_DOWNLOAD_FAILED');
+    }
+    if (!res.body) {
+      throw new StorageError('Verification download returned no body.', 'VERIFY_EMPTY_BODY');
+    }
+
+    const hash = createHash('sha256');
+    let size = 0;
+    const reader = res.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        hash.update(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    return { size, sha256: hash.digest('hex') };
+  }
+
   async getBuffer(key: string): Promise<Buffer> {
     const { url, headers } = signRequest(this.config, 'GET', key, null);
     const res = await fetch(url, { method: 'GET', headers });
@@ -219,10 +251,11 @@ export class S3Storage {
   }
 
   /**
-   * Upload, then verify.
+   * Upload and verify the *actual remote bytes*, not only a reported size.
    *
-   * Only after a successful HEAD showing the right size is the backup
-   * considered stored off-host.
+   * HEAD proves the object exists and has the expected size. A streamed GET
+   * independently hashes the stored object, catching equal-size corruption
+   * without loading the full download into memory.
    */
   async putAndVerify(key: string, filePath: string) {
     const put = await this.putFile(key, filePath);
@@ -235,6 +268,16 @@ export class S3Storage {
         `Stored size ${info.size} does not match ${put.size}.`,
         'VERIFY_SIZE_MISMATCH',
       );
+    }
+    const remote = await this.digest(key);
+    if (remote.size !== put.size) {
+      throw new StorageError(
+        `Downloaded size ${remote.size} does not match ${put.size}.`,
+        'VERIFY_SIZE_MISMATCH',
+      );
+    }
+    if (remote.sha256 !== put.sha256) {
+      throw new StorageError('Stored backup checksum differs from the source.', 'VERIFY_HASH_MISMATCH');
     }
     return { ...put, verified: true as const };
   }
