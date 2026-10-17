@@ -9,6 +9,10 @@ name: Server admin
 #   disk-report   read-only: which directories, images, volumes, build cache
 #                 and logs fill the disk, for a deploy that failed with
 #                 "no space left on device". Deletes nothing.
+#   disk-reclaim  conservative cleanup of the same: Docker build cache,
+#                 untagged image layers, day-old exited one-off containers,
+#                 container logs over 100 MB, journal above 200 MB, apt
+#                 cache. Never tagged images, Coolify containers or volumes.
 # The log is public (public repository): nothing here prints a secret,
 # an application log line, or customer data.
 on:
@@ -18,7 +22,7 @@ on:
         description: What to do
         required: true
         type: choice
-        options: [status, restart-proxy, proxy-log, create-owner, disk-report]
+        options: [status, restart-proxy, proxy-log, create-owner, disk-report, disk-reclaim]
       owner_email:
         description: create-owner only — the owner's email
         required: false

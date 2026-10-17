@@ -105,6 +105,35 @@ case "$TASK" in
          npm run --silent staff:create -- --email '${OWNER_EMAIL}' --name '${OWNER_NAME}' --role OWNER"
     echo "Sign in at /admin with ${OWNER_EMAIL} and the password you saved as OWNER_INITIAL_PASSWORD, then change it and turn on two-step verification."
     ;;
+  # Conservative reclaim for a full shared Coolify disk. Only things that any
+  # app can rebuild or that nobody reads back: Docker build cache, dangling
+  # (untagged) image layers, stopped one-off containers, container log files
+  # over 100 MB (truncated in place, the container keeps running), the
+  # systemd journal above 200 MB and the apt package cache. It never removes
+  # tagged images (Coolify's and R2NETTE's rollback targets), containers that
+  # are running or stopped by Coolify, or any volume. If this is not enough,
+  # the operator decides what else goes, by hand, with disk-report in front
+  # of them.
+  disk-reclaim)
+    ssh_remote "set +e; \
+      echo '== Before'; df -h / 2>/dev/null | tail -n 1; \
+      echo; echo '== Docker build cache'; \
+      docker builder prune --all --force 2>&1 | tail -n 1; \
+      echo; echo '== Dangling image layers (untagged only; tagged images stay)'; \
+      docker image prune --force 2>&1 | tail -n 1; \
+      echo; echo '== Exited one-off containers older than a day (docker compose run leftovers)'; \
+      docker container prune --force --filter 'until=24h' 2>&1 | tail -n 1; \
+      echo; echo '== Container log files over 100 MB, truncated'; \
+      find /var/lib/docker/containers -name '*-json.log' -size +100M -printf '%s %p\n' 2>/dev/null | sort -rn | head -n 20; \
+      find /var/lib/docker/containers -name '*-json.log' -size +100M -exec truncate -s 0 {} + 2>/dev/null; \
+      echo; echo '== systemd journal'; \
+      journalctl --vacuum-size=200M 2>&1 | tail -n 1; \
+      echo; echo '== apt cache'; \
+      apt-get clean 2>/dev/null && echo cleaned; \
+      echo; echo '== After'; df -h / 2>/dev/null | tail -n 1; \
+      echo; echo 'Not touched: tagged images, Coolify containers, volumes. If / is still above 90%, run disk-report and decide by hand.'; \
+      true"
+    ;;
   *)
     echo "Unknown task: ${TASK}" >&2
     exit 1

@@ -156,10 +156,19 @@ instead of starting the bundled Caddy:
   df`, the largest directories, container log files over 50 MB, the journal
   size and R2NETTE's own images, backups volume and deploy logs. On a Coolify
   server the usual culprits are other applications' images and build cache,
-  container logs without a size cap, and stopped containers' volumes. Free
-  space as the server's operator, never with `docker system prune --volumes`
-  (it would delete R2NETTE's and the other apps' data), then re-run **Deploy**
-  with "Run workflow" on `main`.
+  container logs without a size cap, and stopped containers' volumes. Then
+  run **Server admin** → `disk-reclaim`: it prunes the Docker build cache,
+  untagged image layers, day-old exited one-off containers, container log
+  files over 100 MB, the journal above 200 MB and the apt cache, and prints
+  `df` before and after. It never removes tagged images (Coolify's and
+  R2NETTE's rollback targets), Coolify's containers or any volume. If `/` is
+  still above 90 % afterwards, the remaining space is in things only the
+  operator may judge: other apps' tagged images (`docker image prune -a`
+  removes every image no container uses, including rollback targets), old
+  Coolify deployments and their volumes, or big data inside a volume. Never
+  run `docker system prune --volumes`: it deletes R2NETTE's database and the
+  other apps' data. Once there is headroom, re-run **Deploy** with "Run
+  workflow" on `main`.
 
 The manual steps below do the same things by hand, and explain each one.
 
