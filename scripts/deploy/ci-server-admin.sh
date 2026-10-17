@@ -56,6 +56,32 @@ case "$TASK" in
       && echo \"Running image: \$(cat state/current-image-ref 2>/dev/null || echo none)\" \
       && echo \"Proxy: \$(cat state/proxy-mode 2>/dev/null || echo unknown)\""
     ;;
+  # Read-only. Answers "what is filling the disk" when a deploy dies with
+  # "no space left on device". The deploy's own cleanup only removes old
+  # R2NETTE images; on a shared Coolify server the space usually belongs to
+  # other apps' images, build cache, container logs or volumes, which only an
+  # operator may touch. Nothing here deletes anything. Sizes and paths only:
+  # no file contents, no environment, no customer data.
+  disk-report)
+    ssh_remote "set +e; \
+      echo '== Filesystems (the deploy needs headroom on /)'; \
+      df -h -x tmpfs -x devtmpfs -x overlay -x squashfs -x efivarfs 2>/dev/null; \
+      echo; echo '== Docker: images, containers, volumes, build cache'; \
+      docker system df 2>/dev/null || echo 'docker system df unavailable'; \
+      echo; echo '== Docker and containerd stores'; \
+      du -sh /var/lib/docker /var/lib/containerd /data/coolify 2>/dev/null; \
+      echo; echo '== Largest directories on / (same filesystem, depth 3, top 30)'; \
+      du -xh --max-depth=3 / 2>/dev/null | sort -rh | head -n 30; \
+      echo; echo '== Container log files over 50 MB'; \
+      find /var/lib/docker/containers -name '*-json.log' -size +50M -exec du -h {} + 2>/dev/null | sort -rh | head -n 20; \
+      echo; echo '== systemd journal'; \
+      journalctl --disk-usage 2>/dev/null; \
+      echo; echo '== R2NETTE images on this server'; \
+      docker image ls --filter 'reference=ghcr.io/*/r2neet' --format '{{.Tag}} {{.Size}} created {{.CreatedSince}}' 2>/dev/null; \
+      echo; echo '== R2NETTE backups volume and deploy logs'; \
+      du -sh /var/lib/docker/volumes/r2nette_backups /opt/r2nette/logs 2>/dev/null; \
+      true"
+    ;;
   create-owner)
     OWNER_EMAIL="${OWNER_EMAIL:-}"
     OWNER_NAME="${OWNER_NAME:-}"

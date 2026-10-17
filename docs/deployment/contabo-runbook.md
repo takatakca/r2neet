@@ -148,6 +148,18 @@ instead of starting the bundled Caddy:
   rewrites an older `.env` that still says `@postgres:5432` (host part only).
 - `restart-proxy` recreates only R2NETTE's `web` container, which makes
   Coolify's proxy retry the certificate without restarting the other apps.
+- **Deploy fails with `no space left on device`.** Deploy #48 (2026-10-16)
+  printed `/dev/sda1 96G 96G 550M 100% /` and `Removed 0 unused old R2NETTE
+  image tags`: the deploy's own cleanup had nothing left to reclaim, so the
+  disk is full of things that are not R2NETTE's. Run **Server admin** →
+  `disk-report` (read-only, deletes nothing). It prints `df`, `docker system
+  df`, the largest directories, container log files over 50 MB, the journal
+  size and R2NETTE's own images, backups volume and deploy logs. On a Coolify
+  server the usual culprits are other applications' images and build cache,
+  container logs without a size cap, and stopped containers' volumes. Free
+  space as the server's operator, never with `docker system prune --volumes`
+  (it would delete R2NETTE's and the other apps' data), then re-run **Deploy**
+  with "Run workflow" on `main`.
 
 The manual steps below do the same things by hand, and explain each one.
 

@@ -6,6 +6,9 @@ name: Server admin
 #   proxy-log     the proxy's certificate messages for this site
 #   create-owner  the first OWNER login; its password is the
 #                 OWNER_INITIAL_PASSWORD secret and is never printed
+#   disk-report   read-only: which directories, images, volumes, build cache
+#                 and logs fill the disk, for a deploy that failed with
+#                 "no space left on device". Deletes nothing.
 # The log is public (public repository): nothing here prints a secret,
 # an application log line, or customer data.
 on:
@@ -15,7 +18,7 @@ on:
         description: What to do
         required: true
         type: choice
-        options: [status, restart-proxy, proxy-log, create-owner]
+        options: [status, restart-proxy, proxy-log, create-owner, disk-report]
       owner_email:
         description: create-owner only — the owner's email
         required: false

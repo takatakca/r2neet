@@ -3,6 +3,7 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-10-17 | Claude | claude/hopeful-clarke-xvwac3 → PR pending | active | Disk P0: Deploy #38952711773 log shows / at 96G/96G (550M free) with 0 reclaimable R2NETTE images, so the space is other Coolify apps' (images, build cache, logs, volumes); added read-only Server admin `disk-report` task | owner runs disk-report (or df/docker system df over SSH), frees space as operator, re-runs Deploy on main; never `docker system prune --volumes`
 - 2026-10-17 | Claude | claude/hopeful-clarke-xvwac3 → PR pending | active | Customer login: format + validate 10 national digits before calling TAKATAK OTP (the "needs 10 digits" field report was an 11-digit typo); admin Integrations page probes the TAKATAK Supabase project live for phone sign-in / SMS provider; refused SMS now logs GoTrue status + error_code (never the phone); OTP user tagged source_application R2NETTE like the other tenants | PR CI → merge after PR #39 disk recovery; owner enables Phone provider + Twilio on the shared TAKATAK Supabase project (takatak-v1 #141) and runs a real handset SMS test
 
 - 2026-10-16 | ChatGPT | chatgpt/contabo-disk-recovery-20261016 → PR #39 | active/P0 | Fix VPS ENOSPC image pulls with R2NETTE-only pre-pull cleanup; do not touch running/rollback, other sites or volumes | CI, merge, verify non-skipped deployment
