@@ -3,6 +3,8 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-10-17 | Claude | claude/hopeful-clarke-xvwac3 → PR pending | active | Customer login: format + validate 10 national digits before calling TAKATAK OTP (the "needs 10 digits" field report was an 11-digit typo); admin Integrations page probes the TAKATAK Supabase project live for phone sign-in / SMS provider; refused SMS now logs GoTrue status + error_code (never the phone); OTP user tagged source_application R2NETTE like the other tenants | PR CI → merge after PR #39 disk recovery; owner enables Phone provider + Twilio on the shared TAKATAK Supabase project (takatak-v1 #141) and runs a real handset SMS test
+
 - 2026-10-16 | ChatGPT | chatgpt/contabo-disk-recovery-20261016 → PR #39 | active/P0 | Fix VPS ENOSPC image pulls with R2NETTE-only pre-pull cleanup; do not touch running/rollback, other sites or volumes | CI, merge, verify non-skipped deployment
 - 2026-10-16 | ChatGPT | chatgpt/pgdump-artifact-validation-20261016 → PR #38 | green CI, pending merge | Validate PostgreSQL custom dump before S3 upload or fallback purge | after recovery
 - 2026-10-16 | ChatGPT | chatgpt/s3-stream-upload-20261016 → PR #37 | merged, DEPLOY FAILED ENOSPC | Stream signed S3 PUT; main CI #38950346352 green, Deploy #38950594071 failed | recover disk safely, then deploy

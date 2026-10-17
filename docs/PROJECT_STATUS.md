@@ -30,7 +30,9 @@ The last verified main release is **`1a8de4abe8bf24dc0e5742070590d1fd974efe9b`**
 
 [Issue #25](https://github.com/takatakca/r2neet/issues/25) remains open. Latest deployment still explicitly warns that Stripe live keys and signed webhook, Twilio Voice/SMS, Google Maps, dispatch origin, S3 off-host storage, and signed alert webhook are NOT configured. Phone/Google login, real card payments, off-host restore with matching encryption key, worker receipt monitoring, alert delivery and full customer/staff booking acceptance remain unproven. Integrations present in code are not evidence of activation.
 
-The TAKATAK central identity receiver [PR #175](https://github.com/takatakca/takatak-v1/pull/175) was open at last check; keep `TAKATAK_R2NETTE_SYNC_ENABLED=false` until deployed HMAC/tenant testing passes. R2NETTE keeps independent UI and tenant boundaries.
+The TAKATAK central identity receiver [PR #175](https://github.com/takatakca/takatak-v1/pull/175) is present in `takatak-v1` `main` (`574766b7`, 2026-10-16) but its production deployment and secrets are unverified; keep `TAKATAK_R2NETTE_SYNC_ENABLED=false` until deployed HMAC/tenant testing passes. R2NETTE keeps independent UI and tenant boundaries.
+
+**Customer phone login (2026-10-17, branch `claude/hopeful-clarke-xvwac3`, not yet merged):** the login page rejected an eleven-digit typo with "needs 10 digits" and offered no formatting; the branch formats and validates ten national digits before any request, adds a live probe of the shared TAKATAK Supabase project (phone sign-in enabled, SMS provider, auto-confirm) to `/admin#integrations`, and logs the GoTrue error code when an SMS is refused. OTP delivery itself depends on the Phone provider and Twilio being enabled on the TAKATAK Supabase project (takatak-v1 #141), which R2NETTE cannot configure; a real handset test is still required before "phone login works" may be claimed.
 
 ## Canonical next step
 

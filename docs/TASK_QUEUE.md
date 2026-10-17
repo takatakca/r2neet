@@ -8,7 +8,8 @@ Reviewed: **2026-10-16**. Continue from `AGENTS.md`, `WORKLOG.md` and `docs/AGEN
 | P1 | PostgreSQL dump PGDMP header/size guard | PR #38 OPEN, CI green, do not merge before disk recovery | Both manual and scheduled archive validation before off-host upload or retention |
 | P0 | Real Stripe keys and signed webhook | BLOCKED: protected provider configuration | Server amount + tax, idempotent signed event, real state and refund end-to-end |
 | P0 | Off-host S3 account, alerts and recovery | BLOCKED: provider choice/secure credentials | Actual PUT/HEAD/GET digest, object retention, scratch restore with FIELD_ENCRYPTION_KEY, alert receipt |
-| P0 | Twilio/Supabase real phone authentication | BLOCKED: provider setup | Verified OTP delivery and auth, no production bypass |
+| P0 | Twilio/Supabase real phone authentication | BLOCKED: Phone provider + Twilio must be enabled on the shared TAKATAK Supabase project (takatak-v1 #141); R2NETTE code path verified identical to RentAuto/TAKATAK | `/admin#integrations` live probe READY, then one real handset SMS login/sign-up recorded in #25; no production bypass |
+| P1 | Login phone entry + OTP diagnostics | IN PROGRESS: claude/hopeful-clarke-xvwac3 | Ten-digit formatting/validation before send, admin live probe of TAKATAK phone auth, GoTrue error-code logging; PR CI green, merged after disk recovery |
 | P0 | TAKATAK signed receiver and tenant-scoped sync | BLOCKED: receiver PR #175 and operational approval | HMAC invalid rejected; signed events accepted, receiver deployed; then enable sender |
 | P1 | Google Maps + verified dispatch origin | BLOCKED: production key/coordinates | Real address and dispatch behaviors with failure handling |
 | P1 | Customer, staff, recurrence, booking and payment smoke | TODO: controlled real-provider acceptance | FR/EN mobile/desktop, quote and slot, access scopes, cancel/reschedule, payments, workers |

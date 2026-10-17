@@ -14,9 +14,16 @@ Both are enforced by tests, not convention.
 
 ## Auth
 
-`POST /auth/phone/send` — `{ phone }`. Returns the same shape whether or not
-the number is known to us, so the endpoint cannot be used to enumerate
-customers. Never returns or logs the code.
+`POST /auth/phone/send` — `{ phone, intent }`. Returns the same shape whether
+or not the number is known to us, so the endpoint cannot be used to enumerate
+customers. Never returns or logs the code. The phone must be ten Canadian
+digits (an optional +1 is dropped); the login page formats and checks this
+before calling, so a mistyped eleventh digit is caught in the field, not by a
+400. The code itself is sent by the shared TAKATAK Supabase project; a refused
+send is logged as `takatak_otp_send_failed` with the upstream error code and
+no phone number. `GET /admin/integrations` (staff) includes `phoneAuth`, a live
+probe of that project: `READY`, `PHONE_DISABLED`, `UNREACHABLE` or
+`NOT_CONFIGURED` with an operator sentence.
 
 `POST /auth/phone/verify` — `{ phone, code }`. On success sets an opaque
 `r2n_session` cookie (HttpOnly, Secure in production, SameSite=Lax) and

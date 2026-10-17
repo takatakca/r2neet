@@ -1,3 +1,9 @@
+import {
+  formatPhoneInput,
+  nationalPhoneDigits,
+  PHONE_FORMAT_HINT,
+} from '../i18n/index.js';
+
 interface ApiFailure {
   error?: {
     code?: string;
@@ -314,18 +320,37 @@ function initializeLoginPage(): void {
     (suggestedMode === 'login' ? loginToggle : signupToggle).focus();
   });
 
+  // Same behaviour as the booking page: (514) 825-2825 appears as the
+  // customer types, a leading 1 is dropped, and the field never holds more
+  // than ten digits, so an extra keystroke cannot turn into "needs 10 digits".
+  phoneInput.addEventListener('input', () => {
+    phoneInput.value = formatPhoneInput(phoneInput.value);
+  });
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     showError('');
     suggestedModeButton.hidden = true;
 
-    const phone = phoneInput.value.trim();
+    const typed = phoneInput.value.trim();
 
-    if (!phone) {
+    if (!typed) {
       showError('Enter your mobile number.');
       phoneInput.focus();
       return;
     }
+
+    const national = nationalPhoneDigits(typed);
+
+    if (!national) {
+      showError(PHONE_FORMAT_HINT);
+      phoneInput.focus();
+      phoneInput.select();
+      return;
+    }
+
+    // Send the canonical national form; the server adds +1.
+    const phone = formatPhoneInput(national);
 
     const copy = copyForMode(intent);
 

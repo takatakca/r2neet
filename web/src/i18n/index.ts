@@ -814,6 +814,27 @@ export function formatPhoneInput(raw: string): string {
   return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
 }
 
+/**
+ * The ten national digits of a Canadian mobile number, or null.
+ *
+ * Mirrors the server's rule so the customer is told before a request is
+ * made: an optional +1 / 1 prefix is dropped, everything else must be exactly
+ * ten digits with a valid area code and exchange. "51445874587" (an eleventh
+ * digit typed by mistake) is null, not a silently truncated number that would
+ * send the code to someone else.
+ */
+export function nationalPhoneDigits(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed || !/^\+?[\d\s().-]+$/.test(trimmed)) return null;
+  const digits = trimmed.replace(/\D/g, '');
+  const national =
+    digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  return /^[2-9]\d{2}[2-9]\d{6}$/.test(national) ? national : null;
+}
+
+export const PHONE_FORMAT_HINT =
+  'Enter your 10-digit mobile number, for example (514) 825-2825.';
+
 export function maskPhoneDisplay(e164: string): string {
   const d = e164.replace(/\D/g, '');
   if (d.length < 10) return '•••';

@@ -895,9 +895,21 @@ async function integrationsPage(){
   const el = document.getElementById('integrations');
   try{
     const d = await api('/api/v1/admin/integrations');
+    // Live answer from the TAKATAK Supabase project itself: are phone
+    // sign-in and its SMS provider switched on? Keys in the environment
+    // cannot tell you that, and this is the first thing to look at when a
+    // customer says the code never arrived.
+    const p = d.phoneAuth;
+    const phoneCard = p ? `<div class="card ${p.status==='READY'?'good':''}">
+        <div class="k">TAKATAK phone OTP (live check)</div>
+        <div style="margin-top:10px"><span class="pill ${p.status==='READY'?'ok':'warn'}">${esc(p.status.replace('_',' '))}</span></div>
+        <div class="d">${esc(p.detail)}</div>
+        <div class="d" style="margin-top:8px;color:var(--muted)">Customer login and sign-up by SMS code${p.smsProvider?' · SMS provider: '+esc(p.smsProvider):''}</div>
+      </div>` : '';
     el.innerHTML = `
       <div class="hdr"><div><h1>Integrations</h1><div class="sub">Status is read from the environment — never set by hand</div></div></div>
       <div class="cards">
+      ${phoneCard}
       ${d.integrations.map(i=>`<div class="card ${i.status==='CONNECTED'?'good':''}">
         <div class="k">${esc(i.label)}</div>
         <div style="margin-top:10px"><span class="pill ${i.status==='CONNECTED'?'ok':'warn'}">${i.status.replace('_',' ')}</span></div>

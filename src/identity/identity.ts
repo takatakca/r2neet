@@ -84,7 +84,69 @@ export interface VerificationProvider {
     phoneE164: string,
     code: string,
   ): Promise<{ status: VerificationStatus }>;
+  /** Live, SMS-free check of the upstream phone-OTP configuration. */
+  diagnose?(): Promise<PhoneAuthDiagnostic>;
 }
+
+/**
+ * What an operator needs to know when "the code never arrives". Presence of
+ * the project URL and key is not evidence that SMS works: phone sign-in and
+ * the Twilio provider are switched on in the TAKATAK Supabase dashboard, and
+ * only the project itself can say whether they are.
+ */
+export interface PhoneAuthDiagnostic {
+  status: 'NOT_CONFIGURED' | 'UNREACHABLE' | 'PHONE_DISABLED' | 'READY';
+  /** Operator-facing sentence. Never contains the key or a phone number. */
+  detail: string;
+  /** SMS provider name reported by the project (e.g. "twilio"), when known. */
+  smsProvider: string | null;
+}
+
+/** Structured, phone-free log line for provider failures. */
+export type ProviderLog = (line: {
+  level: 'info' | 'warn' | 'error';
+  msg: string;
+  [key: string]: unknown;
+}) => void;
+
+/**
+ * Supabase Auth (GoTrue) error body. `error_code` is the stable field;
+ * older deployments only send `msg`/`error_description`.
+ */
+async function readGoTrueError(
+  response: Response,
+): Promise<{ errorCode: string | null; detail: string | null }> {
+  try {
+    const body = (await response.json()) as Record<string, unknown>;
+    const errorCode =
+      typeof body.error_code === 'string'
+        ? body.error_code
+        : typeof body.code === 'string'
+          ? body.code
+          : null;
+    const detail =
+      typeof body.msg === 'string'
+        ? body.msg
+        : typeof body.error_description === 'string'
+          ? body.error_description
+          : typeof body.message === 'string'
+            ? body.message
+            : null;
+    return {
+      errorCode,
+      // Bound the upstream text so a log line can never carry a payload.
+      detail: detail ? detail.slice(0, 200) : null,
+    };
+  } catch {
+    return { errorCode: null, detail: null };
+  }
+}
+
+const GOTRUE_RATE_LIMIT_CODES = new Set([
+  'over_sms_send_rate_limit',
+  'over_request_rate_limit',
+  'over_email_send_rate_limit',
+]);
 
 /**
  * TAKATAK's Supabase Auth project is the canonical phone-identity authority.
@@ -100,6 +162,7 @@ export class SupabasePhoneAuthProvider implements VerificationProvider {
   constructor(
     env: Record<string, string | undefined> = process.env,
     private readonly fetcher: typeof fetch = fetch,
+    private readonly log: ProviderLog = () => undefined,
   ) {
     this.url = env.TAKATAK_SUPABASE_URL?.trim().replace(/\/+$/, '');
     this.anonKey = env.TAKATAK_SUPABASE_ANON_KEY?.trim();
@@ -122,7 +185,7 @@ export class SupabasePhoneAuthProvider implements VerificationProvider {
 
   private async request(
     operation: 'otp' | 'verify',
-    payload: Record<string, string | boolean>,
+    payload: Record<string, string | boolean | Record<string, string>>,
   ): Promise<Response> {
     if (!this.configured || !this.url || !this.anonKey) {
       throw new IdentityError(
@@ -150,6 +213,91 @@ export class SupabasePhoneAuthProvider implements VerificationProvider {
     }
   }
 
+  /**
+   * Live configuration probe. GoTrue's public settings endpoint reports
+   * whether phone sign-in is enabled and which SMS provider is wired to the
+   * project, without sending anything. It needs only the anon key.
+   */
+  async diagnose(): Promise<PhoneAuthDiagnostic> {
+    if (!this.configured || !this.url || !this.anonKey) {
+      return {
+        status: 'NOT_CONFIGURED',
+        detail:
+          'TAKATAK_SUPABASE_URL and TAKATAK_SUPABASE_ANON_KEY must point at the TAKATAK Supabase project over HTTPS.',
+        smsProvider: null,
+      };
+    }
+
+    let response: Response;
+    try {
+      response = await this.fetcher(`${this.url}/auth/v1/settings`, {
+        method: 'GET',
+        headers: { apikey: this.anonKey, Authorization: 'Bearer ' + this.anonKey },
+        signal: AbortSignal.timeout(5_000),
+      });
+    } catch {
+      return {
+        status: 'UNREACHABLE',
+        detail: 'The TAKATAK Supabase project did not answer within 5 seconds.',
+        smsProvider: null,
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        status: 'UNREACHABLE',
+        detail:
+          response.status === 401 || response.status === 403
+            ? 'The TAKATAK Supabase project rejected TAKATAK_SUPABASE_ANON_KEY. Use the current anon/publishable key of the shared project.'
+            : `The TAKATAK Supabase project answered HTTP ${response.status} to the settings probe.`,
+        smsProvider: null,
+      };
+    }
+
+    let settings: {
+      external?: { phone?: unknown };
+      sms_provider?: unknown;
+      phone_autoconfirm?: unknown;
+    };
+    try {
+      settings = (await response.json()) as typeof settings;
+    } catch {
+      return {
+        status: 'UNREACHABLE',
+        detail: 'The TAKATAK Supabase project returned unreadable settings.',
+        smsProvider: null,
+      };
+    }
+
+    const smsProvider =
+      typeof settings.sms_provider === 'string' && settings.sms_provider.trim()
+        ? settings.sms_provider.trim()
+        : null;
+    if (settings.external?.phone !== true) {
+      return {
+        status: 'PHONE_DISABLED',
+        detail:
+          'Phone sign-in is switched off on the TAKATAK Supabase project. Enable Authentication → Providers → Phone and configure Twilio there; no R2NETTE setting can fix this.',
+        smsProvider,
+      };
+    }
+    if (settings.phone_autoconfirm === true) {
+      return {
+        status: 'PHONE_DISABLED',
+        detail:
+          'The TAKATAK Supabase project auto-confirms phones, so no SMS is sent. Turn off phone auto-confirm and configure Twilio.',
+        smsProvider,
+      };
+    }
+    return {
+      status: 'READY',
+      detail: smsProvider
+        ? `Phone sign-in is enabled on the TAKATAK Supabase project; SMS goes through ${smsProvider}. Real delivery is proven only by a live test.`
+        : 'Phone sign-in is enabled on the TAKATAK Supabase project. Real delivery is proven only by a live test.',
+      smsProvider,
+    };
+  }
+
   async start(phoneE164: string): Promise<{ status: VerificationStatus }> {
     const response = await this.request('otp', {
       phone: phoneE164,
@@ -157,21 +305,38 @@ export class SupabasePhoneAuthProvider implements VerificationProvider {
       // application creates its own customer record only after verification
       // and the registration form are complete.
       create_user: true,
+      // Applied by TAKATAK only when the identity is first created, exactly
+      // like the other tenant applications tag theirs. Never personal data.
+      data: { source_application: 'R2NETTE' },
     });
 
-    if (response.status === 429) {
+    if (response.ok) return { status: 'PENDING' };
+
+    const failure = await readGoTrueError(response);
+    // The phone is deliberately absent: this line is for the operator who
+    // has to find out why "the code never arrives", not for tracing people.
+    this.log({
+      level: response.status >= 500 ? 'error' : 'warn',
+      msg: 'takatak_otp_send_failed',
+      provider: this.name,
+      status: response.status,
+      errorCode: failure.errorCode,
+      detail: failure.detail,
+    });
+
+    if (
+      response.status === 429 ||
+      (failure.errorCode !== null && GOTRUE_RATE_LIMIT_CODES.has(failure.errorCode))
+    ) {
       throw new IdentityError(
         'Too many codes requested. Try again later.',
         'OTP_PROVIDER_LIMIT',
       );
     }
-    if (!response.ok) {
-      throw new IdentityError(
-        'TAKATAK could not send a verification code.',
-        'VERIFY_PROVIDER_UNAVAILABLE',
-      );
-    }
-    return { status: 'PENDING' };
+    throw new IdentityError(
+      'TAKATAK could not send a verification code.',
+      'VERIFY_PROVIDER_UNAVAILABLE',
+    );
   }
 
   async check(
@@ -191,11 +356,22 @@ export class SupabasePhoneAuthProvider implements VerificationProvider {
       );
     }
     if (response.status >= 500) {
+      const failure = await readGoTrueError(response);
+      this.log({
+        level: 'error',
+        msg: 'takatak_otp_check_failed',
+        provider: this.name,
+        status: response.status,
+        errorCode: failure.errorCode,
+        detail: failure.detail,
+      });
       throw new IdentityError(
         'TAKATAK phone authentication is temporarily unavailable.',
         'VERIFY_PROVIDER_UNAVAILABLE',
       );
     }
+    // GoTrue answers "otp_expired" for a wrong code as well as a stale one,
+    // so the distinction cannot be relayed honestly: both are DENIED.
     if (!response.ok) return { status: 'DENIED' };
 
     let body: unknown;

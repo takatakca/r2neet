@@ -2722,7 +2722,7 @@ export function createApi(deps: ApiDeps) {
    * Staff routes live in createOpsApi. They were previously only mounted
    * in tests, which meant /admin and /crew had a UI and no working API.
    */
-  app.use(createOpsApi({ prisma, voice: deps.voice ?? null, now }));
+  app.use(createOpsApi({ prisma, voice: deps.voice ?? null, now, verification }));
 
   /* ---------------- errors ---------------- */
 

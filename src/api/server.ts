@@ -5,7 +5,11 @@ import { LiveStripeProvider } from '../payments/stripe-provider.js';
 import { GooglePlacesProvider } from '../integrations/places.js';
 import { resolveDatabase } from '../db/safety.js';
 import { integrationStatus } from '../data/repositories.js';
-import { validateProductionConfig, installGracefulShutdown } from './hardening.js';
+import {
+  validateProductionConfig,
+  installGracefulShutdown,
+  consoleSink,
+} from './hardening.js';
 
 /**
  * Development/production entrypoint.
@@ -30,7 +34,9 @@ const app = createApi({
     rateLimit: process.env.RATE_LIMIT !== 'false',
     isShuttingDown: () => shuttingDown,
   },
-  verification: new SupabasePhoneAuthProvider(),
+  // The log sink makes a refused SMS visible in the container log (status
+  // and GoTrue error code, never the phone) instead of a silent 503.
+  verification: new SupabasePhoneAuthProvider(process.env, fetch, consoleSink),
   stripe: stripe.configured ? stripe : undefined,
   places: places.configured ? places : undefined,
   origin:

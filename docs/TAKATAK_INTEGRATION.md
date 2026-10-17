@@ -1,6 +1,12 @@
 # R2NETTE -> TAKATAK integration
 
-Status (2026-10-14): the signed outbox implementation and database migration are present in R2NETTE `main`, but production delivery remains deliberately disabled. The TAKATAK receiving PR `takatakca/takatak-v1#175` is still OPEN and must pass its independent release and signature checks before activation.
+Status (2026-10-17): the signed outbox implementation and database migration are present in R2NETTE `main`, but production delivery remains deliberately disabled. The TAKATAK receiver route from `takatakca/takatak-v1#175` is present in `takatak-v1` `main` (`574766b7`, 2026-10-16) at `src/app/api/integrations/r2nette/events/route.ts`; its production deployment, `R2NETTE_SYNC_*` secrets and signature checks are still unverified, so the sender stays off.
+
+## Customer identity (phone OTP) — same project for every TAKATAK company
+
+Customer login and sign-up on R2NETTE, RentAuto and takatak.ca all run against the **one shared TAKATAK Supabase Auth project**: the browser or server calls GoTrue `signInWithOtp` / `verifyOtp` with that project's public anon/publishable key, Supabase sends the code through the Twilio provider configured in its dashboard, and each company keeps its own customer record keyed by the verified E.164 phone. R2NETTE does this server-side in `src/identity/identity.ts` with `TAKATAK_SUPABASE_URL` and `TAKATAK_SUPABASE_ANON_KEY`; there is no Twilio credential in R2NETTE for OTP (the `TWILIO_*` variables are for the callback dialler and notifications only).
+
+When a customer says the code never arrives, open `/admin#integrations`: the first card asks the TAKATAK project live whether phone sign-in is enabled, which SMS provider it reports and whether phone auto-confirm is on. `PHONE DISABLED` means Authentication → Providers → Phone (and Twilio) must be enabled on the TAKATAK project itself; `UNREACHABLE` means the URL or key is wrong. A refused send is also logged as `takatak_otp_send_failed` with the GoTrue `error_code`, never the phone number. `READY` is still not proof of delivery: only a real handset test is.
 
 ## Boundary
 

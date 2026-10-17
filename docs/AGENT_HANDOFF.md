@@ -8,6 +8,19 @@ Last verified production: `1a8de4abe8bf24dc0e5742070590d1fd974efe9b`, non-skippe
 
 Current branch `chatgpt/contabo-disk-recovery-20261016` and PR #39 modifies `scripts/deploy/remote-deploy.sh`, adds `scripts/deploy/pre-pull-cleanup.sh` and `tests/pre-pull-cleanup.test.ts`. Cleanup runs before pull and after successful promotion; it only deletes old R2NETTE SHA image tags, protecting current/previous/target and other applications/volumes. Last functional branch commit before docs: `cfce52ac848d1bb8e69c61b8962526280a48a7fe`. Actual branch HEAD must be checked after docs commit; CI, merge and production recovery not yet verified. No local SSH, df, Docker prune or actual VPS modifications performed here — reviewed GitHub Actions job log of failed Deploy #38950594071 and source/runbooks. Next exact action: require green PR #39 CI, fix failures, merge; verify non-skipped main deploy and exact SHA/health. If still ENOSPC, no blind retries: authorized server operator must inspect disk and approve any broader selective cleanup. After recovery, merge CI-green PR #38, verify deployment and reconcile docs. Provider issue #25 and TAKATAK receiver gate remain unresolved.
 
+## 2026-10-17 — customer phone login / OTP (branch `claude/hopeful-clarke-xvwac3`)
+
+Field report: `/login?google=phone` on r2nette.ca showed "That phone number needs 10 digits." The number typed was `51445874587`, eleven digits without a leading 1, so the server's `normalizePhone` rejected it correctly; the page simply gave no formatting or pre-check. Verified facts, not assumptions:
+
+- R2NETTE already authenticates customers against the **shared TAKATAK Supabase project** (`TAKATAK_SUPABASE_URL` + anon key, GoTrue `/auth/v1/otp` and `/auth/v1/verify`). RentAuto (`takatakca/rentautoca`, `src/lib/takatak-phone-auth.ts`) and TAKATAK's own login (`master-phone-login-form.tsx`) call the same project with `signInWithOtp` / `verifyOtp`. The "one identity for every company" design is in place; nothing in R2NETTE talks to Twilio directly.
+- Twilio is configured **inside that Supabase project** (Authentication → Providers → Phone), not in any R2NETTE variable. `takatak-v1` `docs/mimt/AUTH_AND_CRM.md` and issue takatak-v1#141 still list "confirm live provider config and real SMS test" as open. That is where "the code never arrives" is fixed; no R2NETTE setting can.
+- The TAKATAK receiver `src/app/api/integrations/r2nette/events/route.ts` is present in `takatak-v1` `main` at `574766b7` (2026-10-16). Its production deployment and secrets are still unverified, so `TAKATAK_R2NETTE_SYNC_ENABLED` stays `false`.
+- TAKATAK's `/api/v1/auth/otp/{send,verify}` master API is scoped to the 1LV integration (`TAKATAK_1LV_API_KEY`, `source_application` must be `1lv`); it is not a route R2NETTE may use.
+
+Changes on the branch: `web/src/lib/auth.ts` formats the number as typed (`formatPhoneInput`) and refuses anything but ten national digits with a hint before any request; `web/src/i18n/index.ts` gains `nationalPhoneDigits`; `src/identity/identity.ts` adds `diagnose()` (GET `/auth/v1/settings`: phone enabled, `sms_provider`, auto-confirm) and logs GoTrue `error_code` on a refused send; `/api/v1/admin/integrations` returns `phoneAuth` and `web/admin.html` shows it as the first card; `source_application: R2NETTE` rides the OTP request. Tests: `tests/supabase-phone-auth.test.ts`, `tests/frontend.test.ts`. Local: typecheck, build, and the non-database suites pass; see WORKLOG for CI.
+
+Exact next action: open the PR, get CI green, merge only after PR #39 restores deploys. Then the owner opens `/admin#integrations` on the deployed build: `PHONE DISABLED` or `UNREACHABLE` names the exact Supabase-side fix; `READY` means run one real handset SMS login and record it in issue #25 and takatak-v1#141. Nothing in this branch claims OTP delivery works.
+
 ### Historical sections below predate this current incident; prioritize P0 above
 
 ## Last completed and deployed task

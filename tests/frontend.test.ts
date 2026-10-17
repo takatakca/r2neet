@@ -7,6 +7,8 @@ import {
   formatMoney,
   formatPhoneInput,
   maskPhoneDisplay,
+  nationalPhoneDigits,
+  PHONE_FORMAT_HINT,
 } from '../web/src/i18n/index.js';
 import {
   remainingMs,
@@ -146,6 +148,41 @@ describe('formatting', () => {
 
   it('masks a verified phone for display', () => {
     expect(maskPhoneDisplay('+15148252825')).toBe('(514) •••-2825');
+  });
+
+  it('accepts exactly ten national digits for login, with or without +1', () => {
+    expect(nationalPhoneDigits('5148252825')).toBe('5148252825');
+    expect(nationalPhoneDigits('(514) 825-2825')).toBe('5148252825');
+    expect(nationalPhoneDigits('+1 514-825-2825')).toBe('5148252825');
+    expect(nationalPhoneDigits('1 514 825 2825')).toBe('5148252825');
+  });
+
+  it('refuses a mistyped number instead of truncating it to someone else', () => {
+    // The eleven digits from the field report: one keystroke too many.
+    expect(nationalPhoneDigits('51445874587')).toBeNull();
+    expect(nationalPhoneDigits('514825282')).toBeNull();
+    expect(nationalPhoneDigits('0148252825')).toBeNull();
+    expect(nationalPhoneDigits('+44 20 7946 0958')).toBeNull();
+    expect(nationalPhoneDigits('')).toBeNull();
+    expect(nationalPhoneDigits('call me')).toBeNull();
+    expect(PHONE_FORMAT_HINT).toMatch(/10-digit/);
+  });
+});
+
+describe('login page phone entry', () => {
+  const source = readFileSync(new URL('../web/src/lib/auth.ts', import.meta.url), 'utf8');
+
+  it('formats the mobile number as the customer types, like the booking page', () => {
+    expect(source).toMatch(/phoneInput\.addEventListener\('input'/);
+    expect(source).toMatch(/phoneInput\.value = formatPhoneInput\(phoneInput\.value\)/);
+  });
+
+  it('checks for ten national digits before asking TAKATAK for a code', () => {
+    const check = source.indexOf('nationalPhoneDigits(typed)');
+    const send = source.indexOf("'/api/v1/auth/phone/send'");
+    expect(check).toBeGreaterThan(-1);
+    expect(send).toBeGreaterThan(check);
+    expect(source).toContain('showError(PHONE_FORMAT_HINT)');
   });
 });
 

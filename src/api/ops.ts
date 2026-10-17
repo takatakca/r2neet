@@ -10,6 +10,7 @@ import { CATEGORIES, SERVICES } from '../data/catalogue.js';
 import { workerExpectations, offHostConfigured } from '../workers/expectations.js';
 import { localToUtc, findStaffConflict, DEFAULT_BUFFERS } from '../scheduling/availability.js';
 import { acquireCapacityLocks, loadBusy } from '../db/prisma-repositories.js';
+import type { VerificationProvider } from '../identity/identity.js';
 import cookieParser from 'cookie-parser';
 import {
   StaffAuthService,
@@ -35,6 +36,8 @@ export interface OpsDeps {
   prisma: PrismaClient;
   voice?: VoiceProvider | null;
   now?: () => Date;
+  /** Customer phone-OTP provider, probed live on the integrations page. */
+  verification?: VerificationProvider;
 }
 
 declare global {
@@ -649,9 +652,15 @@ export function createOpsApi(deps: OpsDeps) {
     '/api/v1/admin/integrations',
     wrap(async (req, res) => {
       requirePermission(req, 'integrations.view');
-      const sync = await prisma.reviewSyncState.findMany();
+      const [sync, phoneAuth] = await Promise.all([
+        prisma.reviewSyncState.findMany(),
+        // Env presence says the keys exist; this asks the TAKATAK project
+        // whether phone sign-in and its SMS provider are actually on.
+        deps.verification?.diagnose?.() ?? Promise.resolve(null),
+      ]);
       res.json({
         integrations: integrationStatus(process.env),
+        phoneAuth,
         reviewSync: sync,
       });
     }),
