@@ -1,3 +1,9 @@
+import {
+  formatCanadianPhoneInput,
+  IdentityError,
+  normalizePhone,
+} from "../../../src/identity/identity";
+
 interface ApiFailure {
   error?: {
     code?: string;
@@ -261,7 +267,7 @@ function initializeLoginPage(): void {
 
     authTitle.textContent = copy.title;
     authDescription.textContent = copy.description;
-    label.textContent = copy.submit;
+    label.textContent = buttonLabel(false);
     document.title = copy.pageTitle;
 
     suggestedModeButton.hidden = true;
@@ -281,6 +287,89 @@ function initializeLoginPage(): void {
       `${url.pathname}${url.search}${url.hash}`,
     );
   }
+
+  function buttonLabel(sending: boolean): string {
+    if (googleLinkFlow) {
+      return sending ? 'Sending verification code…' : 'Send verification code';
+    }
+
+    const copy = copyForMode(intent);
+    return sending ? copy.sending : copy.submit;
+  }
+
+  const phoneHint = document.getElementById('phoneHint');
+  const defaultPhoneHint =
+    '10-digit Canadian mobile number, area code included.';
+
+  function refreshPhoneHint(): void {
+    if (!phoneHint) return;
+
+    const raw = phoneInput.value;
+    const digits = raw.replace(/\D/g, '');
+
+    if (!raw.trim()) {
+      phoneHint.textContent = defaultPhoneHint;
+      return;
+    }
+
+    try {
+      normalizePhone(raw);
+      phoneHint.textContent =
+        '10 digits. TAKATAK will text a verification code.';
+      showError('');
+    } catch (error) {
+      if (!(error instanceof IdentityError)) return;
+
+      if (
+        error.code === 'PHONE_UNSUPPORTED_COUNTRY' ||
+        (error.code === 'PHONE_INVALID_LENGTH' && digits.length > 10)
+      ) {
+        phoneHint.textContent = error.message;
+        showError(error.message);
+        return;
+      }
+
+      phoneHint.textContent = `${digits.length} ${
+        digits.length === 1 ? 'digit' : 'digits'
+      } so far. A Canadian mobile number is 10 digits, like (514) 825-2825.`;
+    }
+  }
+
+  function formatPhoneField(): void {
+    const cursor = phoneInput.selectionStart ?? phoneInput.value.length;
+    const rawBeforeCursor = phoneInput.value.slice(0, cursor);
+    let digitsBefore = rawBeforeCursor.replace(/\D/g, '');
+    if (phoneInput.value.replace(/\D/g, '').startsWith('1')) {
+      digitsBefore = digitsBefore.replace(/^1/, '');
+    }
+
+    const formatted = formatCanadianPhoneInput(phoneInput.value);
+    if (phoneInput.value === formatted) return;
+
+    phoneInput.value = formatted;
+    const targetDigits = digitsBefore.length;
+    let next = formatted.length;
+    if (targetDigits === 0) {
+      next = formatted.startsWith('(') ? 1 : 0;
+    } else {
+      let seen = 0;
+      for (let index = 0; index < formatted.length; index += 1) {
+        if (/\d/.test(formatted.charAt(index))) {
+          seen += 1;
+          if (seen === targetDigits) {
+            next = index + 1;
+            break;
+          }
+        }
+      }
+    }
+    phoneInput.setSelectionRange(next, next);
+  }
+
+  phoneInput.addEventListener('input', () => {
+    formatPhoneField();
+    refreshPhoneHint();
+  });
 
   loginToggle.addEventListener('click', () => {
     setMode('login');
@@ -327,12 +416,22 @@ function initializeLoginPage(): void {
       return;
     }
 
-    const copy = copyForMode(intent);
+    try {
+      normalizePhone(phone);
+    } catch (error) {
+      showError(
+        error instanceof IdentityError
+          ? error.message
+          : 'Enter a valid mobile number.',
+      );
+      phoneInput.focus();
+      return;
+    }
 
     button.disabled = true;
     loginToggle.disabled = true;
     signupToggle.disabled = true;
-    label.textContent = copy.sending;
+    label.textContent = buttonLabel(true);
 
     try {
       const result = await apiRequest<SendCodeResponse>(
@@ -387,7 +486,7 @@ function initializeLoginPage(): void {
       loginToggle.disabled = false;
       signupToggle.disabled = false;
 
-      label.textContent = copyForMode(intent).submit;
+      label.textContent = buttonLabel(false);
     }
   });
 
@@ -402,7 +501,7 @@ function initializeLoginPage(): void {
     authTitle.textContent = 'Link your Google account';
     authDescription.textContent =
       'Enter the mobile number on your R2NETTE account to continue.';
-    label.textContent = 'Send verification code';
+    label.textContent = buttonLabel(false);
     document.title = 'Link Google — R2NETTE';
   } else if (query.get('google') === 'error') {
     showError('Google sign-in could not be completed. Please try again.');
