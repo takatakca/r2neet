@@ -54,6 +54,9 @@ if "auth-phone-format.js" not in html or "auth-phone-format.css" not in html:
     raise SystemExit("Could not point auth.html at the phone-format assets.")
 (stage / "auth.html").write_text(html, encoding="utf-8")
 PY
+# The web process is not root. A private file copied into the container
+# makes /login return 500, so these must be world-readable.
+chmod 644 "${stage}/auth.html" "${stage}/assets/auth-phone-format.js" "${stage}/assets/auth-phone-format.css"
 
 # shellcheck source=scripts/deploy/ssh-common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/ssh-common.sh"
@@ -79,6 +82,10 @@ for cid in $ids; do
   docker cp /tmp/r2nette-login-format/auth.html "$cid:/app/dist/auth.html"
   docker cp /tmp/r2nette-login-format/assets/auth-phone-format.js "$cid:/app/dist/assets/auth-phone-format.js"
   docker cp /tmp/r2nette-login-format/assets/auth-phone-format.css "$cid:/app/dist/assets/auth-phone-format.css"
+  docker exec -u 0 "$cid" chmod 644 \
+    /app/dist/auth.html \
+    /app/dist/assets/auth-phone-format.js \
+    /app/dist/assets/auth-phone-format.css
 done
 rm -rf /tmp/r2nette-login-format
 echo "Login phone format copied into the running web container."'
