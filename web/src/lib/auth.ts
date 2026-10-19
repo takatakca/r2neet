@@ -1,4 +1,8 @@
-import { IdentityError, normalizePhone } from "../../../src/identity/identity";
+import {
+  formatCanadianPhoneInput,
+  IdentityError,
+  normalizePhone,
+} from "../../../src/identity/identity";
 
 interface ApiFailure {
   error?: {
@@ -329,7 +333,39 @@ function initializeLoginPage(): void {
     }
   }
 
+  function formatPhoneField(): void {
+    const cursor = phoneInput.selectionStart ?? phoneInput.value.length;
+    const rawBeforeCursor = phoneInput.value.slice(0, cursor);
+    let digitsBefore = rawBeforeCursor.replace(/\D/g, '');
+    if (phoneInput.value.replace(/\D/g, '').startsWith('1')) {
+      digitsBefore = digitsBefore.replace(/^1/, '');
+    }
+
+    const formatted = formatCanadianPhoneInput(phoneInput.value);
+    if (phoneInput.value === formatted) return;
+
+    phoneInput.value = formatted;
+    const targetDigits = digitsBefore.length;
+    let next = formatted.length;
+    if (targetDigits === 0) {
+      next = formatted.startsWith('(') ? 1 : 0;
+    } else {
+      let seen = 0;
+      for (let index = 0; index < formatted.length; index += 1) {
+        if (/\d/.test(formatted.charAt(index))) {
+          seen += 1;
+          if (seen === targetDigits) {
+            next = index + 1;
+            break;
+          }
+        }
+      }
+    }
+    phoneInput.setSelectionRange(next, next);
+  }
+
   phoneInput.addEventListener('input', () => {
+    formatPhoneField();
     refreshPhoneHint();
   });
 

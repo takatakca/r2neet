@@ -68,6 +68,25 @@ export function normalizePhone(
   return `${defaultCountry}${national}`;
 }
 
+/**
+ * What the customer sees while typing. A leading 1 is the country code, so
+ * 5148252825 and 15148252825 both appear as (514) 825-2825.
+ */
+export function formatCanadianPhoneInput(input: string): string {
+  let digits = (input ?? '').replace(/\D/g, '');
+  if (digits.startsWith('1')) digits = digits.slice(1);
+  digits = digits.slice(0, 10);
+  if (!digits) return '';
+
+  const area = digits.slice(0, 3);
+  const exchange = digits.slice(3, 6);
+  const line = digits.slice(6, 10);
+  if (digits.length < 3) return `(${area}`;
+  if (digits.length === 3) return `(${area})`;
+  if (digits.length <= 6) return `(${area}) ${exchange}`;
+  return `(${area}) ${exchange}-${line}`;
+}
+
 /** Display form that never exposes the full number in logs or UI. */
 export function maskPhone(e164: string): string {
   const d = e164.replace(/\D/g, '');

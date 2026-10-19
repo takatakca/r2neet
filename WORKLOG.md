@@ -3,7 +3,7 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
-- 2026-10-19 | Cursor | fix/phone-otp-entry-20261019 → PR #41 | blocked: Contabo ENOSPC | Explain 11-digit Canadian numbers before TAKATAK sends a Twilio OTP, and keep the Google-link button on verification | Do not deploy until disk recovery; Deploy #38952711773 still failed no space left on device
+- 2026-10-19 | Cursor | fix/phone-otp-entry-20261019 → PR #41 | blocked: Contabo ENOSPC | Format numbers typed without a leading 1 as (514) 825-2825, and explain length before TAKATAK sends a Twilio OTP | Do not deploy until disk recovery; Deploy #38952711773 still failed no space left on device
 - 2026-10-16 | ChatGPT | chatgpt/contabo-disk-recovery-20261016 → PR #39 | active/P0 | Fix VPS ENOSPC image pulls with R2NETTE-only pre-pull cleanup; do not touch running/rollback, other sites or volumes | CI, merge, verify non-skipped deployment
 - 2026-10-16 | ChatGPT | chatgpt/pgdump-artifact-validation-20261016 → PR #38 | green CI, pending merge | Validate PostgreSQL custom dump before S3 upload or fallback purge | after recovery
 - 2026-10-16 | ChatGPT | chatgpt/s3-stream-upload-20261016 → PR #37 | merged, DEPLOY FAILED ENOSPC | Stream signed S3 PUT; main CI #38950346352 green, Deploy #38950594071 failed | recover disk safely, then deploy
