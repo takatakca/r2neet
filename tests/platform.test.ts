@@ -527,6 +527,13 @@ describe('phone identity', () => {
     expect(() => normalizePhone('+44 20 7946 0000')).toThrow(/Canadian/i);
   });
 
+  it('explains an 11-digit number before any verification code is sent', () => {
+    expect(() => normalizePhone('51482528251')).toThrow(
+      /11 digits, so no verification code was sent/,
+    );
+    expect(() => normalizePhone('51482528251')).toThrow(/\(514\) 825-2825/);
+  });
+
   it('masks numbers for display and logs', () => {
     expect(maskPhone('+15148252825')).toBe('+1 514 ••• 2825');
   });

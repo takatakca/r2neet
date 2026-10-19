@@ -307,6 +307,13 @@ a {
   outline: 3px solid rgba(8, 120, 209, 0.14);
 }
 
+.phone-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .primary-button {
   width: 100%;
   min-height: 56px;

@@ -48,8 +48,13 @@ export function normalizePhone(
   }
 
   if (national.length !== 10) {
+    const entered = digits.length;
+    const counted =
+      entered === 0
+        ? 'Enter the digits of a Canadian mobile number.'
+        : `That number has ${entered} ${entered === 1 ? 'digit' : 'digits'}, so no verification code was sent.`;
     throw new IdentityError(
-      'That phone number needs 10 digits.',
+      `${counted} A Canadian mobile number is 10 digits, like (514) 825-2825, or 11 digits starting with 1.`,
       'PHONE_INVALID_LENGTH',
     );
   }
