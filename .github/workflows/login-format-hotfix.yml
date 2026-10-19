@@ -1,0 +1,44 @@
+name: Install login phone format
+
+# Manual only. Copies the login page into the container that is already
+# running. It does not build or pull an image, because the server disk cannot
+# hold another one.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: Copy login assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Install sshpass
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null
+
+      - name: Copy the login page into the running container
+        env:
+          CONTABO_SSH_HOST: ${{ secrets.CONTABO_SSH_HOST }}
+          CONTABO_SSH_PORT: ${{ secrets.CONTABO_SSH_PORT }}
+          CONTABO_SSH_USER: ${{ secrets.CONTABO_SSH_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_SSH_KNOWN_HOSTS: ${{ secrets.CONTABO_SSH_KNOWN_HOSTS }}
+          CONTABO_ROOT_PASSWORD: ${{ secrets.CONTABO_ROOT_PASSWORD }}
+          CONTABO_ROOT_SSH_KEY: ${{ secrets.CONTABO_ROOT_SSH_KEY }}
+          CONTABO_SSH_ADMIN_USER: ${{ secrets.CONTABO_SSH_ADMIN_USER }}
+        run: bash scripts/deploy/install-login-format.sh

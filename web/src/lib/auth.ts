@@ -297,11 +297,13 @@ function initializeLoginPage(): void {
     return sending ? copy.sending : copy.submit;
   }
 
-  const phoneHint = element<HTMLParagraphElement>('phoneHint');
+  const phoneHint = document.getElementById('phoneHint');
   const defaultPhoneHint =
     '10-digit Canadian mobile number, area code included.';
 
   function refreshPhoneHint(): void {
+    if (!phoneHint) return;
+
     const raw = phoneInput.value;
     const digits = raw.replace(/\D/g, '');
 
