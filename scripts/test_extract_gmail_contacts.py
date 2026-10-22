@@ -31,6 +31,16 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(len(result['contacts']), 1)
         self.assertEqual(result['contacts'][0]['relationship'], 'correspondent_a_revoir')
 
+    def test_flattened_search_names_and_original_mime_headers(self):
+        message = self.message('one', 'Test Person person@example.com')
+        result = extract.build_inventory({'messages': [message]})
+        self.assertEqual(result['contacts'][0]['email'], 'person@example.com')
+        self.assertEqual(result['contacts'][0]['display_name'], 'Test Person')
+        message['to'] = ['Wrong Summary wrong@example.com']
+        result = extract.build_inventory({'messages': [message], 'bodies': [{'id': 'one', 'payload': {
+            'headers': [{'name': 'To', 'value': 'Test Person <person@example.com>'}]}}]})
+        self.assertEqual(result['contacts'][0]['email'], 'person@example.com')
+
     def test_does_not_extract_quoted_contacts_or_access_codes(self):
         data = {'messages': [self.message('one', 'person@example.com')],
                 'bodies': [{'id': 'one', 'payload': {'mime_type': 'text/plain', 'body': {

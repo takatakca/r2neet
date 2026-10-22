@@ -53,10 +53,15 @@ def build_inventory(data):
         sent = 'SENT' in (message.get('labels') or [])
         # Use direct correspondence headers; do not turn quoted third parties or
         # every email-shaped string in newsletters into a customer database.
-        raw = (message.get('to') or []) if sent else [message.get('from_', '')]
-        if not any(raw):
-            raw = [headers.get('to' if sent else 'from', '')]
-        for name, email in getaddresses(raw):
+        header = headers.get('to' if sent else 'from', '')
+        raw = [header] if header else ((message.get('to') or []) if sent else [message.get('from_', '')])
+        # Search summaries may flatten "Name <email>" to "Name email".
+        # Prefer original MIME headers; normalize only a complete fallback.
+        normalized = []
+        for value in raw:
+            flat = re.fullmatch(r'([^<>]+?)\s+([^\s<>@]+@[^\s<>@]+\.[^\s<>@]+)', value)
+            normalized.append(f'"{flat[1].strip(chr(34))}" <{flat[2]}>' if flat else value)
+        for name, email in getaddresses(normalized):
             email = email.lower().strip()
             if not EMAIL.fullmatch(email) or email in OWN or email.endswith('@r2nette.ca'):
                 continue
