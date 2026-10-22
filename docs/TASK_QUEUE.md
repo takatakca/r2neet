@@ -1,3 +1,9 @@
+## Current customer-growth work — 2026-10-22
+
+- Gmail source inventory and bilingual marketing preferences: branch `feat/customer-source-inventory-20261022`; local extraction/HTTP tests and frontend build pass, GitHub CI required.
+- Imported correspondence is review-only, with source references and unknown marketing eligibility. Wave/Setmore exports and live CRM data are still outstanding.
+- Deployment remains blocked: latest full image attempt #38952711773 failed ENOSPC after PR #39 merged. Obtain server disk inspection/recovery before a new full roll.
+
 # R2NETTE — Task queue
 
 Reviewed: **2026-10-16**. Continue from `AGENTS.md`, `WORKLOG.md` and `docs/AGENT_HANDOFF.md`; no fake provider readiness.

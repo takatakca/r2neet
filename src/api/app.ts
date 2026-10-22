@@ -1490,6 +1490,8 @@ export function createApi(deps: ApiDeps) {
           firstName: customer.firstName,
           lastName: customer.lastName,
           email: customer.email,
+          marketingConsent: customer.marketingConsent,
+          marketingConsentUpdatedAt: customer.marketingConsentUpdatedAt,
           verifiedPhone: customer.phones[0]?.phoneE164 ?? null,
         },
         upcoming: bookings
@@ -1830,6 +1832,29 @@ export function createApi(deps: ApiDeps) {
         );
       });
       res.json({ ok: true });
+    }),
+  );
+
+  // Marketing is an explicit account choice, independent of transactional
+  // booking messages. Never accept a customer id or infer consent from email.
+  app.patch(
+    '/api/v1/account/marketing-preferences',
+    wrap(async (req, res) => {
+      const customerId = requireCustomer(req);
+      if (!req.is('application/json') || req.get('sec-fetch-site') === 'cross-site') {
+        throw new ApiError(400, 'VALIDATION_ERROR', 'Send your choice from your account.');
+      }
+      const input = z.object({ marketingConsent: z.boolean() }).strict().parse(req.body);
+      const updatedAt = now();
+      await prisma.$transaction(async (transaction) => {
+        await transaction.customer.update({
+          where: { id: customerId },
+          data: { marketingConsent: input.marketingConsent, marketingConsentUpdatedAt: updatedAt },
+        });
+        await enqueueCustomerProfile(transaction, customerId, 'PROFILE_UPDATED', updatedAt);
+      });
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ marketingConsent: input.marketingConsent, marketingConsentUpdatedAt: updatedAt.toISOString() });
     }),
   );
 

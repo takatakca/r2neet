@@ -1,3 +1,11 @@
+## Customer inventory and marketing preferences — 2026-10-22
+
+Branch `feat/customer-source-inventory-20261022` adds a private Gmail JSON-to-CSV inventory tool and a bilingual account marketing-preference editor using existing Customer fields. No schema migration, external marketing send, production import or new verification claim. The tool records correspondence evidence; it does not treat all correspondents as customers or as opted-in subscribers. Raw Gmail/CSV and customer data stay OUTSIDE this public repository.
+
+Executed: 5 Python inventory tests, 8 HTTP boundary tests with a mocked persistence adapter, and Vite production build passed locally. Prisma client generation is blocked by the execution network returning HTTP 403 for binaries.prisma.sh; full TypeScript verification therefore lacks generated model types and must run in GitHub CI. The HTTP tests do not prove real database persistence or live TAKATAK synchronization.
+
+Deployment evidence refreshed: PR #39 is already merged, but Deploy #38952711773 failed on Contabo `no space left on device` even after the scoped cleanup removed 0 tags. Main is `38fc9aac856ca902ac09616c1fb55d6b5fa4109d`; manual login asset hotfix #39255689426 succeeded, which does not prove a full immutable-image rollout. No server credentials or operational identity are attached to this execution environment. Do not retry image pulls blindly. Next: PR CI, authorized server disk inspection/recovery, then non-skipped exact-SHA rollout and authenticated preferences smoke.
+
 # R2NETTE — Agent handoff
 
 Updated 2026-10-19. On restart read `AGENTS.md`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, and `docs/DECISIONS.md` and check GitHub open PRs before new work.

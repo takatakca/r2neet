@@ -186,6 +186,9 @@ jobs:
       - name: DNS automation keeps email at MochaHost
         run: python3 -m unittest scripts/deploy/test_mochahost_dns.py
 
+      - name: Gmail inventory preserves provenance and unknown consent
+        run: python3 -m unittest scripts/test_extract_gmail_contacts.py
+
       - name: Pasted SSH keys are repaired, never printed
         run: python3 -m unittest scripts/deploy/test_repair_ssh_key.py
 

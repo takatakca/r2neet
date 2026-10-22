@@ -1,3 +1,7 @@
+## Verified update — 2026-10-22
+
+Repository main is `38fc9aac856ca902ac09616c1fb55d6b5fa4109d`. PR #39 merged but its full Deploy #38952711773 FAILED with ENOSPC. Login-only manual hotfix #39255689426 passed. Neither result is evidence of a newer fully deployed image. Customer-growth branch prepares reviewed source inventory and account marketing opt-in/out; production activation remains pending CI and storage recovery. This inventory is a private working artifact, not the production customer system of record.
+
 # R2NETTE — Project status
 
 **Verified 2026-10-16** — `takatakca/r2neet`, release branch `main`. The application is running, **but the project is not 100% production-accepted**.

@@ -1,3 +1,10 @@
+## Customer source and marketing decisions — 2026-10-22
+
+- Gmail correspondence is evidence for a review inventory, not proof of customer identity, completed service, email ownership or marketing consent. Do not merge historical contacts into verified TAKATAK identities automatically.
+- Keep actual exports private and outside the public Git repository. Preserve source message IDs; do not extract door/access codes, private notes or quoted unrelated contacts.
+- Account marketing choice uses a session-derived customer ID, strict JSON boolean, server timestamp and the existing transactional profile outbox. Withdrawal changes marketing eligibility without blocking booking/payment communications. No bulk sender is activated by this feature.
+- Wave remains a separate payment/customer source and Setmore a historical reservation source, per owner clarification. Waze is the requested map presence; no listing has been verified or created here.
+
 # R2NETTE — Recorded architectural and release decisions
 
 Snapshot: 2026-10-16. This documents existing repository policy and decisions, not new approval to activate providers.

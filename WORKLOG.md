@@ -1,3 +1,4 @@
+2026-10-22 | Codex | feat/customer-source-inventory-20261022 → PR pending | local tests/build passed; PR pending; rollout blocked ENOSPC | Extract Gmail correspondence into deduplicated source-backed review records; prepare newsletter and integration inventory | verify code, PR CI and existing deploy recovery before release
 # Work log
 
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.

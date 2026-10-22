@@ -1,3 +1,7 @@
+## Deployment check — 2026-10-22
+
+Read Actions run #38952711773 and job #117147818213: the image built/pushed, but the VPS roll failed repeatedly with ENOSPC after scoped image cleanup removed 0 old tags. PR #39 is merged; it did not establish recovery. Run #39255689426 successfully copied login assets into the existing container only. Current customer-growth changes must pass PR CI and wait for actual disk recovery, then require non-skipped exact-SHA Deploy and health checks. No production change was executed in this inventory session.
+
 # R2NETTE — Verified production and deployment runbook
 
 Snapshot: **2026-10-16**. Canonical instructions: [Contabo runbook](deployment/contabo-runbook.md) and [disaster recovery](reservation-system/disaster-recovery.md).
