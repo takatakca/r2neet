@@ -1,6 +1,6 @@
 ## Customer inventory and marketing preferences — 2026-10-22
 
-Branch `feat/customer-source-inventory-20261022` adds a private Gmail JSON-to-CSV inventory tool and a bilingual account marketing-preference editor using existing Customer fields. No schema migration, external marketing send, production import or new verification claim. The tool records correspondence evidence; it does not treat all correspondents as customers or as opted-in subscribers. Raw Gmail/CSV and customer data stay OUTSIDE this public repository.
+PR [#43](https://github.com/takatakca/r2neet/pull/43), branch `feat/customer-source-inventory-20261022`, adds a private Gmail JSON-to-CSV inventory tool and a bilingual account marketing-preference editor using existing Customer fields. No schema migration, external marketing send, production import or new verification claim. The tool records correspondence evidence; it does not treat all correspondents as customers or as opted-in subscribers. Raw Gmail/CSV and customer data stay OUTSIDE this public repository.
 
 Executed: 5 Python inventory tests, 8 HTTP boundary tests with a mocked persistence adapter, and Vite production build passed locally. Prisma client generation is blocked by the execution network returning HTTP 403 for binaries.prisma.sh; full TypeScript verification therefore lacks generated model types and must run in GitHub CI. The HTTP tests do not prove real database persistence or live TAKATAK synchronization.
 
