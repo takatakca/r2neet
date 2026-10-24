@@ -1,3 +1,29 @@
+## Prochaines actions signées — 2026-10-24
+
+1. Obtenir le dossier OneDrive désigné par le propriétaire et en lire les consignes ; classer le dossier de remise et le manifeste privé dans les emplacements existants.
+2. Vérifier l’état actuel et le stockage du serveur ; le dernier déploiement complet inspecté a échoué ENOSPC.
+3. Reprendre PR 43, dont le code fonctionnel a passé la CI 40079381092 ; livrer selon la procédure existante avec preuve de migration et de déploiement réel.
+4. Importer le fichier privé validé, relire les compteurs et vérifier l’accès OWNER sur le site.
+5. Compléter les autres sources quand leurs accès seront fournis.
+
+Preuves et détails : [dossier de remise](dossier-client-r2nette/INDEX.md). Aucun transfert OneDrive, aucune livraison de production ni aucun import de production effectué dans la consolidation de notes.
+
+Note signée : **Codex — assistant OpenAI**. Date : **2026-10-24**, America/New_York.
+
+---
+
+## Private site customer database — 2026-10-24
+
+Continued PR #43 on `feat/customer-source-inventory-20261022`. Adds owner-only `/admin#customers`, persistent historical contacts/source evidence, existing-account view, search/pagination, editable name/classification and idempotent bounded import. Migration `20261024090000_add_customer_contacts` is NEW and NOT applied to production. The private inventory validates as 105 contacts / 345 source references / six batches. No real contact data is in Git. No account verification, marketing grant, external send or identity merge is performed by importing it.
+
+Local: eight contact-input/HTTP tests passed, six extraction tests and eight existing marketing HTTP tests passed; frontend build passed. Database tests must run in CI with generated Prisma types and a disposable Postgres database. See `docs/customer-database.md`. Next: final branch CI, recover/verify production storage, deploy migration/image, then import the private file and smoke-test the owner-only directory. None of these production steps has occurred in this session.
+
+## Current customer-growth work — 2026-10-22
+
+- Gmail source inventory and bilingual marketing preferences: branch `feat/customer-source-inventory-20261022`; local extraction/HTTP tests and frontend build pass, GitHub CI required.
+- Imported correspondence is review-only, with source references and unknown marketing eligibility. Wave/Setmore exports and live CRM data are still outstanding.
+- Deployment remains blocked: latest full image attempt #38952711773 failed ENOSPC after PR #39 merged. Obtain server disk inspection/recovery before a new full roll.
+
 # R2NETTE — Task queue
 
 Reviewed: **2026-10-16**. Continue from `AGENTS.md`, `WORKLOG.md` and `docs/AGENT_HANDOFF.md`; no fake provider readiness.

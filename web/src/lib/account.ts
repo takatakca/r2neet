@@ -43,7 +43,10 @@ interface AccountBooking {
 }
 
 interface Overview {
-  customer: { firstName: string | null; email: string | null; verifiedPhone: string | null };
+  customer: {
+    firstName: string | null; email: string | null; verifiedPhone: string | null;
+    marketingConsent: boolean; marketingConsentUpdatedAt: string | null;
+  };
   upcoming: AccountBooking[];
   past: AccountBooking[];
   addresses: { id: string; label: string | null; formattedAddress: string; isDefault: boolean }[];
@@ -199,6 +202,19 @@ function render(): void {
           </div>
           <div class="err" id="pfErr" hidden></div>
           <div class="acts"><button class="btn btn-primary" data-action="save-profile">${esc(t('account.save'))}</button></div>
+        </div>
+      </div>
+
+      <div class="section"><h2>${esc(t('account.newsletterTitle'))}</h2>
+        <div class="card">
+          <label for="marketingConsent" style="display:flex;gap:12px;align-items:flex-start">
+            <input type="checkbox" id="marketingConsent" ${data.customer.marketingConsent ? 'checked' : ''}>
+            <span>${esc(t('account.newsletterChoice'))}</span>
+          </label>
+          <p class="note">${esc(t('account.newsletterNote'))}</p>
+          <div class="err" id="marketingErr" role="alert" hidden></div>
+          <div class="acts"><button type="button" class="btn btn-primary" data-action="save-marketing">${esc(t('account.save'))}</button></div>
+          <p id="marketingStatus" role="status" aria-live="polite"></p>
         </div>
       </div>
 
@@ -450,6 +466,35 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
       await load();
     } catch (e) {
       toast(translateError(locale, e instanceof ApiError ? e.code : undefined));
+    }
+  },
+  'save-marketing': async (el) => {
+    const checkbox = $('marketingConsent') as HTMLInputElement | null;
+    if (!checkbox || !data) return;
+    const button = el as HTMLButtonElement;
+    const error = $('marketingErr');
+    const status = $('marketingStatus');
+    if (error) error.hidden = true;
+    if (status) status.textContent = '';
+    button.disabled = true;
+    checkbox.disabled = true;
+    try {
+      const saved = await call<{ marketingConsent: boolean; marketingConsentUpdatedAt: string }>(
+        '/api/v1/account/marketing-preferences',
+        { method: 'PATCH', body: JSON.stringify({ marketingConsent: checkbox.checked }) },
+      );
+      data.customer.marketingConsent = saved.marketingConsent;
+      data.customer.marketingConsentUpdatedAt = saved.marketingConsentUpdatedAt;
+      checkbox.checked = saved.marketingConsent;
+      if (status) status.textContent = t('account.saved');
+    } catch (e) {
+      if (error) {
+        error.textContent = translateError(locale, e instanceof ApiError ? e.code : undefined);
+        error.hidden = false;
+      }
+    } finally {
+      button.disabled = false;
+      checkbox.disabled = false;
     }
   },
   'save-profile': async () => {

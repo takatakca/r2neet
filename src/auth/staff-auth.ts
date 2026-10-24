@@ -106,6 +106,7 @@ export type Permission =
   | 'integrations.view'
   | 'cutover.view'
   | 'staff.manage'
+  | 'customers.manage'
   | 'crew.ownJobs';
 
 /**
@@ -124,6 +125,7 @@ const ROLE_PERMISSIONS: Record<StaffRole, Permission[]> = {
     'integrations.view',
     'cutover.view',
     'staff.manage',
+    'customers.manage',
     'crew.ownJobs',
   ],
   DISPATCHER: [

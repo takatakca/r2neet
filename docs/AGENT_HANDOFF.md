@@ -1,3 +1,27 @@
+## Reprise signée du dossier — 2026-10-24
+
+Lire [l’index de remise R2NETTE](dossier-client-r2nette/INDEX.md) pour les travaux, les preuves, les données privées et les prochaines actions. Le propriétaire demande des notes d’agent datées et signées dans les fichiers concernés. Les notes de son OneDrive ne sont pas encore accessibles : classement préparatoire dans le dépôt, transfert OneDrive non effectué.
+
+La CI du code fonctionnel `effa46d6f6df1b5f043f11ce319d05d07cfcde83` a réussi intégralement : run 40079381092. PR 43 reste ouverte. Migration et import de production non exécutés. Les paragraphes historiques ci-dessous « CI à exécuter » sont antérieurs à cette preuve. Le dernier déploiement complet inspecté a échoué ENOSPC ; l’état actuel du serveur doit être vérifié.
+
+Note signée : **Codex — assistant OpenAI**. Date : **2026-10-24**, America/New_York.
+
+---
+
+## Private site customer database — 2026-10-24
+
+Continued PR #43 on `feat/customer-source-inventory-20261022`. Adds owner-only `/admin#customers`, persistent historical contacts/source evidence, existing-account view, search/pagination, editable name/classification and idempotent bounded import. Migration `20261024090000_add_customer_contacts` is NEW and NOT applied to production. The private inventory validates as 105 contacts / 345 source references / six batches. No real contact data is in Git. No account verification, marketing grant, external send or identity merge is performed by importing it.
+
+Local: eight contact-input/HTTP tests passed, six extraction tests and eight existing marketing HTTP tests passed; frontend build passed. Database tests must run in CI with generated Prisma types and a disposable Postgres database. See `docs/customer-database.md`. Next: final branch CI, recover/verify production storage, deploy migration/image, then import the private file and smoke-test the owner-only directory. None of these production steps has occurred in this session.
+
+## Customer inventory and marketing preferences — 2026-10-22
+
+PR [#43](https://github.com/takatakca/r2neet/pull/43), branch `feat/customer-source-inventory-20261022`, adds a private Gmail JSON-to-CSV inventory tool and a bilingual account marketing-preference editor using existing Customer fields. No schema migration, external marketing send, production import or new verification claim. The tool records correspondence evidence; it does not treat all correspondents as customers or as opted-in subscribers. Raw Gmail/CSV and customer data stay OUTSIDE this public repository.
+
+Executed: 6 Python inventory tests, 8 HTTP boundary tests with a mocked persistence adapter, and Vite production build passed locally. Prisma client generation is blocked by the execution network returning HTTP 403 for binaries.prisma.sh; full TypeScript verification therefore lacks generated model types and must run in GitHub CI. The HTTP tests do not prove real database persistence or live TAKATAK synchronization.
+
+Deployment evidence refreshed: PR #39 is already merged, but Deploy #38952711773 failed on Contabo `no space left on device` even after the scoped cleanup removed 0 tags. Main is `38fc9aac856ca902ac09616c1fb55d6b5fa4109d`; manual login asset hotfix #39255689426 succeeded, which does not prove a full immutable-image rollout. No server credentials or operational identity are attached to this execution environment. Do not retry image pulls blindly. Next: PR CI, authorized server disk inspection/recovery, then non-skipped exact-SHA rollout and authenticated preferences smoke.
+
 # R2NETTE — Agent handoff
 
 Updated 2026-10-19. On restart read `AGENTS.md`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, and `docs/DECISIONS.md` and check GitHub open PRs before new work.

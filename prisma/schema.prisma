@@ -29,6 +29,42 @@ datasource db {
  * ------------------------------------------------------------------
  */
 
+/// CRM contacts are historical evidence, never a login identity. They remain
+/// separate from Customer until a real account proves its own identity.
+enum CustomerContactStatus {
+  TO_REVIEW
+  PROSPECT
+  CUSTOMER
+  OTHER
+}
+
+model CustomerContact {
+  id              String               @id @default(uuid())
+  emailNormalized String               @unique
+  displayName     String?
+  status          CustomerContactStatus @default(TO_REVIEW)
+  firstSeenAt     DateTime
+  lastSeenAt      DateTime
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  sources         CustomerContactSource[]
+
+  @@index([status, lastSeenAt])
+}
+
+model CustomerContactSource {
+  id           String          @id @default(uuid())
+  contactId    String
+  accountEmail String
+  messageId    String
+  occurredAt   DateTime
+  createdAt    DateTime        @default(now())
+  contact      CustomerContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, accountEmail, messageId])
+  @@index([contactId, occurredAt])
+}
+
 model Customer {
   /// Deterministic id from a legacy system, so re-importing never duplicates.
   legacyExternalId          String?   @unique

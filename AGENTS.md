@@ -16,3 +16,9 @@ Line format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 ## Brand rule
 
 Everything visual or written for TAKATAK follows `BRAND.md` (logo, colours, tagline, services). Electric blue on deep navy; never the old gold "TK" logo; green is for status only.
+
+## Owner documentation requirement — 2026-10-24
+
+The owner requests organized, dated, signed agent notes. Use `docs/dossier-client-r2nette/INDEX.md` as the current technical handoff index and `06-regles-des-notes-agent.md` for the note format. Read the owner-designated OneDrive instructions when the connection makes them accessible; do not claim to have read inaccessible notes. Continue independent work and record that access limitation. Preserve prior notes, attribute only your own intervention, and keep private customer inventories and credentials out of this public repository.
+
+Recorded by Codex — OpenAI assistant, 2026-10-24 (America/New_York), from the owner's instruction in this conversation.

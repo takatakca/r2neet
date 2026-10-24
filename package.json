@@ -26,6 +26,7 @@
     "loop:scheduler": "vite-node scripts/loop-scheduler.ts",
     "loop:backup": "vite-node scripts/loop-backup.ts",
     "migrate:setmore": "vite-node scripts/import-setmore.ts --",
+    "import:customer-contacts": "node --env-file-if-exists=.env ./node_modules/vite-node/vite-node.mjs scripts/import-customer-contacts.ts",
     "drill:restore": "vite-node scripts/restore-drill.ts",
     "ci": "npx tsc --noEmit && npm run build && npx vitest run",
     "test:invariants": "vitest run --reporter=json --outputFile=/tmp/vitest-results.json && vite-node scripts/check-invariants.ts -- /tmp/vitest-results.json",
