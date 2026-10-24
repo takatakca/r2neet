@@ -1,3 +1,13 @@
+## Consignation demandée par le propriétaire — 2026-10-24
+
+Les interventions doivent être organisées, attribuées et signées textuellement par l’agent qui les effectue. Les notes du OneDrive désigné par le propriétaire guideront son classement dès qu’elles pourront être lues. Leur accès manque actuellement ; ne pas prétendre les avoir suivies. Préserver les notes préexistantes et ajouter les corrections sous forme datée.
+
+Le dossier technique public est [indexé ici](dossier-client-r2nette/INDEX.md). Les données nominatives et leurs références privées restent hors du dépôt. Une preuve de code testé, une livraison de production et une validation financière sont trois états distincts. Ne pas attribuer aux autres agents la signature de cette session.
+
+Note signée : **Codex — assistant OpenAI**. Date : **2026-10-24**, America/New_York.
+
+---
+
 ## Private site customer database — 2026-10-24
 
 Continued PR #43 on `feat/customer-source-inventory-20261022`. Adds owner-only `/admin#customers`, persistent historical contacts/source evidence, existing-account view, search/pagination, editable name/classification and idempotent bounded import. Migration `20261024090000_add_customer_contacts` is NEW and NOT applied to production. The private inventory validates as 105 contacts / 345 source references / six batches. No real contact data is in Git. No account verification, marketing grant, external send or identity merge is performed by importing it.

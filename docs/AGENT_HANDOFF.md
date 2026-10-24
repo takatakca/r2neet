@@ -1,3 +1,13 @@
+## Reprise signée du dossier — 2026-10-24
+
+Lire [l’index de remise R2NETTE](dossier-client-r2nette/INDEX.md) pour les travaux, les preuves, les données privées et les prochaines actions. Le propriétaire demande des notes d’agent datées et signées dans les fichiers concernés. Les notes de son OneDrive ne sont pas encore accessibles : classement préparatoire dans le dépôt, transfert OneDrive non effectué.
+
+La CI du code fonctionnel `effa46d6f6df1b5f043f11ce319d05d07cfcde83` a réussi intégralement : run 40079381092. PR 43 reste ouverte. Migration et import de production non exécutés. Les paragraphes historiques ci-dessous « CI à exécuter » sont antérieurs à cette preuve. Le dernier déploiement complet inspecté a échoué ENOSPC ; l’état actuel du serveur doit être vérifié.
+
+Note signée : **Codex — assistant OpenAI**. Date : **2026-10-24**, America/New_York.
+
+---
+
 ## Private site customer database — 2026-10-24
 
 Continued PR #43 on `feat/customer-source-inventory-20261022`. Adds owner-only `/admin#customers`, persistent historical contacts/source evidence, existing-account view, search/pagination, editable name/classification and idempotent bounded import. Migration `20261024090000_add_customer_contacts` is NEW and NOT applied to production. The private inventory validates as 105 contacts / 345 source references / six batches. No real contact data is in Git. No account verification, marketing grant, external send or identity merge is performed by importing it.

@@ -1,3 +1,13 @@
+## Note de livraison signée — 2026-10-24
+
+La consolidation présente publie uniquement des notes techniques dans la branche de PR 43. Elle ne déploie pas le site et ne modifie ni la base de production ni son stockage. Le code fonctionnel `effa46d6f6df1b5f043f11ce319d05d07cfcde83` est couvert par la CI 40079381092 réussie. La migration `20261024090000_add_customer_contacts` et l’import privé restent à exécuter lors d’une livraison autorisée et techniquement accessible.
+
+Le dernier déploiement complet inspecté, 38952711773, a échoué ENOSPC. Un correctif de fichiers de connexion ne vaut pas nouvelle image complète. Revoir le serveur avant toute relance, puis consigner le run réellement exécuté et ses sondes. Voir [les preuves et fichiers](dossier-client-r2nette/02-preuves-et-fichiers.md). Le transfert de documents vers OneDrive est lui aussi en attente d’accès.
+
+Note signée : **Codex — assistant OpenAI**. Date : **2026-10-24**, America/New_York.
+
+---
+
 ## Private site customer database — 2026-10-24
 
 Continued PR #43 on `feat/customer-source-inventory-20261022`. Adds owner-only `/admin#customers`, persistent historical contacts/source evidence, existing-account view, search/pagination, editable name/classification and idempotent bounded import. Migration `20261024090000_add_customer_contacts` is NEW and NOT applied to production. The private inventory validates as 105 contacts / 345 source references / six batches. No real contact data is in Git. No account verification, marketing grant, external send or identity merge is performed by importing it.

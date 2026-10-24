@@ -1,3 +1,13 @@
+## État consolidé et signé — 2026-10-24
+
+Le [dossier de remise](dossier-client-r2nette/INDEX.md) centralise les preuves et distingue les livrables préparés du site en production. Code fonctionnel : `effa46d6f6df1b5f043f11ce319d05d07cfcde83` ; CI 40079381092 réussie. PR 43 ouverte/non fusionnée à la vérification. Le répertoire privé et sa migration ne sont pas déployés. 105 contacts et 345 références sont préparés pour import, sans preuve d’exhaustivité ni qualification automatique comme clients.
+
+Les notes et l’arborescence OneDrive demandées restent à lire avec un accès utilisable. Les documents suivants conservent l’historique ; cette entrée corrige leur ancien statut « CI en attente » pour le commit fonctionnel indiqué.
+
+Note signée : **Codex — assistant OpenAI**. Date : **2026-10-24**, America/New_York.
+
+---
+
 ## Private site customer database — 2026-10-24
 
 Continued PR #43 on `feat/customer-source-inventory-20261022`. Adds owner-only `/admin#customers`, persistent historical contacts/source evidence, existing-account view, search/pagination, editable name/classification and idempotent bounded import. Migration `20261024090000_add_customer_contacts` is NEW and NOT applied to production. The private inventory validates as 105 contacts / 345 source references / six batches. No real contact data is in Git. No account verification, marketing grant, external send or identity merge is performed by importing it.
