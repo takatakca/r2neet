@@ -23,7 +23,7 @@ describe('customer contact input and historical identity boundary', () => {
 
   it('projects evidence only and splits large source histories without truncating', () => {
     const sources = Array.from({ length: 601 }, (_, i) => ['c1', (1000000000000 + i).toString(16).padStart(16, '0'), occurredAt, 'envoye', 'https://untrusted.invalid']);
-    const batches = inventoryBatches({ contacts: [{ contact_id: 'c1', email: 'Test@example.com', display_name: 'Test', marketing_eligible: true }], sources });
+    const batches = inventoryBatches({ source_account: 'r2nette.ca@gmail.com', contacts: [{ contact_id: 'c1', email: 'Test@example.com', display_name: 'Test', marketing_eligible: true }], sources });
     expect(batches).toHaveLength(2);
     expect(batches.flatMap((b) => b.contacts.flatMap((c) => c.sources))).toHaveLength(601);
     expect(JSON.stringify(batches)).not.toContain('untrusted.invalid');
@@ -31,7 +31,8 @@ describe('customer contact input and historical identity boundary', () => {
   });
 
   it('requires provenance and limits batch size', () => {
-    expect(() => inventoryBatches({ contacts: [{ contact_id: 'none', email: 'test@example.com' }], sources: [] })).toThrow();
+    expect(() => inventoryBatches({ source_account: 'r2nette.ca@gmail.com', contacts: [{ contact_id: 'none', email: 'test@example.com' }], sources: [] })).toThrow();
+    expect(() => inventoryBatches({ source_account: 'other@example.com', contacts: [], sources: [] })).toThrow();
     expect(() => contactImportSchema.parse({ ...batch, contacts: Array(21).fill(batch.contacts[0]) })).toThrow();
   });
 

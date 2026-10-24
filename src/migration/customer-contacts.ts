@@ -62,6 +62,7 @@ export async function importContactBatch(prisma: PrismaClient, input: unknown) {
 /** Project only reviewed fields from our private extraction file. */
 export function inventoryBatches(raw: unknown): z.infer<typeof contactImportSchema>[] {
   const inventory = z.object({
+    source_account: z.literal(sourceAccount),
     contacts: z.array(z.object({ email, display_name: z.string().max(200).optional() })).max(10000),
     sources: z.array(z.tuple([z.string(), z.string(), z.string(), z.string(), z.string()])).max(100000),
   }).passthrough().parse(raw);

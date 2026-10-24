@@ -1068,7 +1068,10 @@ function route(){
   switch(id){
     case 'dispatch': dispatch(); break;
     case 'roster': rosterPage(); break;
-    case 'customers': mountCustomerContacts(document.getElementById('customers'), api); break;
+    case 'customers':
+      if ((ME?.permissions || []).includes('customers.manage')) mountCustomerContacts(document.getElementById('customers'), api);
+      else document.getElementById('customers').textContent = 'Accès réservé au propriétaire.';
+      break;
     case 'callbacks': callbacksPage(); break;
     case 'billing': billingPage(); break;
     case 'reviews': reviewsPage(); break;

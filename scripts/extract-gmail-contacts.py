@@ -98,7 +98,7 @@ def build_inventory(data):
             bookings.append([booking[1], when[1] if when else '', service[1] if service else '', mid,
                              metadata.get(mid, {}).get('display_url', ''), 'historique_a_verifier'])
     unique = {row[0]: row for row in bookings}
-    return {'contacts': rows, 'sources': sources, 'bookings': list(unique.values()),
+    return {'source_account': 'r2nette.ca@gmail.com', 'contacts': rows, 'sources': sources, 'bookings': list(unique.values()),
             'coverage': data.get('coverage', {}), 'message_count': len(metadata),
             'body_count': len(body_map)}
 

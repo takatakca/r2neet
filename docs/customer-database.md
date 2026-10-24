@@ -30,7 +30,7 @@ them. Other sources (Wave/Setmore) need their own verified mapping later.
 
 Keep actual JSON/CSV files outside this public repository and all build contexts.
 Use the `inventory.json` produced by `scripts/extract-gmail-contacts.py`. It must
-contain contacts with `contact_id`, `email`, optional `display_name`, and source
+identify `source_account` as `r2nette.ca@gmail.com` and contain contacts with `contact_id`, `email`, optional `display_name`, and source
 tuples `[contact_id, message_id, timestamp, direction, source_url]`.
 The projection drops all unrelated fields, consent assertions and supplied URLs.
 Links are reconstructed server-side from the known mailbox and validated message
