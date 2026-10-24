@@ -175,6 +175,7 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;backgroun
     <a href="#dashboard" data-nav="dashboard" class="on">Dashboard</a>
     <a href="#dispatch" data-nav="dispatch">Dispatch</a>
     <a href="#roster" data-nav="roster">Staff &amp; Cleaners</a>
+    <a href="#customers" data-nav="customers">Clients et contacts</a>
     <a href="#callbacks" data-nav="callbacks">Callbacks</a>
     <a href="#billing" data-nav="billing">Billing</a>
     <div class="grp" data-group="content">Content</div>
@@ -190,6 +191,7 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;backgroun
     <div id="dashboard" class="page on"></div>
     <div id="dispatch" class="page"></div>
     <div id="roster" class="page"></div>
+    <div id="customers" class="page"></div>
     <div id="callbacks" class="page"></div>
     <div id="billing" class="page"></div>
     <div id="reviews" class="page"></div>
@@ -201,6 +203,7 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;backgroun
 </div>
 
 <script type="module">
+import { mountCustomerContacts } from '/src/lib/customer-contacts.ts';
 /** Set once the session resolves; drives which nav items exist at all. */
 let ME = null;
 
@@ -209,6 +212,7 @@ const NAV_PERMISSION = {
   dashboard: 'dashboard.view',
   dispatch: 'dispatch.view',
   roster: 'dispatch.view',
+  customers: 'customers.manage',
   callbacks: 'callbacks.view',
   billing: 'dashboard.view',
   reviews: 'reviews.view',
@@ -253,7 +257,7 @@ function applyRole(){
     if(ok && !firstVisible) firstVisible = a.dataset.nav;
   }
   // A section heading with nothing under it is noise; hide it too.
-  const GROUPS = { ops:['dashboard','dispatch','roster','callbacks','billing'], content:['reviews'], setup:['integrations','cutover','security','operations'] };
+  const GROUPS = { ops:['dashboard','dispatch','roster','customers','callbacks','billing'], content:['reviews'], setup:['integrations','cutover','security','operations'] };
   for(const [group, items] of Object.entries(GROUPS)){
     const heading = document.querySelector(`.grp[data-group="${group}"]`);
     if(heading) heading.hidden = !items.some(i => NAV_PERMISSION[i] === null || allowed.has(NAV_PERMISSION[i]));
@@ -1064,6 +1068,7 @@ function route(){
   switch(id){
     case 'dispatch': dispatch(); break;
     case 'roster': rosterPage(); break;
+    case 'customers': mountCustomerContacts(document.getElementById('customers'), api); break;
     case 'callbacks': callbacksPage(); break;
     case 'billing': billingPage(); break;
     case 'reviews': reviewsPage(); break;

@@ -1,3 +1,9 @@
+## Private site customer database — 2026-10-24
+
+Continued PR #43 on `feat/customer-source-inventory-20261022`. Adds owner-only `/admin#customers`, persistent historical contacts/source evidence, existing-account view, search/pagination, editable name/classification and idempotent bounded import. Migration `20261024090000_add_customer_contacts` is NEW and NOT applied to production. The private inventory validates as 105 contacts / 345 source references / six batches. No real contact data is in Git. No account verification, marketing grant, external send or identity merge is performed by importing it.
+
+Local: eight contact-input/HTTP tests passed, six extraction tests and eight existing marketing HTTP tests passed; frontend build passed. Database tests must run in CI with generated Prisma types and a disposable Postgres database. See `docs/customer-database.md`. Next: final branch CI, recover/verify production storage, deploy migration/image, then import the private file and smoke-test the owner-only directory. None of these production steps has occurred in this session.
+
 ## Deployment check — 2026-10-22
 
 Read Actions run #38952711773 and job #117147818213: the image built/pushed, but the VPS roll failed repeatedly with ENOSPC after scoped image cleanup removed 0 old tags. PR #39 is merged; it did not establish recovery. Run #39255689426 successfully copied login assets into the existing container only. Current customer-growth changes must pass PR CI and wait for actual disk recovery, then require non-skipped exact-SHA Deploy and health checks. No production change was executed in this inventory session.

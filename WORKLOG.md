@@ -1,3 +1,4 @@
+2026-10-24 | Codex | feat/customer-source-inventory-20261022 → PR #43 | PR #43; local checks passed; CI pending; production access blocked | Extend existing private Gmail inventory with persistent owner-only contact database, search, classification and idempotent import | tests/CI; server storage and access remain release gate
 2026-10-22 | Codex | feat/customer-source-inventory-20261022 → PR #43 | PR #43; local tests/build passed; rollout blocked ENOSPC | Extract Gmail correspondence into deduplicated source-backed review records; prepare newsletter and integration inventory | verify code, PR CI and existing deploy recovery before release
 # Work log
 

@@ -1,3 +1,9 @@
+## Private site customer database — 2026-10-24
+
+Continued PR #43 on `feat/customer-source-inventory-20261022`. Adds owner-only `/admin#customers`, persistent historical contacts/source evidence, existing-account view, search/pagination, editable name/classification and idempotent bounded import. Migration `20261024090000_add_customer_contacts` is NEW and NOT applied to production. The private inventory validates as 105 contacts / 345 source references / six batches. No real contact data is in Git. No account verification, marketing grant, external send or identity merge is performed by importing it.
+
+Local: eight contact-input/HTTP tests passed, six extraction tests and eight existing marketing HTTP tests passed; frontend build passed. Database tests must run in CI with generated Prisma types and a disposable Postgres database. See `docs/customer-database.md`. Next: final branch CI, recover/verify production storage, deploy migration/image, then import the private file and smoke-test the owner-only directory. None of these production steps has occurred in this session.
+
 ## Customer inventory and marketing preferences — 2026-10-22
 
 PR [#43](https://github.com/takatakca/r2neet/pull/43), branch `feat/customer-source-inventory-20261022`, adds a private Gmail JSON-to-CSV inventory tool and a bilingual account marketing-preference editor using existing Customer fields. No schema migration, external marketing send, production import or new verification claim. The tool records correspondence evidence; it does not treat all correspondents as customers or as opted-in subscribers. Raw Gmail/CSV and customer data stay OUTSIDE this public repository.

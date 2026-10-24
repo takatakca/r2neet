@@ -11,6 +11,7 @@ import { workerExpectations, offHostConfigured } from '../workers/expectations.j
 import { localToUtc, findStaffConflict, DEFAULT_BUFFERS } from '../scheduling/availability.js';
 import { acquireCapacityLocks, loadBusy } from '../db/prisma-repositories.js';
 import cookieParser from 'cookie-parser';
+import { createCustomerContactsApi } from './customer-contacts.js';
 import {
   StaffAuthService,
   AuthError,
@@ -119,6 +120,10 @@ export function createOpsApi(deps: OpsDeps) {
       month: '2-digit',
       day: '2-digit',
     }).format(now());
+
+  app.use('/api/v1/admin/customer-contacts', createCustomerContactsApi(
+    prisma, (req) => requirePermission(req, 'customers.manage'),
+  ));
 
   /* ---------------- dashboard ---------------- */
 
