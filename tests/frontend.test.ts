@@ -627,7 +627,11 @@ describe('installable app shell', () => {
   });
 
   it('keeps API and identity routes network-only in the service worker', () => {
-    expect(worker).toContain('const NETWORK_ONLY_PATH = /^\\/(?:api\\/|auth');
+    const pattern = worker.match(/const NETWORK_ONLY_PATH = \/(.*)\/;/)?.[1];
+    expect(pattern).toBeTruthy();
+    const networkOnly = new RegExp(pattern!);
+    for (const route of ['/api/v1/customer/me', '/login', '/signup', '/auth', '/verify', '/account', '/admin', '/crew', '/payment', '/phone-login', '/profile']) expect(networkOnly.test(route)).toBe(true);
+    expect(networkOnly.test('/assets/hero.jpg')).toBe(false);
     expect(worker).toContain("if (url.origin !== self.location.origin || NETWORK_ONLY_PATH.test(url.pathname)) return;");
     expect(worker).toContain(".catch(async () => (await caches.match(APP_SHELL_URL))");
     expect(worker).toContain(".catch(() => new Response('', { status: 503, statusText: 'Offline' }))");

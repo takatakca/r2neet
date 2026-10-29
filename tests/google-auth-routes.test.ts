@@ -77,7 +77,7 @@ function createTestApi() {
       },
     },
   };
-  const app = createApi({
+  const app = createApi({ legacyPhoneRegistration: true,
     prisma: prisma as never,
     verification: new FakeVerificationProvider(),
     publicUrl: 'https://r2nette.ca',

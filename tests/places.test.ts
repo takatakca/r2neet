@@ -112,7 +112,7 @@ d('address HTTP routes', () => {
     await prisma.customer.deleteMany();
     await seed(prisma);
     places = new FakePlacesProvider();
-    app = createApi({
+    app = createApi({ legacyPhoneRegistration: true,
       prisma,
       verification: new FakeVerificationProvider('123456'),
       places,
@@ -273,7 +273,7 @@ d('address HTTP routes', () => {
   });
 
   it('reports NOT_CONFIGURED instead of faking addresses', async () => {
-    const bare = createApi({ prisma, verification: new FakeVerificationProvider('123456') });
+    const bare = createApi({ legacyPhoneRegistration: true, prisma, verification: new FakeVerificationProvider('123456') });
     const res = await request(bare).get('/api/v1/address/autocomplete').query({ q: '754 av' });
     expect(res.status).toBe(503);
     expect(res.body.error.code).toBe('INTEGRATION_NOT_CONFIGURED');

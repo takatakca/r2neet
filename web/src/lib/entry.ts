@@ -1,3 +1,4 @@
+import './consent.js';
 import { boot } from './main.js';
 
 boot().catch((error: unknown) => {

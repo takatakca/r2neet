@@ -5,13 +5,19 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 const single = process.env.SINGLE_FILE === '1';
 
 const cleanPageRoutes: Record<string, string> = {
-  '/auth': '/auth.html',
-  '/login': '/auth.html',
+  '/auth': '/email.html',
+  '/login': '/email.html',
   '/verify': '/verify.html',
-  '/signup': '/signup.html',
+  '/signup': '/email.html',
   '/account': '/account.html',
   '/admin': '/admin.html',
   '/crew': '/crew.html',
+  '/phone-login': '/auth.html',
+  '/profile': '/signup.html',
+  '/commercial': '/commercial.html',
+  '/payment': '/payment.html',
+  '/terms': '/terms.html',
+  '/privacy': '/privacy.html',
 };
 
 function cleanPageUrls() {
@@ -54,6 +60,9 @@ export default defineConfig({
           input: {
             index: 'web/index.html',
             auth: 'web/auth.html',
+            email: 'web/email.html',
+            commercial: 'web/commercial.html',
+            payment: 'web/payment.html',
             verify: 'web/verify.html',
             signup: 'web/signup.html',
             account: 'web/account.html',

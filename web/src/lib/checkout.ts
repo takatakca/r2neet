@@ -88,6 +88,7 @@ export interface ElementLike {
 
 export interface MountResult {
   elements: ElementsLike;
+  expressElement: ElementLike;
   /** True only when Stripe reported at least one express method. */
   expressAvailable: boolean;
 }
@@ -143,7 +144,7 @@ export async function mountElements(
   });
   payment.mount(nodes.payment);
 
-  return { elements, expressAvailable };
+  return { elements, expressAvailable, expressElement: express };
 }
 
 /**

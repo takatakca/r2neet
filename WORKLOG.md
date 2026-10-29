@@ -1,5 +1,7 @@
 # Work log
 
+- 2026-10-29 | Codex — assistant OpenAI | feat/email-first-premium-20261029 → PR #46 | code tested, release blocked on real email activation | Email OTP/no signup SMS, guided booking, commercial queue, consent/withdrawal, calendar/GPS and scoped checkout | initial CI 40843380976 passed 764 tests; final follow-up CI then confirm SMTP/template/flag before release; photos/signatures/transfer/plans/LLM remain documented
+
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 

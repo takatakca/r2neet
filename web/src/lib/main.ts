@@ -371,6 +371,8 @@ function openSheet(html: string): void {
   const body = $('sheetBody');
   const sheet = $('sheet');
   if (!body || !sheet) return;
+  const bookingDialog = $('bookingDialog') as HTMLDialogElement | null;
+  (bookingDialog?.open ? bookingDialog : document.body).append(sheet);
   body.innerHTML = html;
   sheet.classList.add('on');
 }
@@ -781,6 +783,7 @@ async function refreshQuote(): Promise<void> {
     });
     if (seq !== quoteSeq) return;
     quote = res.quote;
+    paymentCfg = null;
     renderLedger();
   } catch (e) {
     showError(e);
@@ -815,7 +818,7 @@ function renderLedger(): void {
   h += `<div class="ln tot"><span class="l">${esc(t('ledger.total'))}</span>
     <span class="v" id="ledgerTotal">${formatMoney(lastTotalCents, locale)}</span></div></div><div class="lf">`;
   h += `<div class="due"><span>${esc(t('checkout.dueToday'))}</span>
-    <span class="mono">${formatMoney(paymentCfg?.amountDueNowCents ?? 0, locale)}</span></div>`;
+    <span class="mono">${paymentCfg?.paymentPolicy ? formatMoney(paymentCfg.amountDueNowCents ?? 0, locale) : '—'}</span></div>`;
   const disc = quote.firstVisit?.appliedDiscount;
   if (disc) h += `<div class="savepill">★ ${formatMoney(disc.amountCents, locale)}</div>`;
   if (quote.subsequentVisitPricingPreview) {
@@ -942,9 +945,7 @@ function renderDetails(): void {
   const c = ctx?.customer;
   const vp = $('verifiedPhone');
   if (vp) {
-    vp.innerHTML = `<strong>✓ ${esc(t('details.verified'))}</strong> ${
-      c?.verifiedPhone ? esc(maskPhoneDisplay(c.verifiedPhone)) : ''
-    }`;
+    vp.textContent = c?.verifiedPhone ? `${t('details.verified')}: ${maskPhoneDisplay(c.verifiedPhone)}` : (locale === 'fr' ? 'Compte connecté par courriel. Téléphone facultatif après paiement.' : 'Signed in by email. Optional phone verification after payment.');
   }
   const nm = $('nm') as HTMLInputElement | null;
   const em = $('em') as HTMLInputElement | null;
@@ -952,6 +953,7 @@ function renderDetails(): void {
     const profileName = [c?.firstName, c?.lastName].filter(Boolean).join(' ');
     nm.value = S.name || profileName;
   }
+  if (em && ctx?.customer.email) em.readOnly = true;
   if (em && !em.value) em.value = S.email || c?.email || '';
   const notes = $('notes') as HTMLTextAreaElement | null;
   if (notes && !notes.value && S.notes) notes.value = S.notes;
@@ -1005,22 +1007,33 @@ function bookingServiceDetails() {
   };
 }
 
+function setConfirmDisabled(disabled: boolean): void {
+  for (const button of document.querySelectorAll<HTMLButtonElement>('#confirmBtn, #sticky [data-action="confirm"]')) button.disabled = disabled;
+}
+
 async function renderCheckout(): Promise<void> {
   const area = $('payArea');
   const btn = $('confirmBtn') as HTMLButtonElement | null;
   if (!area || !btn) return;
   btn.textContent = t('checkout.confirm');
-  btn.disabled = false;
+  setConfirmDisabled(true);
 
   try {
-    paymentCfg = await api.paymentConfig();
+    paymentCfg = await api.paymentConfig(undefined, quote?.id);
   } catch {
     paymentCfg = null;
   }
-  const mode = checkoutMode(paymentCfg ?? { configured: false, publishableKey: null, currency: 'CAD' });
+  if (!paymentCfg?.paymentPolicy) {
+    area.textContent = locale === 'fr' ? 'Impossible de vérifier les conditions de paiement. Réessayez avant de confirmer.' : 'Could not verify payment terms. Please retry before confirming.';
+    setConfirmDisabled(true);
+    return;
+  }
+  renderLedger();
+  const mode = checkoutMode(paymentCfg);
 
   if (mode === 'NONE') {
-    area.innerHTML = `<div class="due-hero"><div class="due-amt">${formatMoney(0, locale)}</div>
+    setConfirmDisabled(false);
+    area.innerHTML = `<div class="checkout-total"><span>${esc(locale === 'fr' ? 'Total, taxes incluses' : 'Total, including tax')}</span><b>${formatMoney(paymentCfg.bookingTotalCents ?? quote?.grandTotalCents ?? 0, locale)}</b></div><div class="due-hero"><div class="due-amt">${formatMoney(0, locale)}</div>
       <div class="due-lbl">${esc(t('checkout.dueToday'))}</div>
       <p>${esc(t('checkout.payLaterNote'))}</p></div>`;
     return;
@@ -1028,16 +1041,17 @@ async function renderCheckout(): Promise<void> {
   if (mode === 'NOT_CONFIGURED') {
     area.innerHTML = `<div class="note">${esc(t('checkout.notConfigured'))}
       <button class="link" data-action="open-help">${esc(t('concierge.callMe'))}</button></div>`;
-    btn.disabled = true;
+    setConfirmDisabled(true);
     return;
   }
-  area.innerHTML = `<div class="eyebrow">${esc(t('checkout.fastCheckout'))}</div>
-    <div id="stripe-express"></div><div class="orsep">${esc(t('checkout.orPay'))}</div>
-    <div id="stripe-payment"><div class="note">${esc(t('checkout.preparing'))}</div></div>`;
+  setConfirmDisabled(false);
+  area.textContent = locale === 'fr' ? 'Après validation de cette réservation, vous accéderez au paiement sécurisé. Montant exigé : ' + formatMoney(paymentCfg?.amountDueNowCents ?? 0, locale) : 'After confirming this booking, continue to secure payment. Due now: ' + formatMoney(paymentCfg?.amountDueNowCents ?? 0, locale);
 }
 
 async function submitBooking(): Promise<void> {
+  if (bookingResult) { location.assign('/payment?booking=' + encodeURIComponent(bookingResult.id)); return; }
   const btn = $('confirmBtn') as HTMLButtonElement;
+  if (btn.disabled) return;
   const err = $('payErr');
   if (err) err.hidden = true;
   if (!hold || remainingMs(hold.expiresAt) <= 0) {
@@ -1047,7 +1061,7 @@ async function submitBooking(): Promise<void> {
     }
     return;
   }
-  btn.disabled = true;
+  setConfirmDisabled(true);
   btn.innerHTML = `<span class="spin"></span> ${esc(t('checkout.confirming'))}`;
   try {
     const res = await api.createBooking(
@@ -1062,6 +1076,8 @@ async function submitBooking(): Promise<void> {
     if (holdTimer) clearInterval(holdTimer);
     clearDraft();
     bookingResult = res.booking;
+    const cfg = await api.paymentConfig(res.booking.id) as PaymentConfig;
+    if (checkoutMode(cfg) !== 'NONE') { location.assign('/payment?booking=' + encodeURIComponent(res.booking.id)); return; }
     renderConfirmation(res.booking);
     goTo('confirmation');
     burst();
@@ -1070,7 +1086,7 @@ async function submitBooking(): Promise<void> {
       err.textContent = translateError(locale, e instanceof ApiError ? e.code : undefined);
       err.hidden = false;
     }
-    btn.disabled = false;
+    setConfirmDisabled(false);
     btn.textContent = t('checkout.confirm');
     if (e instanceof ApiError && (e.code === 'HOLD_EXPIRED' || e.code === 'SLOT_UNAVAILABLE')) {
       backToSlots();
@@ -1162,6 +1178,7 @@ function openHelp(): void {
           `<button class="quick-a" data-action="help-action" data-help="${id}">${esc(t(key))}</button>`,
       )
       .join('')}</div>
+    <a class="quick-a" href="/commercial">${esc(locale === 'fr' ? 'Discuter d’un contrat commercial' : 'Discuss a commercial contract')}</a>
     <div class="note sm">${esc(t('concierge.noAi'))}</div>`);
 }
 
@@ -1296,14 +1313,24 @@ function visibleSteps(): string[] {
 }
 
 function goTo(step: string): void {
+  if (step === 'confirmation' && !bookingResult) return;
   S.step = step as typeof S.step;
   saveDraft(S);
   render();
+  const dialog = $('bookingDialog') as HTMLDialogElement | null;
+  if (dialog?.open) { dialog.scrollTo({ top: 0, behavior: reduceMotion() ? 'instant' : 'smooth' }); return; }
   const book = $('book');
   if (book) window.scrollTo({ top: book.offsetTop - 60, behavior: 'smooth' });
 }
 
+let navigationBusy = false;
 async function goNext(): Promise<void> {
+  if (S.step === 'checkout') { await submitBooking(); return; }
+  if (navigationBusy) return;
+  navigationBusy = true;
+  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-action="next"]'));
+  buttons.forEach(button => { button.disabled = true; });
+  try {
   const order = visibleSteps();
   const i = order.indexOf(S.step);
   const guards: Record<string, () => boolean> = {
@@ -1325,6 +1352,7 @@ async function goNext(): Promise<void> {
     toast(t('guard.' + S.step));
     return;
   }
+  if (order[i + 1] === 'address' && !verified) { S.step = 'address'; saveDraft(S); location.assign('/login?returnTo=%2F%23book'); return; }
   if (S.step === 'frequency' || S.step === 'address') await refreshQuote();
   if (S.step === 'details') {
     try {
@@ -1335,6 +1363,10 @@ async function goNext(): Promise<void> {
     }
   }
   goTo(order[Math.min(i + 1, order.length - 1)]!);
+  } finally {
+    navigationBusy = false;
+    buttons.forEach(button => { if (button.dataset.action === 'next') button.disabled = false; });
+  }
 }
 
 function goToPhase(requestedPhase: string): void {
@@ -1591,6 +1623,13 @@ function render(): void {
     el.classList.toggle('done', order.indexOf(p) < order.indexOf(phase));
   });
 
+  const stickyNext = document.querySelector<HTMLButtonElement>('#sticky .btn-primary');
+  if (stickyNext) {
+    stickyNext.dataset.action = S.step === 'checkout' ? 'confirm' : 'next';
+    stickyNext.textContent = t(S.step === 'checkout' ? 'checkout.confirm' : 'common.continue');
+    stickyNext.disabled = S.step === 'checkout';
+    stickyNext.hidden = S.step === 'confirmation';
+  }
   const nav = $('nav');
   if (nav) {
     nav.style.display = ['service', 'welcome', 'confirmation', 'checkout'].includes(S.step)
@@ -1660,19 +1699,8 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
     goTo('service');
   },
 
-  'scroll-book': () => {
-    if (!verified) {
-      window.location.assign(
-        `/login?returnTo=${encodeURIComponent('/#book')}`,
-      );
-      return;
-    }
-
-    $('book')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  },
+  'scroll-book': () => { openBooking(); },
+  'close-booking': () => { ($('bookingDialog') as HTMLDialogElement)?.close(); },
 
   'pick-family': (el) => {
     S.familyId = el.dataset.family;
@@ -1732,13 +1760,7 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
    */
   await refreshQuote();
 
-  if (!verified) {
-    window.location.assign(
-      `/login?returnTo=${encodeURIComponent('/#book')}`,
-    );
-    return;
-  }
-
+  openBooking();
   goTo('property');
 },
 
@@ -2189,6 +2211,7 @@ export async function boot(): Promise<void> {
     return;
   }
 
+  try { ctx = await api.context(); verified = true; } catch { ctx = null; verified = false; }
   renderFamilies();
 
   const deep = new URLSearchParams(location.search).get('service');
@@ -2206,4 +2229,35 @@ export async function boot(): Promise<void> {
   // Non-essential: never blocks first paint.
   void loadPromotions();
   void loadReviews();
+  void loadPublicProfiles();
+  if (location.hash === '#book') openBooking();
+}
+
+// Codex — assistant OpenAI · 2026-10-29
+function openBooking(): void {
+  const dialog = $('bookingDialog') as HTMLDialogElement | null;
+  if (!dialog) return;
+  const book = $('book');
+  if (book) $('bookingMount')?.append(book);
+  const sticky = $('sticky');
+  if (sticky) dialog.append(sticky);
+  if (!dialog.open) dialog.showModal();
+  if (!verified && ['address','slots','details','checkout','confirmation'].includes(S.step)) {
+    S.step = 'frequency'; render();
+  }
+}
+async function loadPublicProfiles(): Promise<void> {
+  try {
+    const response = await fetch('/api/v1/public/experience');
+    if (!response.ok) return;
+    const config = await response.json();
+    const box = $('socialProfiles');
+    if (!box || !Array.isArray(config.profiles)) return;
+    box.replaceChildren();
+    for (const profile of config.profiles) {
+      const url = new URL(profile.url);
+      if (url.protocol !== 'https:') continue;
+      const link = document.createElement('a');link.href = url.href;link.target = '_blank';link.rel = 'noopener noreferrer';link.textContent = String(profile.platform);box.append(link);
+    }
+  } catch { /* Existing content stays available when optional profiles fail. */ }
 }

@@ -1,5 +1,14 @@
 # R2NETTE — Recorded architectural and release decisions
 
+## 2026-10-29 — Codex — assistant OpenAI : parcours premium (branche, non déployé)
+
+PR **46** `feat/email-first-premium-20261029` : connexion courriel avec preuve distincte du téléphone, SMS après paiement positif serveur, dialogue de réservation, paiement scoped/confirmation webhook, commercial avec file opérateur, consentement facultatif, calendrier client et GPS. Audit et blocages : [rapport de reprise](experience/2026-10-29-premium-audit.md). Ne pas confondre la branche et la production ni déclarer photos/signatures/transfert/forfaits/IA tous livrés.
+
+Validation initiale : CI 40843380976 sur 5bb6460, 764 tests passés, migration PostgreSQL et conteneur vérifiés. Audit Chromium simulé mobile/ordinateur, consentement/retrait et corrections de facture documentés dans le rapport ; vérifier la CI du suivi final avant release.
+
+Dernière production revérifiée : `74434524f6b8f9348240be9e13d158d0060566c5`, Deploy 40450497185, job 122011814392, Roll exécuté, probes OK, SHA exact. Le log du 27 octobre signalait encore les fournisseurs non configurés. Nouvelle inscription à activer uniquement après preuve SMTP/Supabase et opt-in protégé ; CI complète et réel parcours requis avant release. PR43 CRM reste distincte. Dépôt non renommé (administration indisponible).
+
+
 Snapshot: 2026-10-16. This documents existing repository policy and decisions, not new approval to activate providers.
 
 1. **Preserve the product:** R2NETTE remains a separate cleaning/reservation application with its own UI, branding and operational booking database. TAKATAK master identity is integrated only through approved tenant-scoped contracts; never place R2NETTE workflows inside the generic TAKATAK dashboard.

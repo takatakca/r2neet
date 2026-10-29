@@ -1,3 +1,4 @@
+import './consent.js';
 /** Account bundle entry. Boot failure shows a recovery screen, never blank. */
 import { bootAccount } from './account.js';
 
