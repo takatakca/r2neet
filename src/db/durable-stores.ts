@@ -33,6 +33,7 @@ export class PrismaSessionStore {
   async create(
     customerId: string,
     meta: { userAgent?: string; ip?: string } = {},
+    proof: 'PHONE' | 'EMAIL' = 'PHONE',
   ): Promise<{ token: string; expiresAt: Date }> {
     const token = randomBytes(32).toString('base64url');
     const at = this.now();
@@ -42,7 +43,8 @@ export class PrismaSessionStore {
       data: {
         sessionTokenHash: sha256(token),
         customerId,
-        phoneVerifiedAt: at,
+        phoneVerifiedAt: proof === 'PHONE' ? at : null,
+        emailVerifiedAt: proof === 'EMAIL' ? at : null,
         createdAt: at,
         lastSeenAt: at,
         expiresAt,

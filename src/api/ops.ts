@@ -458,6 +458,22 @@ export function createOpsApi(deps: OpsDeps) {
     }),
   );
 
+  // Codex — assistant OpenAI · 2026-10-29: scoped commercial follow-up queue.
+  app.get('/api/v1/admin/commercial', wrap(async (req, res) => {
+    requirePermission(req, 'callbacks.view');
+    res.setHeader('Cache-Control', 'no-store');
+    const rows = await prisma.commercialEnquiry.findMany({ orderBy: { createdAt: 'desc' }, take: 100 });
+    res.json({ enquiries: rows });
+  }));
+  app.patch('/api/v1/admin/commercial/:id', wrap(async (req, res) => {
+    requirePermission(req, 'callbacks.act');
+    if (req.get('sec-fetch-site') === 'cross-site' || !req.is('application/json')) throw new AuthError('Use the form on this website.', 'FORBIDDEN', 403);
+    const status = req.body?.status;
+    if (!['NEW', 'CONTACTED', 'CLOSED'].includes(status)) throw new AuthError('Invalid status.', 'VALIDATION_ERROR', 400);
+    await prisma.commercialEnquiry.update({ where: { id: String(req.params.id) }, data: { status } });
+    res.setHeader('Cache-Control', 'no-store'); res.json({ ok: true });
+  }));
+
   /* ---------------- callbacks ---------------- */
 
   app.get(

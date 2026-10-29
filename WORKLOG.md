@@ -1,5 +1,7 @@
 # Work log
 
+- 2026-10-29 | Codex — assistant OpenAI | feat/email-first-premium-20261029 → PR pending | active | Email-first authentication, paid-customer SMS linking, guided booking dialog and commercial enquiry | implement, verify, publish with signed Drive notes
+
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 

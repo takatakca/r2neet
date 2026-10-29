@@ -371,6 +371,8 @@ function openSheet(html: string): void {
   const body = $('sheetBody');
   const sheet = $('sheet');
   if (!body || !sheet) return;
+  const bookingDialog = $('bookingDialog') as HTMLDialogElement | null;
+  (bookingDialog?.open ? bookingDialog : document.body).append(sheet);
   body.innerHTML = html;
   sheet.classList.add('on');
 }
@@ -942,9 +944,7 @@ function renderDetails(): void {
   const c = ctx?.customer;
   const vp = $('verifiedPhone');
   if (vp) {
-    vp.innerHTML = `<strong>✓ ${esc(t('details.verified'))}</strong> ${
-      c?.verifiedPhone ? esc(maskPhoneDisplay(c.verifiedPhone)) : ''
-    }`;
+    vp.textContent = c?.verifiedPhone ? `${t('details.verified')}: ${maskPhoneDisplay(c.verifiedPhone)}` : (locale === 'fr' ? 'Compte connecté par courriel. Téléphone facultatif après paiement.' : 'Signed in by email. Optional phone verification after payment.');
   }
   const nm = $('nm') as HTMLInputElement | null;
   const em = $('em') as HTMLInputElement | null;
@@ -952,6 +952,7 @@ function renderDetails(): void {
     const profileName = [c?.firstName, c?.lastName].filter(Boolean).join(' ');
     nm.value = S.name || profileName;
   }
+  if (em && ctx?.customer.email) em.readOnly = true;
   if (em && !em.value) em.value = S.email || c?.email || '';
   const notes = $('notes') as HTMLTextAreaElement | null;
   if (notes && !notes.value && S.notes) notes.value = S.notes;
@@ -1013,7 +1014,7 @@ async function renderCheckout(): Promise<void> {
   btn.disabled = false;
 
   try {
-    paymentCfg = await api.paymentConfig();
+    paymentCfg = await api.paymentConfig(undefined, quote?.id);
   } catch {
     paymentCfg = null;
   }
@@ -1031,12 +1032,11 @@ async function renderCheckout(): Promise<void> {
     btn.disabled = true;
     return;
   }
-  area.innerHTML = `<div class="eyebrow">${esc(t('checkout.fastCheckout'))}</div>
-    <div id="stripe-express"></div><div class="orsep">${esc(t('checkout.orPay'))}</div>
-    <div id="stripe-payment"><div class="note">${esc(t('checkout.preparing'))}</div></div>`;
+  area.textContent = locale === 'fr' ? 'Après validation de cette réservation, vous accéderez au paiement sécurisé. Montant exigé : ' + formatMoney(paymentCfg?.amountDueNowCents ?? 0, locale) : 'After confirming this booking, continue to secure payment. Due now: ' + formatMoney(paymentCfg?.amountDueNowCents ?? 0, locale);
 }
 
 async function submitBooking(): Promise<void> {
+  if (bookingResult) { location.assign('/payment?booking=' + encodeURIComponent(bookingResult.id)); return; }
   const btn = $('confirmBtn') as HTMLButtonElement;
   const err = $('payErr');
   if (err) err.hidden = true;
@@ -1062,6 +1062,8 @@ async function submitBooking(): Promise<void> {
     if (holdTimer) clearInterval(holdTimer);
     clearDraft();
     bookingResult = res.booking;
+    const cfg = await api.paymentConfig(res.booking.id) as PaymentConfig;
+    if (checkoutMode(cfg) !== 'NONE') { location.assign('/payment?booking=' + encodeURIComponent(res.booking.id)); return; }
     renderConfirmation(res.booking);
     goTo('confirmation');
     burst();
@@ -1299,6 +1301,8 @@ function goTo(step: string): void {
   S.step = step as typeof S.step;
   saveDraft(S);
   render();
+  const dialog = $('bookingDialog') as HTMLDialogElement | null;
+  if (dialog?.open) { dialog.scrollTo({ top: 0, behavior: reduceMotion() ? 'instant' : 'smooth' }); return; }
   const book = $('book');
   if (book) window.scrollTo({ top: book.offsetTop - 60, behavior: 'smooth' });
 }
@@ -1325,6 +1329,7 @@ async function goNext(): Promise<void> {
     toast(t('guard.' + S.step));
     return;
   }
+  if (order[i + 1] === 'address' && !verified) { S.step = 'address'; saveDraft(S); location.assign('/login?returnTo=%2F%23book'); return; }
   if (S.step === 'frequency' || S.step === 'address') await refreshQuote();
   if (S.step === 'details') {
     try {
@@ -1660,19 +1665,8 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
     goTo('service');
   },
 
-  'scroll-book': () => {
-    if (!verified) {
-      window.location.assign(
-        `/login?returnTo=${encodeURIComponent('/#book')}`,
-      );
-      return;
-    }
-
-    $('book')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  },
+  'scroll-book': () => { openBooking(); },
+  'close-booking': () => { ($('bookingDialog') as HTMLDialogElement)?.close(); },
 
   'pick-family': (el) => {
     S.familyId = el.dataset.family;
@@ -1732,13 +1726,7 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
    */
   await refreshQuote();
 
-  if (!verified) {
-    window.location.assign(
-      `/login?returnTo=${encodeURIComponent('/#book')}`,
-    );
-    return;
-  }
-
+  openBooking();
   goTo('property');
 },
 
@@ -2189,6 +2177,7 @@ export async function boot(): Promise<void> {
     return;
   }
 
+  try { ctx = await api.context(); verified = true; } catch { ctx = null; verified = false; }
   renderFamilies();
 
   const deep = new URLSearchParams(location.search).get('service');
@@ -2206,4 +2195,35 @@ export async function boot(): Promise<void> {
   // Non-essential: never blocks first paint.
   void loadPromotions();
   void loadReviews();
+  void loadPublicProfiles();
+  if (location.hash === '#book') openBooking();
+}
+
+// Codex — assistant OpenAI · 2026-10-29
+function openBooking(): void {
+  const dialog = $('bookingDialog') as HTMLDialogElement | null;
+  if (!dialog) return;
+  const book = $('book');
+  if (book) $('bookingMount')?.append(book);
+  const sticky = $('sticky');
+  if (sticky) dialog.append(sticky);
+  if (!dialog.open) dialog.showModal();
+  if (!verified && ['address','slots','details','checkout','confirmation'].includes(S.step)) {
+    S.step = 'frequency'; render();
+  }
+}
+async function loadPublicProfiles(): Promise<void> {
+  try {
+    const response = await fetch('/api/v1/public/experience');
+    if (!response.ok) return;
+    const config = await response.json();
+    const box = $('socialProfiles');
+    if (!box || !Array.isArray(config.profiles)) return;
+    box.replaceChildren();
+    for (const profile of config.profiles) {
+      const url = new URL(profile.url);
+      if (url.protocol !== 'https:') continue;
+      const link = document.createElement('a');link.href = url.href;link.target = '_blank';link.rel = 'noopener noreferrer';link.textContent = String(profile.platform);box.append(link);
+    }
+  } catch { /* Existing content stays available when optional profiles fail. */ }
 }

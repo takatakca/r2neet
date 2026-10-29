@@ -50,13 +50,19 @@ import path from 'node:path';
 const dist = path.resolve('dist');
 const pages: Record<string, string> = {
   '/book': 'index.html',
-  '/auth': 'auth.html',
-  '/login': 'auth.html',
+  '/auth': 'email.html',
+  '/login': 'email.html',
   '/verify': 'verify.html',
-  '/signup': 'signup.html',
+  '/signup': 'email.html',
   '/account': 'account.html',
   '/admin': 'admin.html',
   '/crew': 'crew.html',
+  '/phone-login': 'auth.html',
+  '/profile': 'signup.html',
+  '/commercial': 'commercial.html',
+  '/payment': 'payment.html',
+  '/terms': 'terms.html',
+  '/privacy': 'privacy.html',
 };
 for (const [route, file] of Object.entries(pages)) {
   app.get(route, (_req, res) => {

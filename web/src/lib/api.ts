@@ -313,9 +313,9 @@ export const api = {
       idempotencyKey,
     }),
 
-  paymentConfig: (bookingId?: string) =>
+  paymentConfig: (bookingId?: string, quoteId?: string) =>
     call<PaymentConfig>(
-      `/api/v1/payment-config${bookingId ? `?bookingId=${encodeURIComponent(bookingId)}` : ''}`,
+      `/api/v1/payment-config${bookingId ? `?bookingId=${encodeURIComponent(bookingId)}` : quoteId ? `?quoteId=${encodeURIComponent(quoteId)}` : ''}`,
     ),
 
   /** Re-check promotion eligibility BEFORE any Stripe object is created. */

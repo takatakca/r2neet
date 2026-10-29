@@ -76,7 +76,7 @@ d('HTTP API', () => {
     await prisma.staff.create({ data: { displayName: 'Alice', availability: { create: ALL_WEEK } } });
     await prisma.staff.create({ data: { displayName: 'Bruno', availability: { create: ALL_WEEK } } });
 
-    app = createApi({
+    app = createApi({ legacyPhoneRegistration: true,
       prisma,
       verification: new FakeVerificationProvider('123456'),
       publicUrl: 'https://r2nette.ca',
@@ -933,7 +933,7 @@ d('durability across process restart', () => {
     const client = new PrismaClient({ datasources: { db: { url: URL } } });
     return {
       client,
-      app: createApi({ prisma: client, verification: new FakeVerificationProvider('123456') }),
+      app: createApi({ legacyPhoneRegistration: true, prisma: client, verification: new FakeVerificationProvider('123456') }),
     };
   }
 
@@ -1109,7 +1109,7 @@ d('returning-customer booking template', () => {
     await seed(prisma);
     await prisma.staff.create({ data: { displayName: 'Alice', availability: { create: ALL_WEEK } } });
     await prisma.staff.create({ data: { displayName: 'Bruno', availability: { create: ALL_WEEK } } });
-    app = createApi({ prisma, verification: new FakeVerificationProvider('123456') });
+    app = createApi({ legacyPhoneRegistration: true, prisma, verification: new FakeVerificationProvider('123456') });
   });
 
   /** Register a new customer through the real sign-up flow; returns the session cookie. */
