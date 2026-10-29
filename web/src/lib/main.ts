@@ -783,6 +783,7 @@ async function refreshQuote(): Promise<void> {
     });
     if (seq !== quoteSeq) return;
     quote = res.quote;
+    paymentCfg = null;
     renderLedger();
   } catch (e) {
     showError(e);
@@ -817,7 +818,7 @@ function renderLedger(): void {
   h += `<div class="ln tot"><span class="l">${esc(t('ledger.total'))}</span>
     <span class="v" id="ledgerTotal">${formatMoney(lastTotalCents, locale)}</span></div></div><div class="lf">`;
   h += `<div class="due"><span>${esc(t('checkout.dueToday'))}</span>
-    <span class="mono">${formatMoney(paymentCfg?.amountDueNowCents ?? 0, locale)}</span></div>`;
+    <span class="mono">${paymentCfg?.paymentPolicy ? formatMoney(paymentCfg.amountDueNowCents ?? 0, locale) : '—'}</span></div>`;
   const disc = quote.firstVisit?.appliedDiscount;
   if (disc) h += `<div class="savepill">★ ${formatMoney(disc.amountCents, locale)}</div>`;
   if (quote.subsequentVisitPricingPreview) {
@@ -1006,22 +1007,33 @@ function bookingServiceDetails() {
   };
 }
 
+function setConfirmDisabled(disabled: boolean): void {
+  for (const button of document.querySelectorAll<HTMLButtonElement>('#confirmBtn, #sticky [data-action="confirm"]')) button.disabled = disabled;
+}
+
 async function renderCheckout(): Promise<void> {
   const area = $('payArea');
   const btn = $('confirmBtn') as HTMLButtonElement | null;
   if (!area || !btn) return;
   btn.textContent = t('checkout.confirm');
-  btn.disabled = false;
+  setConfirmDisabled(true);
 
   try {
     paymentCfg = await api.paymentConfig(undefined, quote?.id);
   } catch {
     paymentCfg = null;
   }
-  const mode = checkoutMode(paymentCfg ?? { configured: false, publishableKey: null, currency: 'CAD' });
+  if (!paymentCfg?.paymentPolicy) {
+    area.textContent = locale === 'fr' ? 'Impossible de vérifier les conditions de paiement. Réessayez avant de confirmer.' : 'Could not verify payment terms. Please retry before confirming.';
+    setConfirmDisabled(true);
+    return;
+  }
+  renderLedger();
+  const mode = checkoutMode(paymentCfg);
 
   if (mode === 'NONE') {
-    area.innerHTML = `<div class="due-hero"><div class="due-amt">${formatMoney(0, locale)}</div>
+    setConfirmDisabled(false);
+    area.innerHTML = `<div class="checkout-total"><span>${esc(locale === 'fr' ? 'Total, taxes incluses' : 'Total, including tax')}</span><b>${formatMoney(paymentCfg.bookingTotalCents ?? quote?.grandTotalCents ?? 0, locale)}</b></div><div class="due-hero"><div class="due-amt">${formatMoney(0, locale)}</div>
       <div class="due-lbl">${esc(t('checkout.dueToday'))}</div>
       <p>${esc(t('checkout.payLaterNote'))}</p></div>`;
     return;
@@ -1029,15 +1041,17 @@ async function renderCheckout(): Promise<void> {
   if (mode === 'NOT_CONFIGURED') {
     area.innerHTML = `<div class="note">${esc(t('checkout.notConfigured'))}
       <button class="link" data-action="open-help">${esc(t('concierge.callMe'))}</button></div>`;
-    btn.disabled = true;
+    setConfirmDisabled(true);
     return;
   }
+  setConfirmDisabled(false);
   area.textContent = locale === 'fr' ? 'Après validation de cette réservation, vous accéderez au paiement sécurisé. Montant exigé : ' + formatMoney(paymentCfg?.amountDueNowCents ?? 0, locale) : 'After confirming this booking, continue to secure payment. Due now: ' + formatMoney(paymentCfg?.amountDueNowCents ?? 0, locale);
 }
 
 async function submitBooking(): Promise<void> {
   if (bookingResult) { location.assign('/payment?booking=' + encodeURIComponent(bookingResult.id)); return; }
   const btn = $('confirmBtn') as HTMLButtonElement;
+  if (btn.disabled) return;
   const err = $('payErr');
   if (err) err.hidden = true;
   if (!hold || remainingMs(hold.expiresAt) <= 0) {
@@ -1047,7 +1061,7 @@ async function submitBooking(): Promise<void> {
     }
     return;
   }
-  btn.disabled = true;
+  setConfirmDisabled(true);
   btn.innerHTML = `<span class="spin"></span> ${esc(t('checkout.confirming'))}`;
   try {
     const res = await api.createBooking(
@@ -1072,7 +1086,7 @@ async function submitBooking(): Promise<void> {
       err.textContent = translateError(locale, e instanceof ApiError ? e.code : undefined);
       err.hidden = false;
     }
-    btn.disabled = false;
+    setConfirmDisabled(false);
     btn.textContent = t('checkout.confirm');
     if (e instanceof ApiError && (e.code === 'HOLD_EXPIRED' || e.code === 'SLOT_UNAVAILABLE')) {
       backToSlots();
@@ -1164,6 +1178,7 @@ function openHelp(): void {
           `<button class="quick-a" data-action="help-action" data-help="${id}">${esc(t(key))}</button>`,
       )
       .join('')}</div>
+    <a class="quick-a" href="/commercial">${esc(locale === 'fr' ? 'Discuter d’un contrat commercial' : 'Discuss a commercial contract')}</a>
     <div class="note sm">${esc(t('concierge.noAi'))}</div>`);
 }
 
@@ -1298,6 +1313,7 @@ function visibleSteps(): string[] {
 }
 
 function goTo(step: string): void {
+  if (step === 'confirmation' && !bookingResult) return;
   S.step = step as typeof S.step;
   saveDraft(S);
   render();
@@ -1307,7 +1323,14 @@ function goTo(step: string): void {
   if (book) window.scrollTo({ top: book.offsetTop - 60, behavior: 'smooth' });
 }
 
+let navigationBusy = false;
 async function goNext(): Promise<void> {
+  if (S.step === 'checkout') { await submitBooking(); return; }
+  if (navigationBusy) return;
+  navigationBusy = true;
+  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-action="next"]'));
+  buttons.forEach(button => { button.disabled = true; });
+  try {
   const order = visibleSteps();
   const i = order.indexOf(S.step);
   const guards: Record<string, () => boolean> = {
@@ -1340,6 +1363,10 @@ async function goNext(): Promise<void> {
     }
   }
   goTo(order[Math.min(i + 1, order.length - 1)]!);
+  } finally {
+    navigationBusy = false;
+    buttons.forEach(button => { if (button.dataset.action === 'next') button.disabled = false; });
+  }
 }
 
 function goToPhase(requestedPhase: string): void {
@@ -1596,6 +1623,13 @@ function render(): void {
     el.classList.toggle('done', order.indexOf(p) < order.indexOf(phase));
   });
 
+  const stickyNext = document.querySelector<HTMLButtonElement>('#sticky .btn-primary');
+  if (stickyNext) {
+    stickyNext.dataset.action = S.step === 'checkout' ? 'confirm' : 'next';
+    stickyNext.textContent = t(S.step === 'checkout' ? 'checkout.confirm' : 'common.continue');
+    stickyNext.disabled = S.step === 'checkout';
+    stickyNext.hidden = S.step === 'confirmation';
+  }
   const nav = $('nav');
   if (nav) {
     nav.style.display = ['service', 'welcome', 'confirmation', 'checkout'].includes(S.step)

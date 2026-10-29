@@ -2050,6 +2050,18 @@ button.addon-card{cursor:pointer}
 
 
 /* Codex — assistant OpenAI · 2026-10-29: focused booking workspace. */
+.booking-summary-mobile{display:none}
+@media(max-width:999px){.booking-summary-mobile{display:flex}}
+.ledger .ln .l,.ledger .ln .v,.ledger .ln.tot .v{color:var(--navy)}
+.ledger .ln.mut .l,.ledger .ln.mut .v{color:var(--muted)}
+.ledger .ln.save .l,.ledger .ln.save .v{color:#1565d8}
+.ledger .ln.rule,.ledger .ln.tot{border-color:var(--line)}
+.ledger .lf{background:var(--mist);color:var(--navy)}.ledger .due{color:var(--navy)}
+.sticky .st .big{color:var(--navy)}.sticky .st .lil{color:var(--muted)}.sticky .dt{color:var(--deep)}
+.checkout-total{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 0;font-size:17px}.checkout-total b{font-size:26px;color:var(--navy)}
+.booking-dialog .due-amt{font-size:28px}.booking-dialog .due-hero{padding:20px}
+.booking-dialog .btn-primary{background:linear-gradient(110deg,#1565d8,#1f8fe0);color:white}
+
 .booking-dialog{width:min(1180px,96vw);max-width:1180px;max-height:94dvh;padding:0;border:1px solid var(--line);border-radius:24px;background:var(--paper);color:var(--ink);overflow:auto;overscroll-behavior:contain}
 .booking-dialog::backdrop{background:rgba(6,13,31,.72);backdrop-filter:blur(5px)}
 .booking-dialog-header{position:sticky;top:0;z-index:65;background:var(--paper);display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--line)}

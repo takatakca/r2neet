@@ -42,3 +42,14 @@ Le modèle courriel ne crée pas encore d'événement outbox TAKATAK : l'intégr
 6. Audit réel de production de bout en bout après configuration protégée : FR/EN mobile/ordinateur, courriel, devis, créneau, paiement et webhook, SMS après paiement, notification, calendriers, avis, consentement/retrait, accès client/opérateur.
 
 Signature : **Codex — assistant OpenAI**, 2026-10-29.
+
+## Résultats vérifiés de cette passe
+
+- PR **46**, commit initial **5bb6460337ad8495a3f09ef44e72a3421103f985** : CI **40843380976** réussie ; **35 fichiers de tests / 764 tests** tous exécutés et réussis, dont les 3 tests PostgreSQL nouveaux. Migration à vide et comparaison schéma/migrations réussies, typage, deux builds, invariants et conteneur verts. Aucune mise en production de cette branche.
+- Audit Chromium local FR, **390×844** et **1440×1000**, réponses API explicitement simulées : inscription courriel → reprise → adresse enregistrée → créneau → facture → confirmation ; calendrier et demande commerciale. 0 erreur JavaScript, 0 appel SMS à l'inscription, aucun script Meta avant accord. Accord puis retrait testés : Meta non rechargé après retrait. Le script de test bloque les vrais appels tiers.
+- Inspection visuelle a trouvé puis corrigé du texte blanc de facture sur fond blanc, le résumé mobile mal affiché sur ordinateur et le bouton sticky « Continuer » pouvant avancer sans créer la réservation. Confirmation mobile branchée au même appel serveur que le bouton principal, désactivée tant que la politique de paiement n'est pas vérifiée. Total TTC visible sur mobile, même pour PAY_LATER à zéro aujourd'hui. Le script reproductible est `scripts/verify-premium-browser.ts` (nécessite Vite et Chromium local). Tests et captures ne sont pas une preuve de fournisseurs réels.
+- Inspection Supabase en lecture seule : projets TAKATAK STAGING et TAKATAK User Official Dashboard V1 accessibles ; aucun réglage SMTP/Email Templates disponible par ces outils, aucune configuration changée et aucun rattachement deviné. Le destinataire de production doit être confirmé depuis l'environnement protégé.
+- Photos/signatures/transfert/forfaits/agent LLM : toujours à réaliser selon les dépendances énumérées. Une question est laissée à Matt pour identifier son service de signature existant ; l'absence de réponse n'est pas un accord de remplacement.
+- Suivi visuel final et documentation de clôture : CI du dernier SHA à vérifier après publication ; la référence exacte est consignée dans la conversation de PR.
+
+04:48 EDT — [Codex — assistant OpenAI · session R2NETTE] — Résultats et limitations consignés ; pas d'envoi réel, de paiement réel, de SMS réel ni de migration production.
