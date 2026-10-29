@@ -2,6 +2,14 @@
 
 Updated 2026-10-19. On restart read `AGENTS.md`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, and `docs/DECISIONS.md` and check GitHub open PRs before new work.
 
+## Owner checklist — 2026-10-29 (Claude)
+
+- **`docs/OWNER_ACTIONS.md`** lists the remaining steps for r2nette.ca's hosting, labelled 🔧 OWNER (manual) or 🤖 CLAUDE (agent), with the same numbers as the private Drive main file.
+- **Current state:**
+  - #44 is merged and its deploy was verified (commit 7443452).
+  - What's left is retiring the old MochaHost account (O-13). The DNS zone and the 3 mail forwarders are already prepared in the main account.
+- **Next exact action:** the owner downloads the backup and retires the old account. Then Claude checks DNS and mail (C-10).
+
 ## Redeploy pending — 2026-10-26 (Claude)
 
 - **Production** still runs `1a8de4abe8bf24dc0e5742070590d1fd974efe9b` (Deploy #38855160513), plus the 2026-10-19 login hotfix copied into the running container. `https://r2nette.ca/healthz` and `/readyz` answer OK.
