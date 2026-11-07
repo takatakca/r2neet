@@ -3,6 +3,8 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-11-07 | Cursor | cursor/fix-restore-drill-pg16-54af → PR | active | Pin the weekly restore drill to the PostgreSQL 16 client so a 17+ pg_dump does not emit SET transaction_timeout | CI on the PR; do not deploy
+
 - 2026-10-26 | claude (hosting session 012WCYGx) | claude/r2nette-redeploy-20261026 → PR | blocked: production deploy needs owner approval | Main 38fc9aa not deployed since Deploy #38952711773 failed ENOSPC (disk then 100%); disk now under Coolify's 80% threshold; CI #40351215484 on main green | merge this PR (push → CI → Deploy) or run Deploy manually; verify /healthz, /readyz and exact SHA
 - 2026-10-19 | Cursor | main | active | Make the copied login files readable by the web process | A private copy made /login return 500; chmod 644, still no image pull
 - 2026-10-16 | ChatGPT | chatgpt/contabo-disk-recovery-20261016 → PR #39 | active/P0 | Fix VPS ENOSPC image pulls with R2NETTE-only pre-pull cleanup; do not touch running/rollback, other sites or volumes | CI, merge, verify non-skipped deployment
