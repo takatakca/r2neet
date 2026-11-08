@@ -1,6 +1,6 @@
 # Work log
 
-- 2026-11-08 | Cursor | cursor/security-hardening-54af → PR | active | Stop public secret-name disclosure, clear Secure cookies, generic errors, HTTPS host pinning, CSP-safe admin actions, and keep restore-drill passwords off argv | CI on the PR; do not deploy
+- 2026-11-08 | Cursor | cursor/security-hardening-54af → PR #50 | PR #50 | Stop public secret-name disclosure, clear Secure cookies, generic errors, HTTPS host pinning, CSP-safe admin actions, and keep restore-drill passwords off argv | CI on the PR; owner deploys after the SSH host key is confirmed
 
 - 2026-10-29 | Codex — assistant OpenAI | feat/email-first-premium-20261029 → PR #46 | code tested, release blocked on real email activation | Email OTP/no signup SMS, guided booking, commercial queue, consent/withdrawal, calendar/GPS and scoped checkout | initial CI 40843380976 passed 764 tests; final follow-up CI then confirm SMTP/template/flag before release; photos/signatures/transfer/plans/LLM remain documented
 
