@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+
 /**
  * Keep database passwords out of pg_dump process arguments. PostgreSQL CLI
  * accepts PGPASSWORD via the child environment; its argv only needs a URI
@@ -18,4 +20,24 @@ export function pgCommandConnection(
     url: parsed.toString(),
     env: password ? { ...parentEnv, PGPASSWORD: password } : { ...parentEnv },
   };
+}
+
+/**
+ * Run a PostgreSQL client without putting the password on argv, and without
+ * repeating the connection string if the command fails. execFileSync's own
+ * error includes every argument.
+ */
+export function runPgCommand(
+  bin: string,
+  args: string[],
+  connectionString: string,
+  exec: typeof execFileSync = execFileSync,
+): void {
+  const { url, env } = pgCommandConnection(connectionString);
+  const argv = args.map((arg) => (arg === '{url}' ? url : arg));
+  try {
+    exec(bin, argv, { env, stdio: ['ignore', 'inherit', 'inherit'] });
+  } catch {
+    throw new Error(`${bin} failed`);
+  }
 }

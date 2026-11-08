@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pgCommandConnection } from '../scripts/pg-cli.js';
+import { execFileSync } from 'node:child_process';
+import { pgCommandConnection, runPgCommand } from '../scripts/pg-cli.js';
 
 describe('PostgreSQL subprocess credentials', () => {
   it('does not pass a URI password on the child argv', () => {
@@ -27,5 +28,17 @@ describe('PostgreSQL subprocess credentials', () => {
 
   it('rejects non-PostgreSQL URIs', () => {
     expect(() => pgCommandConnection('https://db.example.test', {})).toThrow(/PostgreSQL/);
+  });
+
+  it('does not repeat the connection string when the command fails', () => {
+    const seen: string[] = [];
+    const exec = ((bin: string, argv: string[]) => {
+      seen.push(argv.join(' '));
+      throw new Error(`Command failed: ${bin} ${argv.join(' ')}`);
+    }) as typeof execFileSync;
+    expect(() =>
+      runPgCommand('pg_restore', ['-d', '{url}'], 'postgresql://app:secret@db:5432/r2nette', exec),
+    ).toThrow(/^pg_restore failed$/);
+    expect(seen.join(' ')).not.toContain('secret');
   });
 });

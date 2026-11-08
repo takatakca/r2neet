@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { ApiError, SESSION_COOKIE } from './app.js';
+import { clearAuthCookie } from './cookies.js';
 import { PrismaSessionStore } from '../db/durable-stores.js';
 import { RateLimiter, normalizePhone, type VerificationProvider } from '../identity/identity.js';
 import type { EmailAuthProvider } from '../identity/email-auth.js';
@@ -78,7 +79,7 @@ export function emailFirstRoutes(prisma: PrismaClient, provider: EmailAuthProvid
     });
     const session = await sessions.create(customer.id, { ip: req.ip, userAgent: req.get('user-agent') }, 'EMAIL');
     res.cookie(SESSION_COOKIE, session.token, { ...cookie, expires: session.expiresAt });
-    res.clearCookie(COOKIE, { path: '/' });
+    clearAuthCookie(res, COOKIE);
     res.json({ authenticated: true });
   }));
 

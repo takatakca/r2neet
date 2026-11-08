@@ -778,10 +778,10 @@ d('HTTP API', () => {
 
   /* ---------------- integrations ---------------- */
 
-  it('reports integration status without inventing a green light', async () => {
+  it('does not publish missing secret names on a public route', async () => {
     const res = await request(app).get('/api/v1/integrations/status');
-    const stripe = res.body.integrations.find((i: { key: string }) => i.key === 'stripe');
-    expect(stripe.status).toBe('NOT_CONFIGURED');
+    expect(res.status).toBe(404);
+    expect(res.text).not.toMatch(/STRIPE_SECRET_KEY|TWILIO_AUTH_TOKEN|GOOGLE_BUSINESS_CLIENT_SECRET|AI_PROVIDER_API_KEY/);
   });
 });
 

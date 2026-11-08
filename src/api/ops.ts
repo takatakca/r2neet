@@ -11,6 +11,7 @@ import { workerExpectations, offHostConfigured } from '../workers/expectations.j
 import { localToUtc, findStaffConflict, DEFAULT_BUFFERS } from '../scheduling/availability.js';
 import { acquireCapacityLocks, loadBusy } from '../db/prisma-repositories.js';
 import cookieParser from 'cookie-parser';
+import { clearAuthCookie } from './cookies.js';
 import {
   StaffAuthService,
   AuthError,
@@ -1013,7 +1014,7 @@ export function createOpsApi(deps: OpsDeps) {
     '/api/v1/staff/logout',
     wrap(async (req, res) => {
       await auth.logout(req.staffToken);
-      res.clearCookie(STAFF_COOKIE, { path: '/' });
+      clearAuthCookie(res, STAFF_COOKIE);
       res.json({ ok: true });
     }),
   );

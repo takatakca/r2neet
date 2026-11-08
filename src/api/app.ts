@@ -41,7 +41,6 @@ import {
   SupabaseGoogleAuthProvider,
   type GoogleAuthProvider,
 } from '../identity/google-auth.js';
-import { integrationStatus } from '../data/repositories.js';
 import {
   PrismaSessionStore,
   PrismaRegistrationSessionStore,
@@ -64,6 +63,7 @@ import {
   readinessHandler,
   type LogSink,
 } from './hardening.js';
+import { clearAuthCookie } from './cookies.js';
 import { ReviewService } from '../reviews/review-service.js';
 import { RecurrenceService } from '../booking/recurrence-service.js';
 import {
@@ -418,7 +418,7 @@ export function createApi(deps: ApiDeps) {
   );
 
   if (hard.enabled) {
-    app.use(requireHttps(hard.requireHttps ?? false));
+    app.use(requireHttps(hard.requireHttps ?? false, publicUrl));
     if (hard.rateLimit !== false) app.use(rateLimit(new EdgeRateLimiter()));
   }
 
@@ -686,7 +686,7 @@ export function createApi(deps: ApiDeps) {
       });
 
       const secure = process.env.NODE_ENV === 'production';
-      res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+      clearAuthCookie(res, GOOGLE_LINK_COOKIE);
       res.cookie(GOOGLE_STATE_COOKIE, state, {
         httpOnly: true,
         secure,
@@ -709,8 +709,8 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/auth/google/callback',
     wrap(async (req, res) => {
       const clearOAuthCookies = () => {
-        res.clearCookie(GOOGLE_STATE_COOKIE, { path: '/api/v1/auth/google' });
-        res.clearCookie(GOOGLE_VERIFIER_COOKIE, { path: '/api/v1/auth/google' });
+        clearAuthCookie(res, GOOGLE_STATE_COOKIE, '/api/v1/auth/google');
+        clearAuthCookie(res, GOOGLE_VERIFIER_COOKIE, '/api/v1/auth/google');
       };
       const code = typeof req.query.code === 'string' ? req.query.code : undefined;
       const stateCookie = req.cookies?.[GOOGLE_STATE_COOKIE] as
@@ -722,7 +722,7 @@ export function createApi(deps: ApiDeps) {
 
       if (req.query.error || !stateCookie || !code || !verifier) {
         clearOAuthCookies();
-        res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+        clearAuthCookie(res, GOOGLE_LINK_COOKIE);
         res.redirect('/login?google=error');
         return;
       }
@@ -775,7 +775,7 @@ export function createApi(deps: ApiDeps) {
             ip: req.ip ?? undefined,
           });
           clearOAuthCookies();
-          res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+          clearAuthCookie(res, GOOGLE_LINK_COOKIE);
           res.cookie(SESSION_COOKIE, session.token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -822,7 +822,7 @@ export function createApi(deps: ApiDeps) {
         res.redirect(loginUrl.toString());
       } catch {
         clearOAuthCookies();
-        res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+        clearAuthCookie(res, GOOGLE_LINK_COOKIE);
         res.redirect('/login?google=error');
       }
     }),
@@ -880,7 +880,7 @@ export function createApi(deps: ApiDeps) {
       if (intent === 'google') {
         await pendingGoogleLink(googleLinkToken);
       } else if (googleLinkToken) {
-        res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+        clearAuthCookie(res, GOOGLE_LINK_COOKIE);
       }
 
       const verified = await identity.verifyPhone(phone, code);
@@ -941,8 +941,8 @@ export function createApi(deps: ApiDeps) {
             path: '/',
             expires: created.expiresAt,
           });
-          res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
-          res.clearCookie(REGISTRATION_COOKIE, { path: '/' });
+          clearAuthCookie(res, GOOGLE_LINK_COOKIE);
+          clearAuthCookie(res, REGISTRATION_COOKIE);
           res.json({
             outcome: 'AUTHENTICATED',
             intent,
@@ -996,9 +996,7 @@ export function createApi(deps: ApiDeps) {
           expires: created.expiresAt,
         });
 
-        res.clearCookie(REGISTRATION_COOKIE, {
-          path: '/',
-        });
+        clearAuthCookie(res, REGISTRATION_COOKIE);
 
         res.json({
           outcome: 'AUTHENTICATED',
@@ -1266,11 +1264,9 @@ export function createApi(deps: ApiDeps) {
         expires: session.expiresAt,
       });
 
-      res.clearCookie(REGISTRATION_COOKIE, {
-        path: '/',
-      });
+      clearAuthCookie(res, REGISTRATION_COOKIE);
       if (req.cookies?.[GOOGLE_LINK_COOKIE]) {
-        res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+        clearAuthCookie(res, GOOGLE_LINK_COOKIE);
       }
 
       res.status(201).json({
@@ -1286,8 +1282,8 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/auth/logout',
     wrap(async (req, res) => {
       await sessions.destroy(req.sessionId);
-      res.clearCookie(SESSION_COOKIE, { path: '/' });
-      res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
+      clearAuthCookie(res, SESSION_COOKIE);
+      clearAuthCookie(res, GOOGLE_LINK_COOKIE);
       res.json({ ok: true });
     }),
   );
@@ -2781,15 +2777,6 @@ export function createApi(deps: ApiDeps) {
     }),
   );
 
-  /* ---------------- integrations ---------------- */
-
-  app.get(
-    '/api/v1/integrations/status',
-    wrap(async (_req, res) => {
-      res.json({ integrations: integrationStatus(process.env) });
-    }),
-  );
-
   /* ---------------- operations (admin + crew) ----------------
    * Staff routes live in createOpsApi. They were previously only mounted
    * in tests, which meant /admin and /crew had a UI and no working API.
@@ -2876,6 +2863,20 @@ export function createApi(deps: ApiDeps) {
       res
         .status(status)
         .json({ error: { code: err.code, message: err.message, requestId } });
+      return;
+    }
+    const parseFailure = err as { type?: string; status?: number };
+    if (
+      parseFailure?.type === 'entity.parse.failed' ||
+      (err instanceof SyntaxError && parseFailure.status === 400)
+    ) {
+      res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'The request body is not valid JSON.',
+          requestId,
+        },
+      });
       return;
     }
     if (err instanceof BookingError) {

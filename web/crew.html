@@ -149,12 +149,12 @@ function render(){
       <div class="svc">${esc(upNext.service)} · ${upNext.durationMinutes/60} h · ${upNext.crewSize} cleaner${upNext.crewSize===1?'':'s'}</div>
       <div class="addr">${esc(upNext.address)}${upNext.unit?`<br>Unit ${esc(upNext.unit)}`:''}</div>
       <div class="actions">
-        <button class="btn btn-go" onclick="openJob('${upNext.id}')">Open job</button>
+        <button class="btn btn-go" data-act="openJob" data-a="${escAttr(upNext.id)}">Open job</button>
         <a class="btn btn-map" href="${mapUrl(upNext)}" target="_blank" rel="noopener">Directions</a>
       </div></div>`;
   }
   h += `<div class="sect">Today</div>`;
-  h += jobs.map(j=>`<button class="job ${DONE.includes(j.status)?'done':ACTIVE.includes(j.status)?'active':''}" onclick="openJob('${j.id}')">
+  h += jobs.map(j=>`<button class="job ${DONE.includes(j.status)?'done':ACTIVE.includes(j.status)?'active':''}" data-act="openJob" data-a="${escAttr(j.id)}">
       <div class="t">${time(j.startAt)}</div>
       <div class="b"><b>${esc(j.service)}</b>
         <span>${esc(j.customerFirstName)} · ${esc(j.city)}</span>
@@ -168,12 +168,13 @@ function mapUrl(j){
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(j.address)}`;
 }
 
+const escAttr = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 window.openJob = (id) => {
   const j = jobs.find(x=>x.id===id);
   if(!j) return;
   const next = NEXT_STEP[j.status];
   document.getElementById('detail').innerHTML = `
-    <button class="back" onclick="showList()">← Today's jobs</button>
+    <button class="back" data-act="showList">← Today's jobs</button>
     <h2 style="font-size:23px;margin-bottom:4px">${esc(j.service)}</h2>
     <div style="color:var(--muted);margin-bottom:16px">${time(j.startAt)} – ${time(j.endAt)} · ${j.durationMinutes/60} h</div>
     <div class="detail">
@@ -186,12 +187,12 @@ window.openJob = (id) => {
       <div class="row"><span class="k">Job</span><span class="v mono" style="font-size:13px">${j.bookingNumber}</span></div>
     </div>
     <a class="btn btn-ghost btn-full" href="${mapUrl(j)}" target="_blank" rel="noopener">Open directions</a>
-    ${next ? `<div class="steps"><button class="btn ${next==='COMPLETED'?'btn-done':'btn-go'} btn-full" onclick="advance('${j.id}','${next}')">${STEP_LABEL[next]}</button></div>`
+    ${next ? `<div class="steps"><button class="btn ${next==='COMPLETED'?'btn-done':'btn-go'} btn-full" data-act="advance" data-a="${escAttr(j.id)}" data-b="${escAttr(next)}">${STEP_LABEL[next]}</button></div>`
            : `<div class="note" style="background:rgba(14,138,99,.1);border-color:rgba(14,138,99,.3)">This job is complete. Nice work.</div>`}
     <div class="sect">Something wrong?</div>
     <div class="issues">
       ${['Cannot access property','Customer not home','Needs more time','Damage concern','Missing products','Other']
-        .map(t=>`<button class="issue" onclick="reportIssue('${j.id}','${t}')">${t}</button>`).join('')}
+        .map(t=>`<button class="issue" data-act="reportIssue" data-a="${escAttr(j.id)}" data-b="${escAttr(t)}">${t}</button>`).join('')}
     </div>`;
   document.getElementById('list').classList.remove('on');
   document.getElementById('detail').classList.add('on');
@@ -214,6 +215,17 @@ window.reportIssue = async (id, type) => {
     alert('Reported. Dispatch has been notified.');
   }catch(e){ alert(e.message); }
 };
+
+document.addEventListener('click', (event) => {
+  const target = event.target instanceof Element ? event.target.closest('[data-act]') : null;
+  if (!target) return;
+  const fn = window[target.getAttribute('data-act')];
+  if (typeof fn !== 'function') return;
+  const args = [];
+  if (target.hasAttribute('data-a')) args.push(target.getAttribute('data-a'));
+  if (target.hasAttribute('data-b')) args.push(target.getAttribute('data-b'));
+  fn(...args);
+});
 
 load();
 </script>

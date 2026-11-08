@@ -11,6 +11,7 @@
  * encryption key together let the owner sign in; the wrong key does not.
  */
 import { execFileSync } from 'node:child_process';
+import { runPgCommand } from './pg-cli.js';
 import { existsSync, readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -189,17 +190,15 @@ try {
   const dump = join(dir, 'drill.dump');
   assertPg16('pg_dump');
   assertPg16('pg_restore');
-  execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-acl', '--file', dump, SOURCE], {
-    stdio: 'inherit',
-  });
+  runPgCommand('pg_dump', ['--format=custom', '--no-owner', '--no-acl', '--file', dump, '{url}'], SOURCE);
   check('Backup produced a dump', existsSync(dump));
 
   /* ---------------- restore ---------------- */
 
   const admin = SOURCE.replace(/\/[^/?]+(\?|$)/, '/postgres$1');
-  execFileSync('psql', [admin, '-c', `DROP DATABASE IF EXISTS ${RESTORE_DB}`], { stdio: 'ignore' });
-  execFileSync('psql', [admin, '-c', `CREATE DATABASE ${RESTORE_DB}`], { stdio: 'ignore' });
-  execFileSync('pg_restore', ['--no-owner', '--no-acl', '-d', RESTORE_URL, dump], { stdio: 'inherit' });
+  runPgCommand('psql', ['{url}', '-c', `DROP DATABASE IF EXISTS ${RESTORE_DB}`], admin);
+  runPgCommand('psql', ['{url}', '-c', `CREATE DATABASE ${RESTORE_DB}`], admin);
+  runPgCommand('pg_restore', ['--no-owner', '--no-acl', '-d', '{url}', dump], RESTORE_URL);
 
   const restored = new PrismaClient({ datasources: { db: { url: RESTORE_URL } } });
 
@@ -259,7 +258,7 @@ try {
   check('The WRONG key denies access', denied);
 
   await restored.$disconnect();
-  execFileSync('psql', [admin, '-c', `DROP DATABASE IF EXISTS ${RESTORE_DB}`], { stdio: 'ignore' });
+  runPgCommand('psql', ['{url}', '-c', `DROP DATABASE IF EXISTS ${RESTORE_DB}`], admin);
 
   const failed = checks.filter((c) => !c.ok);
   console.log(`\n${checks.length - failed.length}/${checks.length} checks passed.\n`);
