@@ -40,6 +40,7 @@ export function buildCsp(opts: SecurityOptions = {}): string {
     "'self'",
     'https://api.stripe.com',
     'https://www.facebook.com',
+    'https://connect.facebook.net',
     'https://places.googleapis.com',
     'https://routes.googleapis.com',
     ...(opts.connectSrc ?? []),

@@ -35,6 +35,12 @@ describe('content security policy', () => {
     expect(csp).toMatch(/frame-src[^;]*js\.stripe\.com/);
   });
 
+  it('allows the Meta pixel script to fetch its config and events', () => {
+    expect(csp).toMatch(/script-src[^;]*connect\.facebook\.net/);
+    expect(csp).toMatch(/connect-src[^;]*https:\/\/www\.facebook\.com/);
+    expect(csp).toMatch(/connect-src[^;]*https:\/\/connect\.facebook\.net/);
+  });
+
   it('blocks framing and plugins outright', () => {
     expect(csp).toMatch(/frame-ancestors 'none'/);
     expect(csp).toMatch(/object-src 'none'/);

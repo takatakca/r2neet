@@ -36,7 +36,7 @@ export function setupAccountExperience(locale=detectLocale()):void{
  }else{box.innerHTML=events.length?events.map(b=>`<article class="customer-calendar-event"><strong>${esc(formatSlotDate(b.startAt,locale))} · ${esc(formatSlotTime(b.startAt,locale))}–${esc(formatSlotTime(b.endAt,locale))}</strong><p>${esc(fr?b.serviceFr:b.service)} · ${esc(b.bookingNumber)} · ${esc(b.status)}</p><p>${esc(b.address)}</p><p>${directions(b.address)}</p><p><a href="/account">${say('Gérer le rendez-vous depuis la liste de réservations','Manage this visit from your booking list')}</a></p></article>`).join(''):`<p>${say('Aucun rendez-vous pendant cette période.','No appointments in this period.')}</p>`;}
  if(data.truncated)box.insertAdjacentHTML('beforeend',`<p>${say('Affichage limité à 500 visites. Réduisez la période.','Showing up to 500 visits. Narrow the date range.')}</p>`);
  }).catch(()=>{if(callSeq===seq){const box=document.getElementById('calendarEvents');if(box)box.textContent=say('Calendrier indisponible. Vos réservations restent dans la liste ci-dessous.','Calendar unavailable. Your bookings remain in the list below.');}});
- void setupPhone(fr);
+ if(!document.getElementById('accountPhone'))void setupPhone(fr);
 }
 async function setupPhone(fr:boolean){
  const settings=document.getElementById('settings');if(!settings)return;

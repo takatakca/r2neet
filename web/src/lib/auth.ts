@@ -513,7 +513,7 @@ function initializeVerifyPage(): void {
   const phone = sessionStorage.getItem('r2nette.authPhone');
 
   if (!phone) {
-    window.location.replace('/login');
+    window.location.replace('/phone-login');
     return;
   }
 
@@ -614,7 +614,7 @@ function initializeVerifyPage(): void {
         error instanceof ApiRequestError &&
         error.code === 'ACCOUNT_ALREADY_EXISTS'
       ) {
-        showErrorWithLink(message, '/login', 'Go to Login');
+        showErrorWithLink(message, '/phone-login', 'Go to Login');
       } else {
         showError(message);
       }
@@ -803,7 +803,7 @@ function initializeSignupPage(): void {
         error instanceof ApiRequestError &&
         error.code === 'REGISTRATION_SESSION_EXPIRED'
       ) {
-        showErrorWithLink(message, '/login?mode=signup', 'Verify your number again');
+        showErrorWithLink(message, '/phone-login?mode=signup', 'Verify your number again');
       } else {
         showError(message);
       }

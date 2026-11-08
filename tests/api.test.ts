@@ -189,7 +189,7 @@ d('HTTP API', () => {
       .set('Cookie', cookieHeader);
 
     expect(callback.status).toBe(302);
-    expect(callback.headers.location).toBe('/login?google=error');
+    expect(callback.headers.location).toBe('/phone-login?google=error');
     expect(await prisma.googleAuthTransaction.count({
       where: { googleAuthSubject: { not: null } },
     })).toBe(0);

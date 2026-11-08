@@ -723,7 +723,7 @@ export function createApi(deps: ApiDeps) {
       if (req.query.error || !stateCookie || !code || !verifier) {
         clearOAuthCookies();
         res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
-        res.redirect('/login?google=error');
+        res.redirect('/phone-login?google=error');
         return;
       }
 
@@ -739,7 +739,7 @@ export function createApi(deps: ApiDeps) {
           !transaction.googleAuthSubject;
         if (!stateStillFresh) {
           clearOAuthCookies();
-          res.redirect('/login?google=error');
+          res.redirect('/phone-login?google=error');
           return;
         }
 
@@ -766,7 +766,7 @@ export function createApi(deps: ApiDeps) {
           });
           if (claimed.count !== 1) {
             clearOAuthCookies();
-            res.redirect('/login?google=error');
+            res.redirect('/phone-login?google=error');
             return;
           }
 
@@ -803,7 +803,7 @@ export function createApi(deps: ApiDeps) {
         });
         if (claimed.count !== 1) {
           clearOAuthCookies();
-          res.redirect('/login?google=error');
+          res.redirect('/phone-login?google=error');
           return;
         }
 
@@ -816,14 +816,14 @@ export function createApi(deps: ApiDeps) {
           expires: transaction.expiresAt,
         });
 
-        const loginUrl = new URL('/login', origin);
+        const loginUrl = new URL('/phone-login', origin);
         loginUrl.searchParams.set('google', 'phone');
         loginUrl.searchParams.set('returnTo', transaction.returnTo);
         res.redirect(loginUrl.toString());
       } catch {
         clearOAuthCookies();
         res.clearCookie(GOOGLE_LINK_COOKIE, { path: '/' });
-        res.redirect('/login?google=error');
+        res.redirect('/phone-login?google=error');
       }
     }),
   );

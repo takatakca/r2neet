@@ -119,7 +119,7 @@ describe('Google OAuth routes', () => {
 
     expect(callback.status).toBe(302);
     expect(callback.headers.location).toBe(
-      'https://r2nette.ca/login?google=phone&returnTo=%2Faccount',
+      'https://r2nette.ca/phone-login?google=phone&returnTo=%2Faccount',
     );
     expect(cookieValue(callback, GOOGLE_LINK_COOKIE)).toMatch(
       /^r2n_google_link=/,
@@ -147,7 +147,7 @@ describe('Google OAuth routes', () => {
       .set('Cookie', `${state}; ${verifier}`);
 
     expect(callback.status).toBe(302);
-    expect(callback.headers.location).toBe('/login?google=error');
+    expect(callback.headers.location).toBe('/phone-login?google=error');
     expect(
       setCookies(callback).some((item) =>
         item.startsWith(`${GOOGLE_LINK_COOKIE}=`),
