@@ -1,3 +1,7 @@
+import { commercialRoutes } from './commercial.js';
+import { publicProfiles } from './public-experience.js';
+import { emailFirstRoutes } from './email-first.js';
+import { SupabaseEmailAuthProvider, type EmailAuthProvider } from '../identity/email-auth.js';
 import express, {
   type Request,
   type Response,
@@ -69,7 +73,7 @@ import {
 import { createOpsApi } from './ops.js';
 import { AuthError } from '../auth/staff-auth.js';
 import { RosterError } from '../staff/roster-service.js';
-import { normalizePhone } from '../identity/identity.js';
+import { normalizePhone, maskPhone } from '../identity/identity.js';
 import {
   SessionTokenManager,
   PlacesError,
@@ -335,6 +339,9 @@ export interface ApiDeps {
   /** Canonical HTTPS origin used for OAuth callbacks. */
   publicUrl?: string;
   googleAuth?: GoogleAuthProvider;
+  emailAuth?: EmailAuthProvider;
+  /** Explicit migration/test compatibility only. Production defaults to email-first registration. */
+  legacyPhoneRegistration?: boolean;
   now?: () => Date;
   /** Twilio Voice for the callback dialler. Unset = queue for a manual call. */
   voice?: VoiceProvider | null;
@@ -442,7 +449,7 @@ export function createApi(deps: ApiDeps) {
       throw new ApiError(
         401,
         'UNAUTHORIZED',
-        'Verify your phone number to continue.',
+        'Sign in to continue.',
       );
     }
     return req.customerId;
@@ -453,6 +460,23 @@ export function createApi(deps: ApiDeps) {
     (req: Request, res: Response, next: NextFunction) => {
       fn(req, res).catch(next);
     };
+
+  app.use('/api/v1', emailFirstRoutes(prisma, deps.emailAuth ?? new SupabaseEmailAuthProvider(), verification, now));
+
+  app.use(commercialRoutes(prisma, now));
+  app.post('/api/v1/privacy/consent', wrap(async (req, res) => {
+    if (req.get('sec-fetch-site') === 'cross-site' || !req.is('application/json')) throw new ApiError(403, 'REQUEST_REJECTED', 'Use the form on this website.');
+    const input = z.object({ version: z.literal('2026-10-29'), analytics: z.boolean(), marketing: z.boolean() }).strict().parse(req.body);
+    const candidate = req.cookies?.r2n_privacy_visitor;
+    const token = typeof candidate === 'string' && /^[A-Za-z0-9_-]{43}$/.test(candidate) ? candidate : randomBytes(32).toString('base64url');
+    await prisma.privacyConsent.create({ data: { ...input, visitorHash: createHash('sha256').update(token).digest('hex'), recordedAt: now() } });
+    res.cookie('r2n_privacy_visitor', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 180 * 86400000 });
+    res.setHeader('Cache-Control', 'no-store'); res.json({ recorded: true });
+  }));
+  app.get('/api/v1/public/experience' , (_req, res) => {
+    res.json({ profiles: publicProfiles(process.env.R2NETTE_PUBLIC_PROFILES_JSON),
+      metaPixelId: /^\d{10,20}$/.test(process.env.R2NETTE_META_PIXEL_ID ?? '') ? process.env.R2NETTE_META_PIXEL_ID : null });
+  });
 
   /* ---------------- auth ---------------- */
 
@@ -814,8 +838,16 @@ export function createApi(deps: ApiDeps) {
         );
       }
       const phoneE164 = normalizePhone(phone);
+      if (!deps.legacyPhoneRegistration) {
+        const known = await prisma.customerPhone.findUnique({ where: { phoneE164 }, include: { customer: true } });
+        if (!known?.verifiedAt) {
+          // Neutral response: unknown/new numbers never trigger a paid SMS.
+          res.json({ sent: true, message: 'Enter the code we sent you.', maskedPhone: maskPhone(phoneE164), intent });
+          return;
+        }
+      }
 
-      // Deliberately no account lookup here. Answering "no account" or
+      // Legacy compatibility: keep the public response neutral. Answering "no account" or
       // "already registered" before the caller proves they own the phone
       // would let anyone enumerate customers by number. Those outcomes
       // (ACCOUNT_NOT_FOUND / ACCOUNT_ALREADY_EXISTS) come from /verify, after
@@ -837,6 +869,10 @@ export function createApi(deps: ApiDeps) {
     '/api/v1/auth/phone/verify',
     wrap(async (req, res) => {
       const { phone, code, intent } = verifySchema.parse(req.body);
+      if (!deps.legacyPhoneRegistration) {
+        const known = await prisma.customerPhone.findUnique({ where: { phoneE164: normalizePhone(phone) } });
+        if (!known?.verifiedAt) throw new ApiError(401, 'OTP_INVALID', 'The code is invalid or expired.');
+      }
       const googleLinkToken = req.cookies?.[GOOGLE_LINK_COOKIE] as
         | string
         | undefined;
@@ -860,8 +896,8 @@ export function createApi(deps: ApiDeps) {
 
       const hasCompleteAccount = Boolean(
         existingPhone?.verifiedAt &&
-        existingPhone.customer.firstName?.trim() &&
-        existingPhone.customer.lastName?.trim(),
+        (existingPhone.customer.registrationCompletedAt ||
+          (existingPhone.customer.firstName?.trim() && existingPhone.customer.lastName?.trim())),
       );
 
       /** Carry the proven phone to the profile form in a single-use cookie. */
@@ -1850,12 +1886,16 @@ export function createApi(deps: ApiDeps) {
         );
       }
       const updated = await prisma.$transaction(async (transaction) => {
+        const current = await transaction.customer.findUniqueOrThrow({ where: { id: customerId } });
+        if (current.emailAuthSubject && body.email !== undefined && body.email.trim().toLowerCase() !== current.email) {
+          throw new ApiError(409, 'EMAIL_REVERIFICATION_REQUIRED', 'Your sign-in email must be changed through a verified email-change flow.');
+        }
         const saved = await transaction.customer.update({
           where: { id: customerId },
           data: {
             firstName: body.firstName?.trim() || undefined,
             lastName: body.lastName?.trim() || undefined,
-            email: body.email?.trim() || undefined,
+            email: body.email?.trim().toLowerCase() || undefined,
           },
         });
         await enqueueCustomerProfile(
@@ -2385,6 +2425,24 @@ export function createApi(deps: ApiDeps) {
     }),
   );
 
+  // Codex — assistant OpenAI · 2026-10-29: range-bounded customer calendar.
+  app.get('/api/v1/account/calendar', wrap(async (req, res) => {
+    const customerId = requireCustomer(req);
+    const range = z.object({ from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).parse(req.query);
+    const parseDay = (key: string) => {
+      const [y, m, d] = key.split('-').map(Number);
+      const date = new Date(Date.UTC(y!, m! - 1, d!));
+      if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0,10) !== key) throw new ApiError(400, 'VALIDATION_ERROR', 'Invalid date.');
+      return localToUtc(y!, m!, d!, 0);
+    };
+    const from = parseDay(range.from), to = parseDay(range.to);
+    if (to <= from || to.getTime() - from.getTime() > 44 * 86400000) throw new ApiError(400, 'VALIDATION_ERROR', 'Choose a range up to 43 days.');
+    const rows = await prisma.booking.findMany({ where: { customerId, startAt: { gte: from, lt: to } }, include: { service: true, address: true }, orderBy: { startAt: 'asc' }, take: 501 });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ truncated: rows.length > 500, bookings: rows.slice(0,500).map(b => ({ id: b.id, bookingNumber: b.bookingNumber, startAt: b.startAt, endAt: b.endAt, status: b.status,
+      service: b.service.nameEn, serviceFr: b.service.nameFr, address: b.address.formattedAddress })) });
+  }));
+
   /* ---------------- payments ---------------- */
 
   function requirePayments(): PaymentService {
@@ -2441,6 +2499,20 @@ export function createApi(deps: ApiDeps) {
           body.recurringPaymentRequired = policy === 'CARD_ON_FILE';
         }
       }
+      if (req.query.bookingId && !body.paymentPolicy) throw new ApiError(404, 'BOOKING_NOT_FOUND', 'We could not find that booking.');
+      if (req.query.quoteId && !bookingId) {
+        const quote = await prisma.quote.findUnique({ where: { id: String(req.query.quoteId) } });
+        if (!quote || (quote.customerId && quote.customerId !== req.customerId)) throw new ApiError(404, 'QUOTE_NOT_FOUND', 'We could not find that quote.');
+        const service = await prisma.serviceOption.findUnique({ where: { id: quote.serviceOptionId } });
+        if (!service) throw new ApiError(404, 'VALIDATION_ERROR', 'Unknown service.');
+        body.paymentPolicy = service.paymentPolicy;
+        body.amountDueNowCents = amountDueNowCents(service.paymentPolicy, quote.grandTotalCents);
+        body.bookingTotalCents = quote.grandTotalCents;
+        body.recurringPaymentRequired = service.paymentPolicy === 'CARD_ON_FILE';
+      }
+      // A charge cannot be presented as ready without its signed receipt path.
+      body.configured = Boolean(paymentService && webhookSecret && body.publishableKey);
+      res.setHeader('Cache-Control', 'no-store');
       res.json(body);
     }),
   );

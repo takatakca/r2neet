@@ -73,7 +73,7 @@ d('quote revalidation', () => {
 
     stripe = new FakeStripeProvider();
     claims = new PromotionClaimService(prisma);
-    app = createApi({
+    app = createApi({ legacyPhoneRegistration: true,
       prisma,
       verification: new FakeVerificationProvider('123456'),
       stripe,
@@ -272,7 +272,7 @@ d('payment config for checkout', () => {
     await prisma.customerPhone.deleteMany();
     await prisma.customer.deleteMany();
     await seed(prisma);
-    app = createApi({
+    app = createApi({ legacyPhoneRegistration: true,
       prisma,
       verification: new FakeVerificationProvider('123456'),
       stripe: new FakeStripeProvider(),

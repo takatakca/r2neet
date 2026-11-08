@@ -29,7 +29,8 @@
     "drill:restore": "vite-node scripts/restore-drill.ts",
     "ci": "npx tsc --noEmit && npm run build && npx vitest run",
     "test:invariants": "vitest run --reporter=json --outputFile=/tmp/vitest-results.json && vite-node scripts/check-invariants.ts -- /tmp/vitest-results.json",
-    "sync:takatak-backfill": "vite-node scripts/takatak-sync-backfill.ts"
+    "sync:takatak-backfill": "vite-node scripts/takatak-sync-backfill.ts",
+    "test:browser:premium": "vite-node scripts/verify-premium-browser.ts"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

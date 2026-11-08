@@ -34,6 +34,8 @@ model Customer {
   legacyExternalId          String?   @unique
   id                        String    @id @default(uuid())
   googleAuthSubject         String?   @unique
+  emailAuthSubject          String?   @unique
+  emailVerifiedAt           DateTime?
   firstName                 String?
   lastName                  String?
   email                     String?   @unique
@@ -654,7 +656,8 @@ model CustomerSession {
   id               String    @id @default(uuid())
   sessionTokenHash String    @unique
   customerId       String
-  phoneVerifiedAt  DateTime
+  phoneVerifiedAt  DateTime?
+  emailVerifiedAt  DateTime?
   createdAt        DateTime  @default(now())
   lastSeenAt       DateTime  @default(now())
   expiresAt        DateTime
@@ -1251,4 +1254,46 @@ model OperationalAlert {
 
   @@index([status, severity])
   @@index([category, status])
+}
+
+/// Browser-bound email challenge. No OTP or provider access tokens are stored.
+model EmailAuthChallenge {
+  id String @id @default(uuid())
+  tokenHash String @unique
+  email String
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([expiresAt])
+}
+
+/// Commercial meeting requests are enquiries, never confirmed cleaning slots.
+model CommercialEnquiry {
+  id String @id @default(uuid())
+  customerId String
+  company String
+  contactName String
+  email String
+  phone String?
+  sector String
+  cadence String
+  preferredAt DateTime?
+  details String
+  locale String
+  status String @default("NEW")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, createdAt])
+  @@index([customerId, createdAt])
+}
+
+/// Versioned, append-only cookie decisions. Pseudonymous browser hash only.
+model PrivacyConsent {
+  id String @id @default(uuid())
+  visitorHash String
+  version String
+  analytics Boolean
+  marketing Boolean
+  recordedAt DateTime @default(now())
+  @@index([visitorHash, recordedAt])
 }

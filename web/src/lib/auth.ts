@@ -1,3 +1,4 @@
+import './consent.js';
 import {
   formatCanadianPhoneInput,
   IdentityError,
@@ -593,7 +594,7 @@ function initializeVerifyPage(): void {
       // PROFILE_REQUIRED: the number is proven; a registration cookie now
       // carries that proof to the profile form.
       window.location.assign(
-        `/signup?returnTo=${encodeURIComponent(returnTo)}`,
+        `/profile?returnTo=${encodeURIComponent(returnTo)}`,
       );
     } catch (error) {
       const message =
@@ -606,7 +607,7 @@ function initializeVerifyPage(): void {
         // proof, so the profile form is the next step; no second code.
         showErrorWithLink(
           message,
-          `/signup?returnTo=${encodeURIComponent(safeReturnPath())}`,
+          `/profile?returnTo=${encodeURIComponent(safeReturnPath())}`,
           'Continue to sign up',
         );
       } else if (

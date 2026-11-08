@@ -176,6 +176,7 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;backgroun
     <a href="#dispatch" data-nav="dispatch">Dispatch</a>
     <a href="#roster" data-nav="roster">Staff &amp; Cleaners</a>
     <a href="#callbacks" data-nav="callbacks">Callbacks</a>
+    <a href="#commercial" data-nav="commercial">Commercial</a>
     <a href="#billing" data-nav="billing">Billing</a>
     <div class="grp" data-group="content">Content</div>
     <a href="#reviews" data-nav="reviews">Reviews</a>
@@ -191,6 +192,7 @@ select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;backgroun
     <div id="dispatch" class="page"></div>
     <div id="roster" class="page"></div>
     <div id="callbacks" class="page"></div>
+    <div id="commercial" class="page"></div>
     <div id="billing" class="page"></div>
     <div id="reviews" class="page"></div>
     <div id="integrations" class="page"></div>
@@ -210,6 +212,7 @@ const NAV_PERMISSION = {
   dispatch: 'dispatch.view',
   roster: 'dispatch.view',
   callbacks: 'callbacks.view',
+  commercial: 'callbacks.view',
   billing: 'dashboard.view',
   reviews: 'reviews.view',
   integrations: 'integrations.view',
@@ -253,7 +256,7 @@ function applyRole(){
     if(ok && !firstVisible) firstVisible = a.dataset.nav;
   }
   // A section heading with nothing under it is noise; hide it too.
-  const GROUPS = { ops:['dashboard','dispatch','roster','callbacks','billing'], content:['reviews'], setup:['integrations','cutover','security','operations'] };
+  const GROUPS = { ops:['dashboard','dispatch','roster','callbacks','commercial','billing'], content:['reviews'], setup:['integrations','cutover','security','operations'] };
   for(const [group, items] of Object.entries(GROUPS)){
     const heading = document.querySelector(`.grp[data-group="${group}"]`);
     if(heading) heading.hidden = !items.some(i => NAV_PERMISSION[i] === null || allowed.has(NAV_PERMISSION[i]));
@@ -1056,6 +1059,15 @@ async function operationsPage(){
   }catch(e){ err(el,e); }
 }
 
+// Codex — assistant OpenAI · 2026-10-29: commercial requests; no invented confirmed slots.
+async function commercialPage(){
+ const el=document.getElementById('commercial');
+ try{const data=await api('/api/v1/admin/commercial');
+ el.innerHTML='<div class="hdr"><h1>Commercial · demandes</h1></div><p>Discussion demandée ; rendez-vous à confirmer avec le client. Les tarifs restent sur proposition.</p>'+data.enquiries.map(e=>`<article class="panel"><h2>${esc(e.company)}</h2><p>${esc(e.contactName)} · ${esc(e.email)} · ${esc(e.phone||'')}</p><p>${esc(e.sector)} · ${esc(e.cadence)} · ${esc(e.status)}</p><p>${e.preferredAt?esc(new Intl.DateTimeFormat('fr-CA',{dateStyle:'medium',timeStyle:'short',timeZone:'America/Toronto'}).format(new Date(e.preferredAt))):'Moment à convenir'}</p><p style="white-space:pre-wrap">${esc(e.details)}</p><div class="acts">${['CONTACTED','CLOSED'].map(status=>`<button type="button" class="btn" data-commercial-id="${esc(e.id)}" data-commercial-status="${status}">${status==='CONTACTED'?'Contacté':'Fermer'}</button>`).join('')}</div></article>`).join('');
+ if(!data.enquiries.length)el.insertAdjacentHTML('beforeend','<div class="panel">Aucune demande commerciale.</div>');
+ el.onclick=async event=>{const b=event.target.closest('[data-commercial-id]');if(!b)return;b.disabled=true;try{await api('/api/v1/admin/commercial/'+encodeURIComponent(b.dataset.commercialId),{method:'PATCH',body:JSON.stringify({status:b.dataset.commercialStatus})});await commercialPage();}catch(e){b.disabled=false;alert(e.message);}};
+ }catch(e){err(el,e);}
+}
 /* ---------------- routing ---------------- */
 function route(){
   const id = (location.hash || '#dashboard').slice(1);
@@ -1065,6 +1077,7 @@ function route(){
     case 'dispatch': dispatch(); break;
     case 'roster': rosterPage(); break;
     case 'callbacks': callbacksPage(); break;
+    case 'commercial': commercialPage(); break;
     case 'billing': billingPage(); break;
     case 'reviews': reviewsPage(); break;
     case 'integrations': integrationsPage(); break;

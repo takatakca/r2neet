@@ -16,3 +16,7 @@ Line format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 ## Brand rule
 
 Everything visual or written for TAKATAK follows `BRAND.md` (logo, colours, tagline, services). Electric blue on deep navy; never the old gold "TK" logo; green is for status only.
+
+## Signed owner handoff — 2026-10-29, Codex — assistant OpenAI
+
+The owner requires signed, dated notes in GitHub AND the existing Google Drive MAIN → Rapide 2 Nette section for every change. Read its ROBOTS protocol, live journal, work registry and client/platform notes before writing there. Keep provider secrets and private customer data outside this public repository. Record source changes, actual test/CI proof, deployment state, blockers and next action separately. Current premium flow audit: `docs/experience/2026-10-29-premium-audit.md`; PR46 remains blocked on verified protected email-provider activation, not owner permission. Preserve the separate open CRM PR43 and other agents' commits.
