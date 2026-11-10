@@ -62,7 +62,7 @@ schedule.
 
 ## Portable preview
 
-`dist-single/index.html` is a genuinely self-contained file: the JS and CSS are
+`npm run build:single` writes `dist-single/index.html` (not committed), a genuinely self-contained file: the JS and CSS are
 inlined, and it imports nothing external. It will render the full interface
 offline, but the booking flow needs the API, so it shows the recovery screen
 rather than pretending to work.
