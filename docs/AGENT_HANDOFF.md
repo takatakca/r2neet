@@ -1,5 +1,15 @@
 # R2NETTE — Agent handoff
 
+## 2026-11-10 16:30 UTC — Claude (Anthropic) : zéro PR ouverte, drill réparé
+
+Sur ordre du propriétaire (« no pull request, no code issue ») :
+
+- **Fusionnées** : #54 (3151da8, drill : binaires PostgreSQL 16 en tête du PATH, le runner Ubuntu 26 prenait pg_dump 18.6) ; #38 (0ca0861, contrôle PGDMP + taille minimale avant envoi/rétention ; les deux sauvegardes sont bien en `--format=custom`) ; #50 (1e70eb5, après fusion de main et correction du cast TS2352 dans `tests/pg-cli.test.ts` ; vitest 786/786 en local sur PostgreSQL 16 UTC).
+- **Fermées sans fusion** : #43 CRM (le propriétaire préfère éviter la migration et l’import ; branche conservée, réouvrable), #45 et #17 (notes périmées ; tâches propriétaire de #45 reportées dans la note Drive du jour). **Issue #40 fermée** : disque 79 % (21 Go libres) au Deploy 42847318418.
+- **Gardées ouvertes** : issues #25 (clés Stripe/Google Maps toujours absentes) et #48 (mission app mobile).
+- **Preuves en production après #50** (Deploy 42854808932) : `/api/v1/integrations/status` public → 404 ; JSON invalide → 400 VALIDATION_ERROR ; `/.env` → 404 « Not found. » ; cookies de déconnexion `HttpOnly; Secure; SameSite=Lax` ; `/`, `/book`, `/login`, `/signup`, `/account`, `/admin`, `/healthz`, `/readyz` → 200 ; bouton TAKATAK visible, clic → takatak.ca/login ; les 24 actions admin et 4 actions crew sont sur `window`. Restore drill 42855338061 sur 1e70eb5 : 11/11 PASS.
+- **Reste** : branches fusionnées à supprimer à la main (le proxy refuse la suppression) ; vrai parcours TAKATAK (compte neuf + existant) ; connexion courriel toujours désactivée.
+
 ## 2026-11-10 — Claude (Anthropic) : ménage du dépôt
 
 Supprimés sur accord du propriétaire (branche `claude/remove-unused-files`) : `dist/` et `dist-single/` (anciennes sorties Vite, reconstruites par la CI et l’image Docker, désormais dans `.gitignore`), `qa.ts` (script ponctuel du 2026-09-12, remplacé par `tests/`), `booking.html` et `web/prototype-reference.html` (prototypes non construits ni servis), `.agent/CONTINUATION.md` (remplacé par ce fichier). Conservés à la demande du propriétaire : workflows « Install login phone format » et « DNS (MochaHost) ».

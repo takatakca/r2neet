@@ -1,13 +1,14 @@
 # Work log
 
-- 2026-11-08 | Cursor | cursor/security-hardening-54af → PR #50 | PR #50 | Stop public secret-name disclosure, clear Secure cookies, generic errors, HTTPS host pinning, CSP-safe admin actions, and keep restore-drill passwords off argv | CI on the PR; owner deploys after the SSH host key is confirmed
+- 2026-11-08 | Cursor | cursor/security-hardening-54af → PR #50 | done | Stop public secret-name disclosure, clear Secure cookies, generic errors, HTTPS host pinning, CSP-safe admin actions, and keep restore-drill passwords off argv | merged 1e70eb5 on 2026-11-10 by Claude (Anthropic) on owner's order after a main merge + TS2352 test-cast fix (786/786 local); Deploy 42854808932; live checks in docs/AGENT_HANDOFF.md
 
 - 2026-10-29 | Codex — assistant OpenAI | feat/email-first-premium-20261029 → PR #46 | code tested, release blocked on real email activation | Email OTP/no signup SMS, guided booking, commercial queue, consent/withdrawal, calendar/GPS and scoped checkout | initial CI 40843380976 passed 764 tests; final follow-up CI then confirm SMTP/template/flag before release; photos/signatures/transfer/plans/LLM remain documented
 
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
-- 2026-11-10 | Claude (Anthropic) | claude/fix-restore-drill-pg16-path → PR #54 | PR #54 | Restore drill red since 2026-11-02: on the Ubuntu 26 runner the bare pg_dump/pg_restore resolve to 18.x even after installing postgresql-client-16, so the version guard fails | drill run 42850253639 on the branch passed (client 16.15); CI → merge
+- 2026-11-10 | Claude (Anthropic) | claude/log-2026-11-10-cleanup → PR pending | active | Owner asked for zero open PRs and no code issues: merged #38 and #50, closed #43 #45 #17 and issue #40, kept issues #25 #48 open (real to-do lists) | merge this log PR; owner deletes merged branches (proxy refuses branch deletion)
+- 2026-11-10 | Claude (Anthropic) | claude/fix-restore-drill-pg16-path → PR #54 | done | Restore drill red since 2026-11-02: on the Ubuntu 26 runner the bare pg_dump/pg_restore resolve to 18.x even after installing postgresql-client-16, so the version guard fails | drill run 42850253639 on the branch passed (client 16.15); CI → merge
 - 2026-11-10 | Claude (Anthropic) | claude/remove-unused-files → PR #53 | done | Remove unused files: stale committed dist/ and dist-single/ builds (now gitignored), qa.ts, booking.html, web/prototype-reference.html, .agent/CONTINUATION.md (superseded by docs/AGENT_HANDOFF.md) | PR → CI → merge; owner kept the login-format hotfix and DNS (MochaHost) workflows
 - 2026-11-10 | Claude (Anthropic) | claude/server-setup-takatak-client-id → PR #52 | done | Server setup never copied TAKATAK_OAUTH_CLIENT_ID (web upload of #51 dropped .github and .env.example), so the button was hidden | merged f3eb9a7; Server setup 42844540901 copied it; Deploy 42844918942; config true, button live, click reaches takatak.ca/login; next: owner tests a real sign-in (new and existing account)
 - 2026-11-10 | Claude (Anthropic) | claude/r2nette-takatak-sso → PR #51 | done | "Continuer avec TAKATAK" OAuth sign-in/sign-up + account linking; R2NETTE keeps a copy and queues the profile back | merged b032c91 (owner web upload) and live with #52
