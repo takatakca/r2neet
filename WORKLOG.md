@@ -5,6 +5,7 @@
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-11-10 | Claude (Anthropic) | claude/server-setup-takatak-client-id → PR #52 | PR #52 | Server setup never copied TAKATAK_OAUTH_CLIENT_ID (web upload of #51 dropped .github and .env.example), so /api/v1/auth/takatak/config stays false and the button is hidden | PR → CI → merge → Server setup (log must list TAKATAK_OAUTH_CLIENT_ID) → Deploy → config true
 - 2026-11-10 | Claude (Anthropic) | claude/r2nette-takatak-sso → PR pending | blocked: push not authorized for this session | "Continuer avec TAKATAK" OAuth sign-in/sign-up + account linking; R2NETTE keeps a copy and queues the profile back | OAuth client R2NETTE registered in TAKATAK Supabase + TAKATAK_OAUTH_CLIENT_ID set in GitHub production (done 2026-11-10); next: add repo to session sources, push, PR → CI → Server setup → deploy
 - 2026-11-07 | Cursor | cursor/fix-restore-drill-pg16-54af → PR #49 | PR #49 | Pin the weekly restore drill to the PostgreSQL 16 client so a 17+ pg_dump does not emit SET transaction_timeout | CI on the PR; do not deploy or merge
 

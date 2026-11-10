@@ -1,5 +1,9 @@
 # R2NETTE — Agent handoff
 
+## 2026-11-10 — Claude (Anthropic) : bouton TAKATAK masqué en production
+
+PR #51 (b032c91) est en production, mais `/api/v1/auth/takatak/config` répond `{"configured":false}` : le bouton reste masqué et `/login` affiche « Sign-in is unavailable ». Cause : le téléversement web de #51 a perdu `.github/` et `.env.example` (16 fichiers au lieu de 18). `server-setup.yml` ne passait donc pas `TAKATAK_OAUTH_CLIENT_ID` à `ci-server-setup.sh`, et Server setup 42840801557 n’a copié que `TAKATAK_SUPABASE_URL TAKATAK_SUPABASE_ANON_KEY`. Correctif : branche `claude/server-setup-takatak-client-id` (accepte un secret ou une variable d’environnement). Reste : CI, fusion, Server setup (le journal doit lister `TAKATAK_OAUTH_CLIENT_ID`), Deploy, puis vérifier `configured:true` et un vrai parcours.
+
 ## 2026-11-10 — Claude (Anthropic) : « Continuer avec TAKATAK » (branche, non déployé)
 
 Branche `claude/r2nette-takatak-sso` depuis `main` 73a17e2. TAKATAK devient le compte maître : `/login` et `/signup` envoient le client sur TAKATAK (OAuth 2.1 + PKCE, client public), puis R2NETTE crée ou retrouve sa copie du client et ouvre la session. Liaison d’un ancien compte depuis `/account`. Flux et règles : `docs/TAKATAK_INTEGRATION.md`, décision 19.
