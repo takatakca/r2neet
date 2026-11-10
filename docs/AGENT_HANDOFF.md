@@ -1,6 +1,12 @@
 # R2NETTE — Agent handoff
 
-## 2026-11-10 — Claude (Anthropic) : bouton TAKATAK masqué en production
+## 2026-11-10 — Claude (Anthropic) : ménage du dépôt
+
+Supprimés sur accord du propriétaire (branche `claude/remove-unused-files`) : `dist/` et `dist-single/` (anciennes sorties Vite, reconstruites par la CI et l’image Docker, désormais dans `.gitignore`), `qa.ts` (script ponctuel du 2026-09-12, remplacé par `tests/`), `booking.html` et `web/prototype-reference.html` (prototypes non construits ni servis), `.agent/CONTINUATION.md` (remplacé par ce fichier). Conservés à la demande du propriétaire : workflows « Install login phone format » et « DNS (MochaHost) ».
+
+## 2026-11-10 — Claude (Anthropic) : bouton TAKATAK masqué en production — résolu
+
+Résolu : PR #52 fusionnée (f3eb9a7), Server setup 42844540901 a copié `TAKATAK_OAUTH_CLIENT_ID`, Deploy 42844918942 ; `configured:true`, bouton visible, le clic mène à takatak.ca/login. Reste : vrai parcours avec un compte TAKATAK neuf et un compte existant.
 
 PR #51 (b032c91) est en production, mais `/api/v1/auth/takatak/config` répond `{"configured":false}` : le bouton reste masqué et `/login` affiche « Sign-in is unavailable ». Cause : le téléversement web de #51 a perdu `.github/` et `.env.example` (16 fichiers au lieu de 18). `server-setup.yml` ne passait donc pas `TAKATAK_OAUTH_CLIENT_ID` à `ci-server-setup.sh`, et Server setup 42840801557 n’a copié que `TAKATAK_SUPABASE_URL TAKATAK_SUPABASE_ANON_KEY`. Correctif : branche `claude/server-setup-takatak-client-id` (accepte un secret ou une variable d’environnement). Reste : CI, fusion, Server setup (le journal doit lister `TAKATAK_OAUTH_CLIENT_ID`), Deploy, puis vérifier `configured:true` et un vrai parcours.
 
