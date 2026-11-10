@@ -1,5 +1,13 @@
 # R2NETTE — Agent handoff
 
+## 2026-11-10 — Claude (Anthropic) : « Continuer avec TAKATAK » (branche, non déployé)
+
+Branche `claude/r2nette-takatak-sso` depuis `main` 73a17e2. TAKATAK devient le compte maître : `/login` et `/signup` envoient le client sur TAKATAK (OAuth 2.1 + PKCE, client public), puis R2NETTE crée ou retrouve sa copie du client et ouvre la session. Liaison d’un ancien compte depuis `/account`. Flux et règles : `docs/TAKATAK_INTEGRATION.md`, décision 19.
+
+Preuves locales : `tsc` OK ; `vitest` 781/781 avec PostgreSQL 16 en UTC (dont `tests/takatak-oauth.test.ts` 15 et `tests/takatak-oauth-db.test.ts` 2) ; invariants 34/34 ; `vite build` OK ; contrôle Chromium 390 px et 1280 px sans erreur ni débordement. Aucune CI GitHub : la session n’avait pas le droit de pousser vers `takatakca/r2neet`.
+
+Fait le 2026-11-10 sur ordre du propriétaire : client OAuth « R2NETTE » créé dans Supabase TAKATAK (id public `8e551e10-b1e1-4cf5-8af9-72fc791b9086`, réponse 302 vers takatak.ca/oauth/consent vérifiée) et variable `TAKATAK_OAUTH_CLIENT_ID` posée dans l’environnement GitHub `production`. Reste : 3) PR, CI, Server setup, Deploy ; 4) vrai parcours avec un compte TAKATAK neuf et un compte existant. Note : `R2NETTE_EMAIL_AUTH_ENABLED` n’est pas copié par Server setup (absent de la liste `settings`), donc le formulaire courriel reste désactivé en production tant qu’il n’est pas posé à la main. Paiement : clés Stripe R2NETTE et Google Maps toujours manquantes en production.
+
 ## 2026-10-29 — Codex — assistant OpenAI : parcours premium (branche, non déployé)
 
 PR **46** `feat/email-first-premium-20261029` : connexion courriel avec preuve distincte du téléphone, SMS après paiement positif serveur, dialogue de réservation, paiement scoped/confirmation webhook, commercial avec file opérateur, consentement facultatif, calendrier client et GPS. Audit et blocages : [rapport de reprise](experience/2026-10-29-premium-audit.md). Ne pas confondre la branche et la production ni déclarer photos/signatures/transfert/forfaits/IA tous livrés.

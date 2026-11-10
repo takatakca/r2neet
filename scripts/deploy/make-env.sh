@@ -75,6 +75,8 @@ R2NETTE_PUBLIC_PROFILES_JSON=
 # Optional brand-specific Meta pixel. Loaded only after explicit marketing consent.
 R2NETTE_META_PIXEL_ID=
 TAKATAK_SUPABASE_ANON_KEY=
+# Public OAuth client id for "Continuer avec TAKATAK" (no secret).
+TAKATAK_OAUTH_CLIENT_ID=
 TAKATAK_R2NETTE_SYNC_ENABLED=false
 TAKATAK_R2NETTE_SYNC_URL=
 TAKATAK_R2NETTE_SYNC_CLIENT_ID=

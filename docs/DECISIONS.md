@@ -30,5 +30,7 @@ Snapshot: 2026-10-16. This documents existing repository policy and decisions, n
 17. **Shared VPS storage safety:** The deployment can clean up only obsolete R2NETTE SHA-tagged Docker images, never active, previous, target, other Coolify services or Docker volumes. Do not run global volume prune. Pre-pull cleanup is intended to recover from ENOSPC, with PR #39 CI and real deploy still pending.
 18. **Agent continuity:**17. **Agent continuity:** Keep `AGENTS.md`, `WORKLOG.md` and the five `docs/` status files current; never claim a deployment or test without SHA-linked evidence. Avoid force-pushes and conflicting work.
 
+19. **TAKATAK is the master account (2026-11-10, Claude — Anthropic):** customers sign in to R2NETTE with "Continuer avec TAKATAK" (OAuth 2.1 + PKCE, public client, server-side code exchange, UserInfo as the only identity source). R2NETTE keeps a copy and never takes over a historic profile by email match alone; linking an existing account happens from a signed-in session. Signup stays email-first; phone is imported only when TAKATAK already verified it and is otherwise requested after the first payment. Details: `docs/TAKATAK_INTEGRATION.md`.
+
 References: `BRAND.md`, `RUN.md`, `docs/TAKATAK_INTEGRATION.md`, `docs/reservation-system/`, `docs/deployment/contabo-runbook.md`, [production readiness issue #25](https://github.com/takatakca/r2neet/issues/25).
 
