@@ -5,7 +5,7 @@ import { LiveStripeProvider } from '../payments/stripe-provider.js';
 import { GooglePlacesProvider } from '../integrations/places.js';
 import { resolveDatabase } from '../db/safety.js';
 import { integrationStatus } from '../data/repositories.js';
-import { validateProductionConfig, installGracefulShutdown } from './hardening.js';
+import { validateProductionConfig, installGracefulShutdown, notFoundHandler } from './hardening.js';
 
 /**
  * Development/production entrypoint.
@@ -70,6 +70,7 @@ for (const [route, file] of Object.entries(pages)) {
   });
 }
 app.use(express.static(dist));
+app.use(notFoundHandler());
 
 const problems = validateProductionConfig(process.env);
 for (const p of problems) {

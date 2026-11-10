@@ -94,7 +94,45 @@ export function securityHeaders(opts: SecurityOptions = {}): RequestHandler {
  * Trusts `x-forwarded-proto`, which is only safe when a proxy sets it and the
  * app is not directly reachable. Express must have `trust proxy` enabled.
  */
-export function requireHttps(enabled: boolean): RequestHandler {
+/**
+ * Build an HTTPS redirect that cannot be pointed at an attacker host.
+ * When a canonical origin is configured, the request Host header is ignored.
+ */
+export function httpsRedirectTarget(
+  canonicalOrigin: string | undefined,
+  hostHeader: string | undefined,
+  originalUrl: string,
+): string | null {
+  const path =
+    originalUrl.startsWith('/') &&
+    !originalUrl.startsWith('//') &&
+    !originalUrl.includes('\\') &&
+    !/[\u0000\r\n]/.test(originalUrl)
+      ? originalUrl
+      : '/';
+  if (canonicalOrigin) {
+    let origin: URL;
+    try {
+      origin = new URL(canonicalOrigin);
+    } catch {
+      return null;
+    }
+    if (
+      origin.protocol !== 'https:' ||
+      origin.username ||
+      origin.password ||
+      origin.search ||
+      origin.hash
+    ) {
+      return null;
+    }
+    return `${origin.origin}${path}`;
+  }
+  if (!hostHeader || /[\s/@\\]/.test(hostHeader) || /[\u0000\r\n]/.test(hostHeader)) return null;
+  return `https://${hostHeader}${path}`;
+}
+
+export function requireHttps(enabled: boolean, canonicalOrigin?: string): RequestHandler {
   return (req, res, next) => {
     if (!enabled) return next();
     const proto = req.header('x-forwarded-proto') ?? req.protocol;
@@ -106,7 +144,25 @@ export function requireHttps(enabled: boolean): RequestHandler {
       });
       return;
     }
-    res.redirect(308, `https://${req.header('host')}${req.originalUrl}`);
+    const target = httpsRedirectTarget(canonicalOrigin, req.header('host'), req.originalUrl);
+    if (!target) {
+      res.status(400).json({
+        error: { code: 'HTTPS_REQUIRED', message: 'This endpoint requires a secure connection.' },
+      });
+      return;
+    }
+    res.redirect(308, target);
+  };
+}
+
+/** Unknown routes must not echo the path or the framework's diagnostic text. */
+export function notFoundHandler(): RequestHandler {
+  return (req, res) => {
+    if (req.path.startsWith('/api/') || req.path === '/healthz' || req.path === '/readyz') {
+      res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Not found.' } });
+      return;
+    }
+    res.status(404).type('html').send('<!doctype html><title>Not found</title><p>Not found.</p>');
   };
 }
 

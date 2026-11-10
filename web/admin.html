@@ -264,7 +264,7 @@ function applyRole(){
   document.getElementById('whoami').innerHTML =
     `<b>${esc(ME.user.displayName)}</b>${esc(ME.user.email)}
      <span class="role">${esc(ME.user.role)}</span>
-     <button type="button" onclick="signOut()">Sign out</button>`;
+     <button type="button" data-act="signOut">Sign out</button>`;
   // A cleaner has no admin surface at all — send them to their own app.
   if(!firstVisible){
     document.querySelector('main').innerHTML =
@@ -384,7 +384,7 @@ async function dispatch(){
           <div class="when">${time(b.startAt)}</div>
           <div class="who"><b>${esc(b.service)}</b><span>${esc(b.customerName)} · ${esc(b.city)} · ${b.assignedStaffIds.length}/${b.requiredStaffCount} assigned</span></div>
           <select id="sel-${b.id}">${d.staff.filter(s=>!s.onTimeOff && !b.assignedStaffIds.includes(s.id)).map(s=>`<option value="${s.id}">${esc(s.displayName)}</option>`).join('')}</select>
-          <button class="btn" onclick="assign('${b.id}')">Assign</button>
+          <button class="btn" data-act="assign" data-a="${esc(b.id)}">Assign</button>
         </div>`).join('')}
         </div></div>` : ''}
       <div class="panel">
@@ -452,8 +452,8 @@ function skillPicker(services, categories, selected){
     if(!items.length) return '';
     return `<div class="skills-group">
       <h3>${esc(cat.name)}
-        <button type="button" class="btn ghost tiny" onclick="toggleSkillGroup('${esc(cat.id)}',true)">All</button>
-        <button type="button" class="btn ghost tiny" onclick="toggleSkillGroup('${esc(cat.id)}',false)">None</button>
+        <button type="button" class="btn ghost tiny" data-act="toggleSkillGroup" data-a="${esc(cat.id)}" data-b="true">All</button>
+        <button type="button" class="btn ghost tiny" data-act="toggleSkillGroup" data-a="${esc(cat.id)}" data-b="false">None</button>
       </h3>
       <div class="check-grid">${items.map(s=>
         `<label><input type="checkbox" class="skill-box" data-cat="${esc(cat.id)}" value="${esc(s.id)}" ${sel.has(s.id)?'checked':''}> ${esc(s.name)}</label>`
@@ -490,7 +490,7 @@ async function rosterPage(){
     el.innerHTML = `
       <div class="hdr"><div><h1>Staff &amp; Cleaners</h1>
         <div class="sub">Who works, and when. Availability is what the booking page can offer.</div></div>
-        ${owner?`<button class="btn" onclick="addCleaner()">Add cleaner</button>`:''}</div>
+        ${owner?`<button class="btn" data-act="addCleaner">Add cleaner</button>`:''}</div>
       ${bannerHtml()}
 
       <div class="cards">
@@ -526,12 +526,12 @@ async function rosterPage(){
               ? '<span class="pill warn">Time off</span>'
               : s.active ? '<span class="pill ok">Active</span>' : '<span class="pill mut">Inactive</span>'}</td>
           <td style="white-space:nowrap">
-            ${owner?`<button class="btn ghost" onclick="editWeek('${s.id}')">Hours</button>`:''}
-            ${owner?`<button class="btn ghost" onclick="editSkills('${s.id}')">Skills</button>`:''}
-            ${timeOffOk?`<button class="btn ghost" onclick="editTimeOff('${s.id}')">Time off</button>`:''}
+            ${owner?`<button class="btn ghost" data-act="editWeek" data-a="${esc(s.id)}">Hours</button>`:''}
+            ${owner?`<button class="btn ghost" data-act="editSkills" data-a="${esc(s.id)}">Skills</button>`:''}
+            ${timeOffOk?`<button class="btn ghost" data-act="editTimeOff" data-a="${esc(s.id)}">Time off</button>`:''}
             ${owner?(s.active
-              ?`<button class="btn ghost" onclick="setActive('${s.id}',false)">Deactivate</button>`
-              :`<button class="btn" onclick="setActive('${s.id}',true)">Reactivate</button>`):''}
+              ?`<button class="btn ghost" data-act="setActive" data-a="${esc(s.id)}" data-b="false">Deactivate</button>`
+              :`<button class="btn" data-act="setActive" data-a="${esc(s.id)}" data-b="true">Reactivate</button>`):''}
           </td></tr>`).join('')}
       </tbody></table>` : '<div class="empty"><div class="big">No cleaners yet</div>Nothing can be booked until at least one cleaner has availability.</div>'}
       </div>
@@ -543,6 +543,8 @@ function closeRosterEdit(){
   const box = document.getElementById('rosterEdit');
   if(box) box.innerHTML = '';
 }
+
+window.closeRosterEdit = closeRosterEdit;
 
 window.addCleaner = () => {
   if(!canManage()) return;
@@ -559,8 +561,8 @@ window.addCleaner = () => {
       <p class="hint">Leave skills empty to allow every service. Most hires should have Basic, Deep, and at least one specialty.</p>
       ${skillPicker(d.services, d.categories, [])}
       <div style="margin-top:8px">
-        <button class="btn" onclick="saveNewCleaner()">Hire</button>
-        <button class="btn ghost" onclick="closeRosterEdit()">Cancel</button>
+        <button class="btn" data-act="saveNewCleaner">Hire</button>
+        <button class="btn ghost" data-act="closeRosterEdit">Cancel</button>
       </div>
     </div></div>`;
   box.scrollIntoView({behavior:'smooth'});
@@ -605,8 +607,8 @@ window.editWeek = async (id) => {
       </tr>`;
     }).join('')}
     </tbody></table>
-    <div class="form-pad"><button class="btn" onclick="saveWeek('${id}')">Save week</button>
-    <button class="btn ghost" onclick="closeRosterEdit()">Cancel</button></div></div>`;
+    <div class="form-pad"><button class="btn" data-act="saveWeek" data-a="${esc(id)}">Save week</button>
+    <button class="btn ghost" data-act="closeRosterEdit">Cancel</button></div></div>`;
   box.scrollIntoView({behavior:'smooth'});
 };
 
@@ -650,8 +652,8 @@ window.editSkills = (id) => {
     <div class="form-pad">
       <p class="hint">Empty means they can do every service. The booking engine reads this list.</p>
       ${skillPicker(d.services, d.categories, s.skills)}
-      <button class="btn" onclick="saveSkills('${id}')">Save skills</button>
-      <button class="btn ghost" onclick="closeRosterEdit()">Cancel</button>
+      <button class="btn" data-act="saveSkills" data-a="${esc(id)}">Save skills</button>
+      <button class="btn ghost" data-act="closeRosterEdit">Cancel</button>
     </div></div>`;
   box.scrollIntoView({behavior:'smooth'});
 };
@@ -717,15 +719,15 @@ window.editTimeOff = (id) => {
         <div style="flex:1;min-width:160px"><label class="gl" for="offReason">Reason</label>
           <input class="gi" id="offReason" placeholder="Vacation, sick, …"></div>
       </div>
-      <button class="btn" onclick="saveTimeOff('${id}')">Add time off</button>
-      <button class="btn ghost" onclick="closeRosterEdit()">Cancel</button>
+      <button class="btn" data-act="saveTimeOff" data-a="${esc(id)}">Add time off</button>
+      <button class="btn ghost" data-act="closeRosterEdit">Cancel</button>
     </div>
     ${upcoming.length ? `<div class="panel-h"><h2>Upcoming</h2></div>
       ${upcoming.map(t=>`<div class="job-row">
         <div class="when">${torontoDay(t.startAt)}</div>
         <div class="who"><b>${torontoDay(t.startAt)} → ${throughDay(t.endAt)}</b>
           <span>${esc(t.reason||'Time off')}</span></div>
-        <button class="btn ghost" onclick="removeTimeOff('${t.id}')">Remove</button>
+        <button class="btn ghost" data-act="removeTimeOff" data-a="${esc(t.id)}">Remove</button>
       </div>`).join('')}` : '<div class="empty">No upcoming time off.</div>'}
     </div>`;
   box.scrollIntoView({behavior:'smooth'});
@@ -788,8 +790,8 @@ async function callbacksPage(){
           <td><span class="pill ${c.status==='CONNECTED'||c.status==='COMPLETED'?'ok':c.status==='FAILED'||c.status==='NO_ANSWER'?'bad':'aqua'}">${c.status}</span></td>
           <td class="mono">${c.attemptCount}</td>
           <td style="white-space:nowrap">
-            <button class="btn" onclick="cbAction('${c.id}','dial')">Call</button>
-            <button class="btn ghost" onclick="cbAction('${c.id}','complete')">Done</button>
+            <button class="btn" data-act="cbAction" data-a="${esc(c.id)}" data-b="dial">Call</button>
+            <button class="btn ghost" data-act="cbAction" data-a="${esc(c.id)}" data-b="complete">Done</button>
           </td></tr>`).join('')}
       </tbody></table>` : `<div class="empty"><div class="big">No callback requests</div>Requests from the booking flow and concierge land here.</div>`}
       </div>`;
@@ -826,8 +828,8 @@ async function billingPage(){
           <td><span class="pill ${c.upcomingBookings>0?'warn':'mut'}">${c.upcomingBookings}</span></td>
           <td><span class="pill ${c.daysOpen>3?'bad':'mut'}">${c.daysOpen}d</span></td>
           <td style="white-space:nowrap">
-            ${c.status==='OPEN'?`<button class="btn" onclick="caseAction('${c.id}','contacted')">Mark contacted</button>`:''}
-            <button class="btn ghost" onclick="caseAction('${c.id}','resolved')">Resolved</button>
+            ${c.status==='OPEN'?`<button class="btn" data-act="caseAction" data-a="${esc(c.id)}" data-b="contacted">Mark contacted</button>`:''}
+            <button class="btn ghost" data-act="caseAction" data-a="${esc(c.id)}" data-b="resolved">Resolved</button>
           </td></tr>`).join('')}
       </tbody></table>` : `<div class="empty"><div class="big">Nothing to chase</div>Every payment is up to date.</div>`}
       </div>
@@ -839,7 +841,7 @@ async function billingPage(){
           <td>${esc(f.failureCode||'—')}</td>
           <td class="mono">${f.attemptNumber}</td>
           <td>${f.nextRetryAt?new Date(f.nextRetryAt).toLocaleString('en-CA'):'—'}</td>
-          <td><button class="btn ghost" onclick="retryAttempt('${f.id}')">Retry now</button></td>
+          <td><button class="btn ghost" data-act="retryAttempt" data-a="${esc(f.id)}">Retry now</button></td>
         </tr>`).join('')}
       </tbody></table>` : `<div class="empty">No recent failures.</div>`}
       </div>`;
@@ -878,11 +880,11 @@ async function reviewsPage(){
           <td style="max-width:340px">${esc((r.reviewText||'').slice(0,110))}${(r.reviewText||'').length>110?'…':''}</td>
           <td><span class="pill ${r.status==='PUBLISHED'?'ok':r.status==='PENDING'?'warn':'mut'}">${r.status}</span></td>
           <td style="white-space:nowrap">
-            ${r.status!=='PUBLISHED'?`<button class="btn" onclick="revAction('${r.id}','publish')">Publish</button>`:`<button class="btn ghost" onclick="revAction('${r.id}','hide')">Hide</button>`}
-            <button class="btn ghost" onclick="revAction('${r.id}','feature')">${r.featured?'Unfeature':'Feature'}</button>
+            ${r.status!=='PUBLISHED'?`<button class="btn" data-act="revAction" data-a="${esc(r.id)}" data-b="publish">Publish</button>`:`<button class="btn ghost" data-act="revAction" data-a="${esc(r.id)}" data-b="hide">Hide</button>`}
+            <button class="btn ghost" data-act="revAction" data-a="${esc(r.id)}" data-b="feature">${r.featured?'Unfeature':'Feature'}</button>
           </td></tr>`).join('')}
       </tbody></table>` : `<div class="empty"><div class="big">No reviews yet</div>Sync Google or import your Setmore history to populate this.<br><br>
-        <button class="btn" onclick="importDemo()">Run Setmore import (dry run)</button></div>`}
+        <button class="btn" data-act="importDemo">Run Setmore import (dry run)</button></div>`}
       </div>`;
   }catch(e){ err(el,e); }
 }
@@ -945,9 +947,9 @@ async function securityPage(){
       </p>
       <div id="tfaBody"></div>
       ${u.twoFactorEnabled
-        ? `<button class="btn ghost" onclick="tfaDisable()">Turn off</button>
-           <button class="btn ghost" onclick="tfaNewCodes()">New recovery codes</button>`
-        : `<button class="btn" onclick="tfaBegin()">Turn on two-step verification</button>`}
+        ? `<button class="btn ghost" data-act="tfaDisable">Turn off</button>
+           <button class="btn ghost" data-act="tfaNewCodes">New recovery codes</button>`
+        : `<button class="btn" data-act="tfaBegin">Turn on two-step verification</button>`}
     </div>`;
 }
 
@@ -960,7 +962,7 @@ window.tfaBegin = async () => {
       <p style="font-size:12.5px;color:var(--muted)">Or open: <span class="tfa-uri" style="display:inline">${esc(res.otpauthUri)}</span></p>
       <input class="gi mono" id="enrolCode" inputmode="numeric" maxlength="6" placeholder="000000" style="max-width:220px">
       <div class="gerr" id="enrolErr" hidden></div>
-      <div style="margin-top:12px"><button class="btn" onclick="tfaConfirm()">Confirm</button></div>`;
+      <div style="margin-top:12px"><button class="btn" data-act="tfaConfirm">Confirm</button></div>`;
   }catch(e){ alert(e.message); }
 };
 
@@ -976,7 +978,7 @@ window.tfaConfirm = async () => {
       <p style="font-size:14px"><b>Save these recovery codes now.</b> Each works once, and this is
       the only time they are shown. Without them, losing your phone means losing this account.</p>
       <div class="tfa-codes">${res.recoveryCodes.map(c=>`<div>${esc(c)}</div>`).join('')}</div>
-      <button class="btn" onclick="location.reload()">I have saved them</button>`;
+      <button class="btn" data-act="reload">I have saved them</button>`;
   }catch(e){ err.textContent = e.message; err.hidden = false; }
 };
 
@@ -1087,6 +1089,22 @@ function route(){
     default: dashboard();
   }
 }
+document.addEventListener('click', (event) => {
+  const target = event.target instanceof Element ? event.target.closest('[data-act]') : null;
+  if (!target) return;
+  const act = target.getAttribute('data-act');
+  if (act === 'reload') { location.reload(); return; }
+  const fn = window[act];
+  if (typeof fn !== 'function') return;
+  const args = [];
+  if (target.hasAttribute('data-a')) args.push(target.getAttribute('data-a'));
+  if (target.hasAttribute('data-b')) {
+    const raw = target.getAttribute('data-b');
+    args.push(raw === 'true' ? true : raw === 'false' ? false : raw);
+  }
+  fn(...args);
+});
+
 window.addEventListener('hashchange', route);
 
 /* Resolve the session before rendering anything. */

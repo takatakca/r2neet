@@ -5,6 +5,8 @@ import {
   buildCsp,
   securityHeaders,
   requireHttps,
+  httpsRedirectTarget,
+  notFoundHandler,
   RateLimiter,
   rateLimit,
   classifyRoute,
@@ -19,6 +21,7 @@ import {
 import type { PrismaClient } from '@prisma/client';
 import { createApi } from '../src/api/app.js';
 import { FakeVerificationProvider } from '../src/identity/identity.js';
+import { authCookieOptions } from '../src/api/cookies.js';
 
 describe('content security policy', () => {
   const csp = buildCsp();
@@ -111,6 +114,62 @@ describe('https enforcement', () => {
 
   it('does nothing when disabled, so local development works', async () => {
     expect((await request(app(false)).get('/x')).status).toBe(200);
+  });
+
+  it('redirects to the configured origin instead of the Host header', async () => {
+    const a = express();
+    a.set('trust proxy', 1);
+    a.use(requireHttps(true, 'https://r2nette.ca'));
+    a.get('/x', (_r, res) => res.json({ ok: true }));
+    const res = await request(a).get('/x?q=1').set('x-forwarded-proto', 'http').set('Host', 'evil.example');
+    expect(res.status).toBe(308);
+    expect(res.headers.location).toBe('https://r2nette.ca/x?q=1');
+    expect(httpsRedirectTarget('https://r2nette.ca', 'evil.example', '/\\evil')).toBe('https://r2nette.ca/');
+  });
+});
+
+describe('framework errors stay generic', () => {
+  it('does not echo a missing path', async () => {
+    const a = express();
+    a.use(notFoundHandler());
+    const res = await request(a).get('/.env');
+    expect(res.status).toBe(404);
+    expect(res.text).not.toMatch(/Cannot GET/);
+    expect(res.text).not.toContain('/.env');
+  });
+
+  it('rejects malformed JSON without echoing the body', async () => {
+    const prisma = { $queryRaw: async () => [{ ok: 1 }] } as unknown as PrismaClient;
+    const a = createApi({
+      legacyPhoneRegistration: true,
+      prisma,
+      verification: new FakeVerificationProvider('123456'),
+      hardening: { enabled: true, requireHttps: false, rateLimit: false, log: null },
+    });
+    const res = await request(a)
+      .post('/api/v1/auth/phone/send')
+      .set('Content-Type', 'application/json')
+      .send('not-json');
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(JSON.stringify(res.body)).not.toContain('not-json');
+  });
+});
+
+describe('auth cookies', () => {
+  it('clears a production cookie with the Secure flag that set it', () => {
+    const previous = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      expect(authCookieOptions('/api/v1/auth/google')).toMatchObject({
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/api/v1/auth/google',
+      });
+    } finally {
+      process.env.NODE_ENV = previous;
+    }
   });
 });
 

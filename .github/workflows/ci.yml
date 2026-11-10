@@ -250,11 +250,11 @@ jobs:
         run: |
           # Inline handlers reference globals that may not exist in a bundled
           # build. This was a real outage; the guard keeps it fixed.
-          if grep -n 'onclick=' web/index.html; then
-            echo "::error::web/index.html reintroduced an inline onclick handler."
+          if grep -n 'onclick="' web/index.html web/admin.html web/crew.html; then
+            echo "::error::An operations or booking page reintroduced an inline onclick handler."
             exit 1
           fi
-          echo "Booking page uses delegated listeners only."
+          echo "Booking, admin, and crew pages use delegated listeners only."
 
       - name: Browser storage is not used in the customer app
         run: |
