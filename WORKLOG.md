@@ -13,8 +13,8 @@ Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
 - 2026-10-26 | claude (hosting session 012WCYGx) | claude/r2nette-redeploy-20261026 → PR | blocked: production deploy needs owner approval | Main 38fc9aa not deployed since Deploy #38952711773 failed ENOSPC (disk then 100%); disk now under Coolify's 80% threshold; CI #40351215484 on main green | merge this PR (push → CI → Deploy) or run Deploy manually; verify /healthz, /readyz and exact SHA
 - 2026-10-19 | Cursor | main | active | Make the copied login files readable by the web process | A private copy made /login return 500; chmod 644, still no image pull
-- 2026-10-16 | ChatGPT | chatgpt/contabo-disk-recovery-20261016 → PR #39 | active/P0 | Fix VPS ENOSPC image pulls with R2NETTE-only pre-pull cleanup; do not touch running/rollback, other sites or volumes | CI, merge, verify non-skipped deployment
-- 2026-10-16 | ChatGPT | chatgpt/pgdump-artifact-validation-20261016 → PR #38 | green CI, pending merge | Validate PostgreSQL custom dump before S3 upload or fallback purge | after recovery
+- 2026-10-16 | ChatGPT | chatgpt/contabo-disk-recovery-20261016 → PR #39 | merged deb7dd26, deploy FAILED ENOSPC; incident #40 | Fix VPS ENOSPC image pulls with R2NETTE-only pre-pull cleanup; do not touch running/rollback, other sites or volumes | CI, merge, verify non-skipped deployment
+- 2026-10-16 | ChatGPT | chatgpt/pgdump-artifact-validation-20261016 → PR #38 | CI green; conflict reconciled on new base, deployment blocked by disk incident #40 | Validate PostgreSQL custom dump before S3 upload or fallback purge | after recovery
 - 2026-10-16 | ChatGPT | chatgpt/s3-stream-upload-20261016 → PR #37 | merged, DEPLOY FAILED ENOSPC | Stream signed S3 PUT; main CI #38950346352 green, Deploy #38950594071 failed | recover disk safely, then deploy
 
 - 2026-10-16 | ChatGPT | chatgpt/s3-stream-upload-20261016 → PR pending | active | Stream S3 backup uploads in bounded memory with two-pass SigV4 hashing, reject single PUT >5 GiB; add tests | PR CI → green merge → non-skipped Contabo deploy; S3 credentials/restore still blocked

@@ -94,6 +94,10 @@ untested backup is a guess.
 
 A new code branch `chatgpt/backup-local-retention-20261016` makes the scheduled backup prune expired local `r2nette-*.dump` files **only after creating a fresh dump**, even if the later S3 upload fails or the destination is missing. `BACKUP_KEEP_DAYS` defaults to 7, and only accepts whole numbers 1–365. This reduces VPS disk-exhaustion risk, but does **not** make local-only copies disaster recovery. Branch CI and production rollout are pending.
 
+## Pending dump artifact validation
+
+Branch `chatgpt/pgdump-artifact-validation-20261016` adds explicit checks for the PostgreSQL custom archive header (`PGDMP`) and a minimum dump size after `pg_dump` and before local retention/off-host upload. Both manual and scheduled backups reject obviously invalid output. It is not proof that a restore will succeed; real off-host restore remains necessary. CI and exact-SHA deployment pending.
+
 ## Still to arrange
 
 - Automated scheduling of `db:backup` on the deployment platform
