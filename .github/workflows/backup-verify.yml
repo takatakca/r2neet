@@ -53,6 +53,11 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/postgresql-pgdg.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends postgresql-client-16
+          # The Ubuntu 26 runner already ships a newer client, and the bare
+          # pg_dump wrapper picks the newest one (18.x, Restore drill
+          # #42668676568). Put the 16 binaries first, here and for the drill.
+          export PATH="/usr/lib/postgresql/16/bin:$PATH"
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
           pg_dump --version
           pg_restore --version
           pg_dump --version | grep -Eq ' 16\.'

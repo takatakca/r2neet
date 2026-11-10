@@ -2,6 +2,8 @@ import { commercialRoutes } from './commercial.js';
 import { publicProfiles } from './public-experience.js';
 import { emailFirstRoutes } from './email-first.js';
 import { SupabaseEmailAuthProvider, type EmailAuthProvider } from '../identity/email-auth.js';
+import { takatakOAuthRoutes } from './takatak-oauth.js';
+import { SupabaseTakatakOAuthProvider, type TakatakOAuthProvider } from '../identity/takatak-oauth.js';
 import express, {
   type Request,
   type Response,
@@ -340,6 +342,8 @@ export interface ApiDeps {
   publicUrl?: string;
   googleAuth?: GoogleAuthProvider;
   emailAuth?: EmailAuthProvider;
+  /** "Continuer avec TAKATAK" (OAuth 2.1 + PKCE against the TAKATAK identity). */
+  takatakOAuth?: TakatakOAuthProvider;
   /** Explicit migration/test compatibility only. Production defaults to email-first registration. */
   legacyPhoneRegistration?: boolean;
   now?: () => Date;
@@ -462,6 +466,7 @@ export function createApi(deps: ApiDeps) {
     };
 
   app.use('/api/v1', emailFirstRoutes(prisma, deps.emailAuth ?? new SupabaseEmailAuthProvider(), verification, now));
+  app.use('/api/v1', takatakOAuthRoutes(prisma, deps.takatakOAuth ?? new SupabaseTakatakOAuthProvider(), { publicUrl, now }));
 
   app.use(commercialRoutes(prisma, now));
   app.post('/api/v1/privacy/consent', wrap(async (req, res) => {
