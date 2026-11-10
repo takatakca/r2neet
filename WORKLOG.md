@@ -1,8 +1,18 @@
 # Work log
 
+- 2026-10-29 | Codex — assistant OpenAI | feat/email-first-premium-20261029 → PR #46 | code tested, release blocked on real email activation | Email OTP/no signup SMS, guided booking, commercial queue, consent/withdrawal, calendar/GPS and scoped checkout | initial CI 40843380976 passed 764 tests; final follow-up CI then confirm SMTP/template/flag before release; photos/signatures/transfer/plans/LLM remain documented
+
 Newest first, one line per piece of work. Rule: `AGENTS.md` › Work log rule.
 Format: `YYYY-MM-DD | agent | branch → PR | status | what | next step`
 
+- 2026-11-10 | Claude (Anthropic) | claude/fix-restore-drill-pg16-path → PR #54 | PR #54 | Restore drill red since 2026-11-02: on the Ubuntu 26 runner the bare pg_dump/pg_restore resolve to 18.x even after installing postgresql-client-16, so the version guard fails | drill run 42850253639 on the branch passed (client 16.15); CI → merge
+- 2026-11-10 | Claude (Anthropic) | claude/remove-unused-files → PR #53 | done | Remove unused files: stale committed dist/ and dist-single/ builds (now gitignored), qa.ts, booking.html, web/prototype-reference.html, .agent/CONTINUATION.md (superseded by docs/AGENT_HANDOFF.md) | PR → CI → merge; owner kept the login-format hotfix and DNS (MochaHost) workflows
+- 2026-11-10 | Claude (Anthropic) | claude/server-setup-takatak-client-id → PR #52 | done | Server setup never copied TAKATAK_OAUTH_CLIENT_ID (web upload of #51 dropped .github and .env.example), so the button was hidden | merged f3eb9a7; Server setup 42844540901 copied it; Deploy 42844918942; config true, button live, click reaches takatak.ca/login; next: owner tests a real sign-in (new and existing account)
+- 2026-11-10 | Claude (Anthropic) | claude/r2nette-takatak-sso → PR #51 | done | "Continuer avec TAKATAK" OAuth sign-in/sign-up + account linking; R2NETTE keeps a copy and queues the profile back | merged b032c91 (owner web upload) and live with #52
+- 2026-11-07 | Cursor | cursor/fix-restore-drill-pg16-54af → PR #49 | PR #49 | Pin the weekly restore drill to the PostgreSQL 16 client so a 17+ pg_dump does not emit SET transaction_timeout | CI on the PR; do not deploy or merge
+
+- 2026-10-26 | claude (hosting session 012WCYGx) | claude/r2nette-redeploy-20261026 → PR | blocked: production deploy needs owner approval | Main 38fc9aa not deployed since Deploy #38952711773 failed ENOSPC (disk then 100%); disk now under Coolify's 80% threshold; CI #40351215484 on main green | merge this PR (push → CI → Deploy) or run Deploy manually; verify /healthz, /readyz and exact SHA
+- 2026-10-19 | Cursor | main | active | Make the copied login files readable by the web process | A private copy made /login return 500; chmod 644, still no image pull
 - 2026-10-16 | ChatGPT | chatgpt/contabo-disk-recovery-20261016 → PR #39 | merged deb7dd26, deploy FAILED ENOSPC; incident #40 | Fix VPS ENOSPC image pulls with R2NETTE-only pre-pull cleanup; do not touch running/rollback, other sites or volumes | CI, merge, verify non-skipped deployment
 - 2026-10-16 | ChatGPT | chatgpt/pgdump-artifact-validation-20261016 → PR #38 | CI green; conflict reconciled on new base, deployment blocked by disk incident #40 | Validate PostgreSQL custom dump before S3 upload or fallback purge | after recovery
 - 2026-10-16 | ChatGPT | chatgpt/s3-stream-upload-20261016 → PR #37 | merged, DEPLOY FAILED ENOSPC | Stream signed S3 PUT; main CI #38950346352 green, Deploy #38950594071 failed | recover disk safely, then deploy

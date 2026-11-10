@@ -641,7 +641,7 @@ d('payment HTTP routes', () => {
     });
 
     stripe = new FakeStripeProvider();
-    app = createApi({
+    app = createApi({ legacyPhoneRegistration: true,
       prisma,
       verification: new FakeVerificationProvider('123456'),
       stripe,
@@ -790,7 +790,7 @@ d('payment HTTP routes', () => {
   });
 
   it('reports NOT_CONFIGURED rather than faking payments when Stripe is absent', async () => {
-    const bare = createApi({ prisma, verification: new FakeVerificationProvider('123456') });
+    const bare = createApi({ legacyPhoneRegistration: true, prisma, verification: new FakeVerificationProvider('123456') });
     const cfg = await request(bare).get('/api/v1/payment-config');
     expect(cfg.body.configured).toBe(false);
 

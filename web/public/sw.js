@@ -3,7 +3,7 @@ const CACHE_NAME = `${CACHE_PREFIX}v1`;
 const OFFLINE_URL = '/offline.html';
 const APP_SHELL_URL = '/';
 const STATIC_PATH = /^\/assets\/.+/;
-const NETWORK_ONLY_PATH = /^\/(?:api\/|auth(?:\/|$)|login(?:\/|$)|logout(?:\/|$)|verify(?:\/|$)|signup(?:\/|$)|account(?:\/|$)|admin(?:\/|$)|crew(?:\/|$))/;
+const NETWORK_ONLY_PATH = /^\/(?:api\/|payment(?:\/|$)|phone-login(?:\/|$)|profile(?:\/|$)|auth(?:\/|$)|login(?:\/|$)|logout(?:\/|$)|verify(?:\/|$)|signup(?:\/|$)|account(?:\/|$)|admin(?:\/|$)|crew(?:\/|$))/;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

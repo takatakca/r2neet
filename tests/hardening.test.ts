@@ -452,7 +452,7 @@ describe('health probes behind the HTTPS redirect', () => {
   // caught them, the container could never become healthy.
   function hardenedApp() {
     const prisma = { $queryRaw: async () => [{ ok: 1 }] } as unknown as PrismaClient;
-    return createApi({
+    return createApi({ legacyPhoneRegistration: true,
       prisma,
       verification: new FakeVerificationProvider('123456'),
       hardening: { enabled: true, requireHttps: true, rateLimit: true, log: null },

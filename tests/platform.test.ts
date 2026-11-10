@@ -17,6 +17,7 @@ import {
   IdentityService,
   FakeVerificationProvider,
   RateLimiter,
+  formatCanadianPhoneInput,
   normalizePhone,
   maskPhone,
   IdentityError,
@@ -525,6 +526,21 @@ describe('phone identity', () => {
     expect(() => normalizePhone('123')).toThrow(IdentityError);
     expect(() => normalizePhone('014 825 2825')).toThrow(/valid/i);
     expect(() => normalizePhone('+44 20 7946 0000')).toThrow(/Canadian/i);
+  });
+
+  it('formats a number written without a leading 1', () => {
+    expect(formatCanadianPhoneInput('5148252825')).toBe('(514) 825-2825');
+    expect(formatCanadianPhoneInput('514825')).toBe('(514) 825');
+    expect(formatCanadianPhoneInput('5148252')).toBe('(514) 825-2');
+    expect(formatCanadianPhoneInput('15148252825')).toBe('(514) 825-2825');
+    expect(formatCanadianPhoneInput('+1 (514) 825-2825')).toBe('(514) 825-2825');
+  });
+
+  it('explains an 11-digit number before any verification code is sent', () => {
+    expect(() => normalizePhone('51482528251')).toThrow(
+      /11 digits, so no verification code was sent/,
+    );
+    expect(() => normalizePhone('51482528251')).toThrow(/\(514\) 825-2825/);
   });
 
   it('masks numbers for display and logs', () => {

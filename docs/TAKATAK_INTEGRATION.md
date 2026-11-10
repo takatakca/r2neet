@@ -91,3 +91,26 @@ The scheduler worker is called `takatak-sync`. Worker health becomes production-
 The master contract already exists in `takatakca/takatak-v1/src/lib/integrations/r2nette`. R2NETTE must not bypass it or write master database tables directly.
 
 The public Next.js route is handled separately in TAKATAK PR #175. R2NETTE production sync must remain disabled until that PR has passed CI, been approved/merged by the TAKATAK release coordinator, deployed under the existing TAKATAK production gate, and verified.
+
+## "Continuer avec TAKATAK" sign-in (Claude, Anthropic — 2026-11-10)
+
+TAKATAK is the master account for every Groupe TAKATAK site. R2NETTE signs customers in through TAKATAK and keeps its own copy of the customer.
+
+1. `/login` and `/signup` show **Continuer avec TAKATAK** when `GET /api/v1/auth/takatak/config` says it is configured. The email-code form stays below it as the alternative; when email codes are off, only the TAKATAK path is shown.
+2. `GET /api/v1/auth/takatak/start` creates the PKCE verifier and state, keeps them in an httpOnly cookie scoped to `/api/v1/auth/takatak` (10 minutes) and redirects to the TAKATAK Supabase OAuth server (`/auth/v1/oauth/authorize`, scope `openid email profile phone`).
+3. The customer signs in, or creates the TAKATAK account, on takatak.ca and authorizes R2NETTE on `takatak.ca/oauth/consent`.
+4. `GET /api/v1/auth/takatak/callback` checks the state, exchanges the code server-to-server as a public client (no secret) and reads `/auth/v1/oauth/userinfo`. The browser never sees a TAKATAK token, and R2NETTE stores no TAKATAK token.
+5. Account matching, in order: the TAKATAK user id in `Customer.emailAuthSubject` (customers who used the email-code form already have it, because those codes come from the same TAKATAK project); a phone that both TAKATAK and R2NETTE already verified; otherwise a new customer, only with a TAKATAK-verified email and the terms box ticked. A historic R2NETTE profile that merely lists the same email is never taken over: its owner signs in with the usual method and uses **Relier mon compte TAKATAK** on `/account` (`intent=link`).
+6. R2NETTE copies TAKATAK's verified email, name and verified phone into empty fields only, then queues the usual `CUSTOMER_REGISTERED` / `PROFILE_UPDATED` event in the outbox above, so TAKATAK receives the R2NETTE profile back once the sync is enabled.
+
+Setup (done 2026-11-10 by Claude on the owner's instruction, except the deploy):
+
+- Done: OAuth app **R2NETTE** registered in TAKATAK Supabase (public client, `none` auth, `authorization_code,refresh_token`, redirect `https://r2nette.ca/api/v1/auth/takatak/callback`). Client id `8e551e10-b1e1-4cf5-8af9-72fc791b9086` (public, not a secret). Probe: `/auth/v1/oauth/authorize` with this client answered 302 to `https://takatak.ca/oauth/consent`.
+- Done: GitHub `production` environment variable `TAKATAK_OAUTH_CLIENT_ID` set to that id.
+- Remaining: merge this branch, run **Server setup** (copies the id to the server), deploy, then a real sign-in.
+
+Reference steps:
+
+- In the TAKATAK Supabase project (`pcjfahhlozsseqqevimi`), Authentication › OAuth Apps: register **R2NETTE** as a public client, PKCE, grant types `authorization_code` and `refresh_token`, redirect URI `https://r2nette.ca/api/v1/auth/takatak/callback`.
+- Put its client id in the GitHub `production` environment as `TAKATAK_OAUTH_CLIENT_ID` (variable or secret; it is not a secret), with `PUBLIC_URL=https://r2nette.ca`, then run **Server setup** and deploy.
+- takatak-v1: the login page's "Create an account" link must keep `?next=` so a visitor without a TAKATAK account returns to the consent screen after sign-up (branch `claude/email-signup-transfer`).

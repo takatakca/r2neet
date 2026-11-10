@@ -35,10 +35,11 @@ export interface SecurityOptions {
  * files precisely so it can stay strict.
  */
 export function buildCsp(opts: SecurityOptions = {}): string {
-  const script = ["'self'", 'https://js.stripe.com', ...(opts.scriptSrc ?? [])];
+  const script = ["'self'", 'https://js.stripe.com', 'https://connect.facebook.net', ...(opts.scriptSrc ?? [])];
   const connect = [
     "'self'",
     'https://api.stripe.com',
+    'https://www.facebook.com',
     'https://places.googleapis.com',
     'https://routes.googleapis.com',
     ...(opts.connectSrc ?? []),

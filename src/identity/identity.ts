@@ -48,8 +48,13 @@ export function normalizePhone(
   }
 
   if (national.length !== 10) {
+    const entered = digits.length;
+    const counted =
+      entered === 0
+        ? 'Enter the digits of a Canadian mobile number.'
+        : `That number has ${entered} ${entered === 1 ? 'digit' : 'digits'}, so no verification code was sent.`;
     throw new IdentityError(
-      'That phone number needs 10 digits.',
+      `${counted} A Canadian mobile number is 10 digits, like (514) 825-2825, or 11 digits starting with 1.`,
       'PHONE_INVALID_LENGTH',
     );
   }
@@ -61,6 +66,25 @@ export function normalizePhone(
     );
   }
   return `${defaultCountry}${national}`;
+}
+
+/**
+ * What the customer sees while typing. A leading 1 is the country code, so
+ * 5148252825 and 15148252825 both appear as (514) 825-2825.
+ */
+export function formatCanadianPhoneInput(input: string): string {
+  let digits = (input ?? '').replace(/\D/g, '');
+  if (digits.startsWith('1')) digits = digits.slice(1);
+  digits = digits.slice(0, 10);
+  if (!digits) return '';
+
+  const area = digits.slice(0, 3);
+  const exchange = digits.slice(3, 6);
+  const line = digits.slice(6, 10);
+  if (digits.length < 3) return `(${area}`;
+  if (digits.length === 3) return `(${area})`;
+  if (digits.length <= 6) return `(${area}) ${exchange}`;
+  return `(${area}) ${exchange}-${line}`;
 }
 
 /** Display form that never exposes the full number in logs or UI. */

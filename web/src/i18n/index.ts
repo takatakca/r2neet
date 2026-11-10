@@ -45,6 +45,15 @@ export function persistLocale(locale: Locale): void {
 type Dict = Record<string, string>;
 
 const en: Dict = {
+  'nav.commercial': 'Commercial',
+  'commercial.kicker': 'For your business',
+  'commercial.title': 'A clean space. A clear plan.',
+  'commercial.sub': 'Offices, retail, bars and kitchens. Discuss a one-time visit or a recurring contract with our team.',
+  'commercial.cta': 'Explore commercial cleaning',
+  'booking.close': 'Save and close',
+  'footer.privacy': 'Privacy',
+  'footer.terms': 'Terms',
+
   'brand.tagline': 'Serving Montréal, Laval and surrounding areas',
   'nav.services': 'Services',
   'nav.reviews': 'Reviews',
@@ -410,6 +419,15 @@ const en: Dict = {
 };
 
 const fr: Dict = {
+  'nav.commercial': 'Commercial',
+  'commercial.kicker': 'Pour votre entreprise',
+  'commercial.title': 'Des espaces propres. Un plan clair.',
+  'commercial.sub': 'Bureaux, commerces, bars et cuisines. Discutez d’une intervention ponctuelle ou d’un contrat régulier avec notre équipe.',
+  'commercial.cta': 'Découvrir le commercial',
+  'booking.close': 'Enregistrer et fermer',
+  'footer.privacy': 'Confidentialité',
+  'footer.terms': 'Conditions',
+
   'brand.tagline': 'Au service de Montréal, Laval et les environs',
   'nav.services': 'Services',
   'nav.reviews': 'Avis',

@@ -35,7 +35,7 @@ on the site and a different one on their invoice.
 
 ### `web/` — the production customer flow
 
-Mobile-first and bilingual. The running app is built from `web/` and served by the Node API at `/book`. Steps cover service, property, required cleaning products, frequency, extras, address, available time, details and checkout. Catalogue choices and price quotes come from the server. `booking.html` remains a legacy/prototype file, not the deployed application.
+Mobile-first and bilingual. The running app is built from `web/` and served by the Node API at `/book`. Steps cover service, property, required cleaning products, frequency, extras, address, available time, details and checkout. Catalogue choices and price quotes come from the server.
 
 ---
 

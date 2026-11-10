@@ -39,8 +39,29 @@ jobs:
           cache: npm
       - run: npm ci && npx prisma generate
       - run: npx prisma migrate deploy
-      - name: Install postgresql-client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Install PostgreSQL 16 client
+        run: |
+          # The service is postgres:16. Ubuntu's default postgresql-client is
+          # now 17+, and its pg_dump writes SET transaction_timeout, which
+          # PostgreSQL 16 rejects on restore (Restore drill #41491577802).
+          # Use the same PGDG client the production image pins.
+          set -eu
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ca-certificates curl
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /usr/share/keyrings/postgresql-pgdg.asc >/dev/null
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/keyrings/postgresql-pgdg.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client-16
+          # The Ubuntu 26 runner already ships a newer client, and the bare
+          # pg_dump wrapper picks the newest one (18.x, Restore drill
+          # #42668676568). Put the 16 binaries first, here and for the drill.
+          export PATH="/usr/lib/postgresql/16/bin:$PATH"
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
+          pg_dump --version
+          pg_restore --version
+          pg_dump --version | grep -Eq ' 16\.'
+          pg_restore --version | grep -Eq ' 16\.'
 
       - name: Run the drill
         run: npx vite-node scripts/restore-drill.ts

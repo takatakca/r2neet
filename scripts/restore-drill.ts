@@ -50,6 +50,18 @@ const check = (name: string, ok: boolean, detail?: string) => {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+const pgClientVersion = (bin: string) =>
+  execFileSync(bin, ['--version'], { encoding: 'utf8' }).trim();
+
+const assertPg16 = (bin: string) => {
+  const version = pgClientVersion(bin);
+  if (!/ 16\./.test(version)) {
+    throw new Error(
+      `${bin} must be PostgreSQL 16, matching the drill server. A newer client writes SET transaction_timeout, which PostgreSQL 16 rejects. Got: ${version}`,
+    );
+  }
+};
+
 const wallTime = (d: Date) =>
   new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Toronto',
@@ -175,7 +187,11 @@ try {
 
   const dir = mkdtempSync(join(tmpdir(), 'r2nette-drill-'));
   const dump = join(dir, 'drill.dump');
-  execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-acl', '--file', dump, SOURCE]);
+  assertPg16('pg_dump');
+  assertPg16('pg_restore');
+  execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-acl', '--file', dump, SOURCE], {
+    stdio: 'inherit',
+  });
   check('Backup produced a dump', existsSync(dump));
 
   /* ---------------- restore ---------------- */
@@ -183,7 +199,7 @@ try {
   const admin = SOURCE.replace(/\/[^/?]+(\?|$)/, '/postgres$1');
   execFileSync('psql', [admin, '-c', `DROP DATABASE IF EXISTS ${RESTORE_DB}`], { stdio: 'ignore' });
   execFileSync('psql', [admin, '-c', `CREATE DATABASE ${RESTORE_DB}`], { stdio: 'ignore' });
-  execFileSync('pg_restore', ['--no-owner', '--no-acl', '-d', RESTORE_URL, dump], { stdio: 'ignore' });
+  execFileSync('pg_restore', ['--no-owner', '--no-acl', '-d', RESTORE_URL, dump], { stdio: 'inherit' });
 
   const restored = new PrismaClient({ datasources: { db: { url: RESTORE_URL } } });
 

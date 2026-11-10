@@ -1,6 +1,46 @@
 # R2NETTE — Agent handoff
 
-Updated 2026-10-16. On restart read `AGENTS.md`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, and `docs/DECISIONS.md` and check GitHub open PRs before new work.
+## 2026-11-10 — Claude (Anthropic) : ménage du dépôt
+
+Supprimés sur accord du propriétaire (branche `claude/remove-unused-files`) : `dist/` et `dist-single/` (anciennes sorties Vite, reconstruites par la CI et l’image Docker, désormais dans `.gitignore`), `qa.ts` (script ponctuel du 2026-09-12, remplacé par `tests/`), `booking.html` et `web/prototype-reference.html` (prototypes non construits ni servis), `.agent/CONTINUATION.md` (remplacé par ce fichier). Conservés à la demande du propriétaire : workflows « Install login phone format » et « DNS (MochaHost) ».
+
+## 2026-11-10 — Claude (Anthropic) : bouton TAKATAK masqué en production — résolu
+
+Résolu : PR #52 fusionnée (f3eb9a7), Server setup 42844540901 a copié `TAKATAK_OAUTH_CLIENT_ID`, Deploy 42844918942 ; `configured:true`, bouton visible, le clic mène à takatak.ca/login. Reste : vrai parcours avec un compte TAKATAK neuf et un compte existant.
+
+PR #51 (b032c91) est en production, mais `/api/v1/auth/takatak/config` répond `{"configured":false}` : le bouton reste masqué et `/login` affiche « Sign-in is unavailable ». Cause : le téléversement web de #51 a perdu `.github/` et `.env.example` (16 fichiers au lieu de 18). `server-setup.yml` ne passait donc pas `TAKATAK_OAUTH_CLIENT_ID` à `ci-server-setup.sh`, et Server setup 42840801557 n’a copié que `TAKATAK_SUPABASE_URL TAKATAK_SUPABASE_ANON_KEY`. Correctif : branche `claude/server-setup-takatak-client-id` (accepte un secret ou une variable d’environnement). Reste : CI, fusion, Server setup (le journal doit lister `TAKATAK_OAUTH_CLIENT_ID`), Deploy, puis vérifier `configured:true` et un vrai parcours.
+
+## 2026-11-10 — Claude (Anthropic) : « Continuer avec TAKATAK » (branche, non déployé)
+
+Branche `claude/r2nette-takatak-sso` depuis `main` 73a17e2. TAKATAK devient le compte maître : `/login` et `/signup` envoient le client sur TAKATAK (OAuth 2.1 + PKCE, client public), puis R2NETTE crée ou retrouve sa copie du client et ouvre la session. Liaison d’un ancien compte depuis `/account`. Flux et règles : `docs/TAKATAK_INTEGRATION.md`, décision 19.
+
+Preuves locales : `tsc` OK ; `vitest` 781/781 avec PostgreSQL 16 en UTC (dont `tests/takatak-oauth.test.ts` 15 et `tests/takatak-oauth-db.test.ts` 2) ; invariants 34/34 ; `vite build` OK ; contrôle Chromium 390 px et 1280 px sans erreur ni débordement. Aucune CI GitHub : la session n’avait pas le droit de pousser vers `takatakca/r2neet`.
+
+Fait le 2026-11-10 sur ordre du propriétaire : client OAuth « R2NETTE » créé dans Supabase TAKATAK (id public `8e551e10-b1e1-4cf5-8af9-72fc791b9086`, réponse 302 vers takatak.ca/oauth/consent vérifiée) et variable `TAKATAK_OAUTH_CLIENT_ID` posée dans l’environnement GitHub `production`. Reste : 3) PR, CI, Server setup, Deploy ; 4) vrai parcours avec un compte TAKATAK neuf et un compte existant. Note : `R2NETTE_EMAIL_AUTH_ENABLED` n’est pas copié par Server setup (absent de la liste `settings`), donc le formulaire courriel reste désactivé en production tant qu’il n’est pas posé à la main. Paiement : clés Stripe R2NETTE et Google Maps toujours manquantes en production.
+
+## 2026-10-29 — Codex — assistant OpenAI : parcours premium (branche, non déployé)
+
+PR **46** `feat/email-first-premium-20261029` : connexion courriel avec preuve distincte du téléphone, SMS après paiement positif serveur, dialogue de réservation, paiement scoped/confirmation webhook, commercial avec file opérateur, consentement facultatif, calendrier client et GPS. Audit et blocages : [rapport de reprise](experience/2026-10-29-premium-audit.md). Ne pas confondre la branche et la production ni déclarer photos/signatures/transfert/forfaits/IA tous livrés.
+
+Validation initiale : CI 40843380976 sur 5bb6460, 764 tests passés, migration PostgreSQL et conteneur vérifiés. Audit Chromium simulé mobile/ordinateur, consentement/retrait et corrections de facture documentés dans le rapport ; vérifier la CI du suivi final avant release.
+
+Dernière production revérifiée : `74434524f6b8f9348240be9e13d158d0060566c5`, Deploy 40450497185, job 122011814392, Roll exécuté, probes OK, SHA exact. Le log du 27 octobre signalait encore les fournisseurs non configurés. Nouvelle inscription à activer uniquement après preuve SMTP/Supabase et opt-in protégé ; CI complète et réel parcours requis avant release. PR43 CRM reste distincte. Dépôt non renommé (administration indisponible).
+
+
+Updated 2026-10-19. On restart read `AGENTS.md`, `WORKLOG.md`, `docs/TASK_QUEUE.md`, `docs/PROJECT_STATUS.md`, `docs/DEPLOYMENT.md`, and `docs/DECISIONS.md` and check GitHub open PRs before new work.
+
+## Redeploy pending — 2026-10-26 (Claude)
+
+- **Production** still runs `1a8de4abe8bf24dc0e5742070590d1fd974efe9b` (Deploy #38855160513), plus the 2026-10-19 login hotfix copied into the running container. `https://r2nette.ca/healthz` and `/readyz` answer OK.
+- **Not deployed:** `7d03a38` (#37 streamed S3 upload), `deb7dd2` (#39 pre-pull cleanup), `32181c5` and `38fc9aa` (login phone format and file mode, pushed with `[skip ci]`).
+- **Why:** Deploy #38950594071 and #38952711773 failed with ENOSPC; the VPS root disk was 96 GB / 100 % on 2026-10-16. On 2026-10-26 Coolify's docker-cleanup check reports vps1 under its 80 % threshold, and other builds on vps1 succeed, so there is room again.
+- **Done:** CI dispatched on `main` `38fc9aa`: run #40351215484 green (typecheck/build, tests, container start, safety invariants). That satisfies the "Require a passing CI run" step of a manual Deploy.
+- **Blocked:** the agent was not allowed to start a production deploy. Owner action: merge this PR (push to `main` → CI → Deploy), or Actions › Deploy › Run workflow on `main`.
+- **Then verify:** Deploy log shows `Deploy verified for commit <sha>`, `/healthz` and `/readyz` OK, the PR #39 cleanup ran before the pull, and the login page still accepts a 10-digit number.
+
+## Login OTP — 2026-10-19
+
+The Google phone-link page rejected an 11-digit entry with `PHONE_INVALID_LENGTH` before TAKATAK/Twilio was called. A separate live check showed a 10-digit Canadian number is accepted by `POST /api/v1/auth/phone/send` and a wrong code is denied. Branch `fix/phone-otp-entry-20261019` ([PR #41](https://github.com/takatakca/r2neet/pull/41)) tells the customer that no code was sent and why, and keeps the Google-link button labeled “Send verification code” after the error. Do not send OTP codes to company servers. TAKATAK sync stays disabled until receiver PR takatakca/takatak-v1#175 is approved. Disk P0 below still blocks a production roll of this fix.
 
 ## CURRENT P0 — disk exhaustion unresolved; PR #38 prepared but NOT deployed
 

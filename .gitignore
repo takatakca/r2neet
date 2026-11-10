@@ -21,6 +21,9 @@
 
 # production
 /build
+# Vite output: rebuilt by CI and the Docker image, never committed
+/dist
+/dist-single
 
 # misc
 .DS_Store

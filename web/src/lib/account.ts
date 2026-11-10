@@ -1,3 +1,4 @@
+import { setupAccountExperience, gpsLinks } from './account-experience.js';
 /**
  * Account area.
  *
@@ -141,7 +142,7 @@ function bookingCard(b: AccountBooking, hero = false): string {
         </div>
       </div>
     </div>
-    ${cutoffNote}${actions}</div>`;
+    <div class="acts"><a class="btn btn-ghost" href="${esc(gpsLinks(b.addressSummary).google)}" target="_blank" rel="noopener noreferrer">Google Maps</a><a class="btn btn-ghost" href="${esc(gpsLinks(b.addressSummary).waze)}" target="_blank" rel="noopener noreferrer">Waze</a><a class="btn btn-ghost" href="${esc(gpsLinks(b.addressSummary).apple)}" target="_blank" rel="noopener noreferrer">Apple Plans</a>${!paid && b.status !== 'CANCELLED' ? `<a class="btn btn-ghost" href="/payment?booking=${encodeURIComponent(b.id)}">${locale === 'fr' ? 'Paiement' : 'Payment'}</a>` : ''}</div>${cutoffNote}${actions}</div>`;
 }
 
 function render(): void {
@@ -182,7 +183,7 @@ function render(): void {
   }
 
   // Upcoming plan dates load after the panel paints, so the tab never waits.
-  setTimeout(() => void loadPlanDates(), 0);
+  setTimeout(() => { void loadPlanDates(); setupAccountExperience(locale); }, 0);
   const settings = $('settings');
   if (settings) {
     settings.innerHTML = `
@@ -194,7 +195,7 @@ function render(): void {
                 id="pfName" value="${esc(data.customer.firstName ?? '')}"></div>
             <div><label class="d" style="font-size:13px;font-weight:600">${esc(t('details.email'))}</label>
               <input class="slot" style="width:100%;text-align:left;padding:13px 14px;font-weight:400"
-                id="pfEmail" type="email" value="${esc(data.customer.email ?? '')}"></div>
+                id="pfEmail" type="email" readonly value="${esc(data.customer.email ?? '')}"></div>
             <div class="note">${esc(t('details.verified'))}: <b>${esc(data.customer.verifiedPhone ? maskPhoneDisplay(data.customer.verifiedPhone) : '—')}</b></div>
           </div>
           <div class="err" id="pfErr" hidden></div>

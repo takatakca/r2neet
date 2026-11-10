@@ -55,7 +55,7 @@ d('customer account', () => {
     await seed(prisma);
     staffA = (await prisma.staff.create({ data: { displayName: 'Alice', availability: { create: ALL_WEEK } } })).id;
     staffB = (await prisma.staff.create({ data: { displayName: 'Bruno', availability: { create: ALL_WEEK } } })).id;
-    app = createApi({ prisma, verification: new FakeVerificationProvider('123456') });
+    app = createApi({ legacyPhoneRegistration: true, prisma, verification: new FakeVerificationProvider('123456') });
   });
 
   /** Register a new customer through the real sign-up flow and return its session. */
