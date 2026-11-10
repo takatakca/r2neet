@@ -35,7 +35,7 @@ describe('PostgreSQL subprocess credentials', () => {
     const exec = ((bin: string, argv: string[]) => {
       seen.push(argv.join(' '));
       throw new Error(`Command failed: ${bin} ${argv.join(' ')}`);
-    }) as typeof execFileSync;
+    }) as unknown as typeof execFileSync;
     expect(() =>
       runPgCommand('pg_restore', ['-d', '{url}'], 'postgresql://app:secret@db:5432/r2nette', exec),
     ).toThrow(/^pg_restore failed$/);
