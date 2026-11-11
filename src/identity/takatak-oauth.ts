@@ -18,10 +18,68 @@ export interface TakatakIdentity {
   name: string | null;
 }
 
+/** A TAKATAK user session obtained on this server (email code or Google). */
+export interface HubSession {
+  accessToken: string;
+  /** TAKATAK user id. Same id space as Customer.emailAuthSubject. */
+  subject: string;
+  email: string | null;
+  phone: string | null;
+}
+
+/** What the consent screen on r2nette.ca shows. */
+export interface ConsentDetails {
+  authorizationId: string;
+  appName: string;
+  returnAddress: string;
+  account: string;
+  scopes: string[];
+}
+
+export type AuthorizationView =
+  | { kind: 'consent'; details: ConsentDetails }
+  | { kind: 'approved'; redirectUrl: string };
+
 export interface TakatakOAuthProvider {
   readonly configured: boolean;
+  /** Google through the hub needs the public key on top of the client id. */
+  readonly googleConfigured: boolean;
   authorizationUrl(input: { redirectUri: string; challenge: string; state: string; locale: 'fr' | 'en' }): Promise<string>;
   exchangeCode(input: { code: string; verifier: string; redirectUri: string }): Promise<TakatakIdentity>;
+  // Claude (Anthropic) · 2026-11-11 — sign-in on r2nette.ca without visiting takatak.ca.
+  sendEmailCode(email: string): Promise<void>;
+  verifyEmailCode(email: string, code: string): Promise<HubSession>;
+  googleAuthorizationUrl(input: { redirectUri: string; challenge: string; state: string }): string;
+  exchangeGoogleCode(input: { code: string; verifier: string }): Promise<HubSession>;
+  /** Opens the R2NETTE authorization in the hub; returns its id without a browser. */
+  beginAuthorization(input: { redirectUri: string; challenge: string; state: string; locale: 'fr' | 'en' }): Promise<string>;
+  authorizationDetails(input: { authorizationId: string; accessToken: string; subject: string; locale: 'fr' | 'en' }): Promise<AuthorizationView>;
+  decideConsent(input: { authorizationId: string; accessToken: string; decision: 'approve' | 'deny' }): Promise<string>;
+  /** Ends the hub session this server held for the consent step. Never throws. */
+  revokeSession(accessToken: string): Promise<void>;
+}
+
+const AUTHORIZATION_ID = /^[a-z2-7]{32}$/;
+
+const SCOPE_TEXT: Record<string, { fr: string; en: string }> = {
+  openid: { fr: 'Confirmer que vous êtes connecté à TAKATAK', en: 'Confirm that you are signed in to TAKATAK' },
+  email: { fr: 'Voir votre adresse courriel', en: 'See your email address' },
+  profile: { fr: 'Voir votre nom et votre profil', en: 'See your name and profile' },
+  phone: { fr: 'Voir votre numéro de téléphone', en: 'See your phone number' },
+  offline_access: { fr: 'Rester connecté après avoir fermé l’application', en: 'Stay connected after you close the application' },
+};
+
+/** Same wording as takatak.ca's consent page, so the screen reads the same everywhere. */
+export function consentScopeText(scope: string, locale: 'fr' | 'en'): string[] {
+  return scope
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => {
+      const known = SCOPE_TEXT[part];
+      if (known) return known[locale];
+      const safe = /^[a-z0-9_.:/-]{1,64}$/i.test(part) ? part : '?';
+      return locale === 'fr' ? `Accès « ${safe} »` : `Access “${safe}”`;
+    });
 }
 
 interface Discovery {
@@ -57,6 +115,175 @@ export class SupabaseTakatakOAuthProvider implements TakatakOAuthProvider {
       return new URL(this.issuer).protocol === 'https:';
     } catch {
       return false;
+    }
+  }
+
+  get googleConfigured(): boolean {
+    return this.configured && Boolean(this.anonKey);
+  }
+
+  private hubHeaders(accessToken?: string): Record<string, string> {
+    const headers: Record<string, string> = { accept: 'application/json', 'Content-Type': 'application/json' };
+    if (this.anonKey) headers.apikey = this.anonKey;
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    return headers;
+  }
+
+  /** One hub call; network failures and 5xx are "unavailable", never a 4xx code. */
+  private async hub(path: string, init: RequestInit): Promise<Response> {
+    if (!this.issuer) this.unavailable();
+    let response: Response;
+    try {
+      response = await this.fetcher(`${this.issuer}${path}`, { ...init, signal: AbortSignal.timeout(10_000) });
+    } catch {
+      this.unavailable();
+    }
+    if (response.status >= 500) this.unavailable();
+    return response;
+  }
+
+  private static async body(response: Response): Promise<Record<string, unknown> | null> {
+    return (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  }
+
+  private sessionFrom(body: Record<string, unknown> | null): HubSession | null {
+    const accessToken = text(body?.access_token, 8192);
+    const user = (body?.user ?? null) as Record<string, unknown> | null;
+    const subject = text(user?.id, 128);
+    if (!accessToken || !subject) return null;
+    const email = text(user?.email)?.toLowerCase() ?? null;
+    const phoneRaw = text(user?.phone, 32);
+    const phone = phoneRaw ? (phoneRaw.startsWith('+') ? phoneRaw : `+${phoneRaw}`) : null;
+    return { accessToken, subject, email, phone: phone && E164.test(phone) ? phone : null };
+  }
+
+  async sendEmailCode(email: string): Promise<void> {
+    const response = await this.hub('/otp', { method: 'POST', headers: this.hubHeaders(), body: JSON.stringify({ email, create_user: true }) });
+    if (response.status === 429) throw new IdentityError('Please wait before trying again.', 'OTP_PROVIDER_LIMIT');
+    if (!response.ok) this.unavailable();
+  }
+
+  async verifyEmailCode(email: string, code: string): Promise<HubSession> {
+    const response = await this.hub('/verify', { method: 'POST', headers: this.hubHeaders(), body: JSON.stringify({ type: 'email', email, token: code }) });
+    if (response.status === 429) throw new IdentityError('Please wait before trying again.', 'OTP_PROVIDER_LIMIT');
+    const invalid = () => new IdentityError('The code is invalid or expired.', 'EMAIL_CODE_INVALID');
+    if (!response.ok) throw invalid();
+    const body = await SupabaseTakatakOAuthProvider.body(response);
+    const session = this.sessionFrom(body);
+    const user = (body?.user ?? null) as Record<string, unknown> | null;
+    const confirmedAt = text(user?.email_confirmed_at, 64);
+    if (!session || session.email !== email || !confirmedAt || !Number.isFinite(Date.parse(confirmedAt))) throw invalid();
+    return session;
+  }
+
+  googleAuthorizationUrl(input: { redirectUri: string; challenge: string; state: string }): string {
+    if (!this.googleConfigured) {
+      throw new IdentityError('TAKATAK Google authentication is not configured.', 'GOOGLE_AUTH_NOT_CONFIGURED');
+    }
+    const url = new URL(`${this.issuer}/authorize`);
+    url.searchParams.set('provider', 'google');
+    url.searchParams.set('redirect_to', input.redirectUri);
+    url.searchParams.set('state', input.state);
+    url.searchParams.set('code_challenge', input.challenge);
+    url.searchParams.set('code_challenge_method', 's256');
+    return url.toString();
+  }
+
+  async exchangeGoogleCode(input: { code: string; verifier: string }): Promise<HubSession> {
+    const response = await this.hub('/token?grant_type=pkce', {
+      method: 'POST',
+      headers: this.hubHeaders(),
+      body: JSON.stringify({ auth_code: input.code, code_verifier: input.verifier }),
+    });
+    const denied = () => new IdentityError('Google sign-in could not be completed.', 'GOOGLE_AUTH_DENIED');
+    if (!response.ok) throw denied();
+    const body = await SupabaseTakatakOAuthProvider.body(response);
+    const session = this.sessionFrom(body);
+    const user = (body?.user ?? null) as { app_metadata?: { providers?: unknown }; identities?: Array<{ provider?: unknown }> } | null;
+    const providers = [
+      ...(Array.isArray(user?.app_metadata?.providers) ? user.app_metadata.providers : []),
+      ...(Array.isArray(user?.identities) ? user.identities.map((identity) => identity?.provider) : []),
+    ];
+    if (!session || !providers.includes('google')) throw denied();
+    return session;
+  }
+
+  async beginAuthorization(input: { redirectUri: string; challenge: string; state: string; locale: 'fr' | 'en' }): Promise<string> {
+    const url = await this.authorizationUrl(input);
+    let response: Response;
+    try {
+      response = await this.fetcher(url, { redirect: 'manual', headers: { accept: 'text/html' }, signal: AbortSignal.timeout(10_000) });
+    } catch {
+      this.unavailable();
+    }
+    if (response.status >= 500) this.unavailable();
+    const invalid = () => new IdentityError('TAKATAK could not open this authorization.', 'CONSENT_INVALID');
+    const location = response.headers.get('location');
+    if (response.status < 300 || response.status > 399 || !location) throw invalid();
+    let target: URL;
+    try {
+      target = new URL(location, url);
+    } catch {
+      throw invalid();
+    }
+    const issuerHost = new URL(this.issuer!).host;
+    if (target.protocol !== 'https:' || (target.host !== 'takatak.ca' && target.host !== issuerHost)) throw invalid();
+    const id = target.searchParams.get('authorization_id') ?? '';
+    if (!AUTHORIZATION_ID.test(id)) throw invalid();
+    return id;
+  }
+
+  async authorizationDetails(input: { authorizationId: string; accessToken: string; subject: string; locale: 'fr' | 'en' }): Promise<AuthorizationView> {
+    const response = await this.hub(`/oauth/authorizations/${input.authorizationId}`, { headers: this.hubHeaders(input.accessToken) });
+    const invalid = () => new IdentityError('TAKATAK cannot read this authorization.', 'CONSENT_INVALID');
+    if (!response.ok) throw invalid();
+    const data = await SupabaseTakatakOAuthProvider.body(response);
+    if (!data) throw invalid();
+    if (typeof data.authorization_id === 'string') {
+      const user = (data.user ?? null) as Record<string, unknown> | null;
+      const client = (data.client ?? null) as Record<string, unknown> | null;
+      const returnAddress = text(data.redirect_uri, 2048);
+      if (data.authorization_id !== input.authorizationId || text(user?.id, 128) !== input.subject || !returnAddress) throw invalid();
+      const email = text(user?.email)?.toLowerCase() ?? null;
+      const account = email && email.includes('@')
+        ? email
+        : input.locale === 'fr' ? 'Compte TAKATAK connecté' : 'Signed-in TAKATAK account';
+      return {
+        kind: 'consent',
+        details: {
+          authorizationId: input.authorizationId,
+          appName: text(client?.name, 80) ?? (input.locale === 'fr' ? 'Une application' : 'An application'),
+          returnAddress,
+          account,
+          scopes: consentScopeText(typeof data.scope === 'string' ? data.scope : '', input.locale),
+        },
+      };
+    }
+    const redirectUrl = text(data.redirect_url, 2048);
+    if (redirectUrl) return { kind: 'approved', redirectUrl };
+    throw invalid();
+  }
+
+  async decideConsent(input: { authorizationId: string; accessToken: string; decision: 'approve' | 'deny' }): Promise<string> {
+    const response = await this.hub(`/oauth/authorizations/${input.authorizationId}/consent`, {
+      method: 'POST',
+      headers: this.hubHeaders(input.accessToken),
+      body: JSON.stringify({ action: input.decision }),
+    });
+    const invalid = () => new IdentityError('TAKATAK could not record this choice.', 'CONSENT_INVALID');
+    if (!response.ok) throw invalid();
+    const data = await SupabaseTakatakOAuthProvider.body(response);
+    const redirectUrl = text(data?.redirect_url, 2048);
+    if (!redirectUrl) throw invalid();
+    return redirectUrl;
+  }
+
+  async revokeSession(accessToken: string): Promise<void> {
+    if (!this.issuer) return;
+    try {
+      await this.fetcher(`${this.issuer}/logout?scope=local`, { method: 'POST', headers: this.hubHeaders(accessToken), signal: AbortSignal.timeout(5_000) });
+    } catch {
+      // Best effort: the R2NETTE session is what the customer uses from here.
     }
   }
 
