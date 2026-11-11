@@ -1,5 +1,15 @@
 # R2NETTE — Agent handoff
 
+## 2026-11-11 — Claude (Anthropic) : connexion sur r2nette.ca par code courriel ou Google, TAKATAK comme centre
+
+Ordre du propriétaire : se connecter ou créer son compte sur r2nette.ca sans passer par takatak.ca, le compte restant dans TAKATAK (centre de toutes les données), puis l’écran TAKATAK « Autoriser l’accès » affiché sur r2nette.ca. Le bouton sombre « Continuer avec TAKATAK » est retiré (choix du propriétaire). Branche `claude/takatak-embedded-signin` ; spec et plan dans `docs/superpowers/`.
+
+- **Parcours** : `/login` → courriel + code (envoyé par TAKATAK, `create_user`) ou Google (via TAKATAK, PKCE côté serveur) → carte « Autoriser l’accès » avec le texte de TAKATAK (application R2NETTE, adresse de retour, compte, accès demandé, FR/EN) → Autoriser → le `/callback` OAuth existant ouvre la session R2NETTE (mêmes règles de rapprochement, même événement outbox). Refuser → `/login?takatak=cancelled`. Détails et codes d’erreur : `docs/TAKATAK_INTEGRATION.md`, section du 2026-11-11.
+- **Sécurité** : le jeton TAKATAK ne va jamais au navigateur ; le passage vers la carte est un cookie httpOnly de 10 min chiffré AES-GCM (`FIELD_ENCRYPTION_KEY`, obligatoire en production) ; l’URL de retour donnée par le centre n’est acceptée que si elle vise notre `/callback` avec l’état du parcours ; la session TAKATAK est révoquée après la décision ; requêtes inter-sites refusées ; limites par courriel et par IP.
+- **Preuves locales** : `tsc` OK ; vitest 819/819 sur PostgreSQL 16 en UTC (comme la CI) ; invariants 34/34 ; `vite build` OK ; Chromium contre un faux centre local : téléphone (Galaxy S9+) et 1280 px, FR et EN, Autoriser → session sur `/#book`, Refuser, Google → `/account`, mauvais code, aucune erreur ni débordement. La bannière cookies couvrait « Autoriser » sur téléphone : la page réserve désormais sa hauteur.
+- **Reste au propriétaire (tableau Supabase TAKATAK)** : 1) modèle « Magic Link » (le courriel dit aujourd’hui « You’ve been invited — Join a TAKATAK workspace ») → texte fourni dans `docs/TAKATAK_INTEGRATION.md` ; 2) ajouter `https://r2nette.ca/api/v1/auth/takatak/google/callback` aux Redirect URLs pour Google.
+- **Suite** : PR → CI → fusion → Deploy → `config` doit répondre `{"configured":true,"google":true}` → essai réel avec le compte du propriétaire (accord du 2026-11-11 ; le code n’est écrit nulle part). Phase 2 : bouton Google sur takatak.ca (takatak-v1, règle du tableau des agents).
+
 ## 2026-11-11 — Claude (Anthropic) : réservation mobile (adresse, prix, barre du bas)
 
 Signalé par le propriétaire (captures téléphone) : recherche d’adresse en échec et barre Retour/Continuer flottante au milieu de l’écran.
