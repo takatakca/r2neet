@@ -114,3 +114,36 @@ Reference steps:
 - In the TAKATAK Supabase project (`pcjfahhlozsseqqevimi`), Authentication › OAuth Apps: register **R2NETTE** as a public client, PKCE, grant types `authorization_code` and `refresh_token`, redirect URI `https://r2nette.ca/api/v1/auth/takatak/callback`.
 - Put its client id in the GitHub `production` environment as `TAKATAK_OAUTH_CLIENT_ID` (variable or secret; it is not a secret), with `PUBLIC_URL=https://r2nette.ca`, then run **Server setup** and deploy.
 - takatak-v1: the login page's "Create an account" link must keep `?next=` so a visitor without a TAKATAK account returns to the consent screen after sign-up (branch `claude/email-signup-transfer`).
+
+## Sign in on r2nette.ca by email code or Google, TAKATAK as the hub (Claude, Anthropic — 2026-11-11)
+
+Replaces the dark "Continuer avec TAKATAK" button above. The customer never leaves r2nette.ca; the account still lives in the TAKATAK hub (Supabase project `pcjfahhlozsseqqevimi`), so one TAKATAK account serves every Groupe TAKATAK site. The old `/api/v1/auth/takatak/start` + `/callback` pair stays as the OAuth client (the consent step below ends on that same `/callback`).
+
+Flow (page `/login`, `web/email.html` + `web/src/lib/email-entry.ts`; API `src/api/takatak-signin.ts`; hub calls `src/identity/takatak-oauth.ts`):
+
+1. **Choose**: email address + "Envoyer le code", or "Continuer avec Google"; terms box for new accounts. `GET /api/v1/auth/takatak/config` → `{configured, google}` decides what is shown.
+2. **Email code**: `POST /api/v1/auth/takatak/email/send {email}` → hub `/auth/v1/otp` (`create_user: true`, so a new address creates the TAKATAK account); `POST …/email/verify {email, code, locale, terms, returnTo}` → hub `/auth/v1/verify` (type `email`). The hub session token is never sent to the browser.
+3. **Google**: `GET /api/v1/auth/takatak/google/start` → hub `/auth/v1/authorize?provider=google` with PKCE (verifier in an httpOnly cookie scoped to `/api/v1/auth/takatak/google`, 10 minutes) → Google → hub → `GET …/google/callback?code&state` → hub `/auth/v1/token?grant_type=pkce` server-side → `/login?consent=1`.
+4. **Consent on r2nette.ca**: with the hub session the server starts the OAuth authorization for the R2NETTE client (`/auth/v1/oauth/authorize`, 302 → `authorization_id`), reads `/auth/v1/oauth/authorizations/{id}` and shows TAKATAK's own "Autoriser l’accès" card (application, return address, account, access requested, FR/EN) on `/login`. The handoff lives in `r2n_takatak_consent`: httpOnly, 10 minutes, hub token AES-GCM encrypted with `FIELD_ENCRYPTION_KEY` (`src/api/takatak-consent-cookie.ts`).
+5. **Autoriser / Refuser**: `POST /api/v1/auth/takatak/consent {decision}` → hub `…/consent {action}` → the hub answers with the redirect URL. R2NETTE accepts it only if it is our own `/api/v1/auth/takatak/callback` with the state of this flow, revokes the hub session (`/auth/v1/logout?scope=local`) and sends the browser there; the existing callback exchanges the code and opens the R2NETTE session exactly as before (same matching rules, same outbox event). Refuse → `/login?takatak=cancelled`. An already-approved client skips the card.
+6. **Errors**: wrong code → 401 `EMAIL_CODE_INVALID` (stay on the code step); hub limits → 429; hub down → 503 `TAKATAK_AUTH_UNAVAILABLE`; stale handoff → 410 `CONSENT_EXPIRED` (back to step 1); forged redirect → 502 `CONSENT_INVALID`. Our own rate limits apply per email and per IP (`RateLimiter`).
+
+Owner steps in the TAKATAK Supabase dashboard (not done by the agent; the hub echoes any redirect so the agent cannot verify them):
+
+1. **Authentication › Email Templates › Magic Link** (the template used for email codes). Today it reads "You've been invited — Join a TAKATAK workspace", which is wrong for a sign-in code. Replace with:
+   - Subject: `Votre code de connexion TAKATAK / Your TAKATAK sign-in code`
+   - Body (HTML allowed):
+
+     ```html
+     <h2>Code de connexion / Sign-in code</h2>
+     <p>Saisissez ce code sur la page où vous l’avez demandé : <strong>{{ .Token }}</strong></p>
+     <p>Enter this code only on the page where you requested it.</p>
+     <p>Si vous n’avez pas demandé ce code, ignorez ce courriel. / If you did not request this code, ignore this email.</p>
+     <p style="font-size:12px;color:#666">Ou ouvrez ce lien / Or open this link: {{ .ConfirmationURL }}</p>
+     ```
+
+2. **Authentication › URL Configuration › Redirect URLs**: add `https://r2nette.ca/api/v1/auth/takatak/google/callback` (Google button). Without it the hub sends the Google return to the Site URL and the button ends on `/login?takatak=error`.
+
+Local check: `tests/takatak-signin.test.ts` (routes, forged redirect, expiry, limits), `tests/takatak-signin-provider.test.ts` (hub calls), `tests/takatak-consent-cookie.test.ts`; the Chromium run of 2026-11-11 used a local hub stub (phone + desktop, FR + EN, approve, refuse, Google, wrong code).
+
+Not changed: `R2NETTE_EMAIL_AUTH_ENABLED` and `/api/v1/auth/email/*` remain in the code but the page no longer uses them (later cleanup).

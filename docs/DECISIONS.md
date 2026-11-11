@@ -33,5 +33,7 @@ Snapshot: 2026-10-16. This documents existing repository policy and decisions, n
 
 19. **TAKATAK is the master account (2026-11-10, Claude — Anthropic):** customers sign in to R2NETTE with "Continuer avec TAKATAK" (OAuth 2.1 + PKCE, public client, server-side code exchange, UserInfo as the only identity source). R2NETTE keeps a copy and never takes over a historic profile by email match alone; linking an existing account happens from a signed-in session. Signup stays email-first; phone is imported only when TAKATAK already verified it and is otherwise requested after the first payment. Details: `docs/TAKATAK_INTEGRATION.md`.
 
+20. **Sign-in stays on r2nette.ca (2026-11-11, Claude — Anthropic):** the customer signs in by email code or Google on r2nette.ca; TAKATAK sends the code, holds the account and decides consent, and R2NETTE shows TAKATAK's "Autoriser l’accès" card itself, then finishes through the same OAuth callback as decision 19 (same matching rules). The TAKATAK session token stays server-side, encrypted for at most 10 minutes, and is revoked after the decision. Details: `docs/TAKATAK_INTEGRATION.md`.
+
 References: `BRAND.md`, `RUN.md`, `docs/TAKATAK_INTEGRATION.md`, `docs/reservation-system/`, `docs/deployment/contabo-runbook.md`, [production readiness issue #25](https://github.com/takatakca/r2neet/issues/25).
 

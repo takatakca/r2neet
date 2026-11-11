@@ -81,6 +81,15 @@ function setup(opts: { identity?: Partial<TakatakIdentity>; customers?: Row[]; p
       return u.toString();
     }),
     exchangeCode: vi.fn(async () => identity),
+    googleConfigured: true,
+    sendEmailCode: vi.fn(),
+    verifyEmailCode: vi.fn(),
+    googleAuthorizationUrl: vi.fn(() => 'https://auth.takatak.test/auth/v1/authorize'),
+    exchangeGoogleCode: vi.fn(),
+    beginAuthorization: vi.fn(),
+    authorizationDetails: vi.fn(),
+    decideConsent: vi.fn(),
+    revokeSession: vi.fn(),
   };
   const app = createApi({
     prisma,
@@ -242,7 +251,7 @@ describe('Continuer avec TAKATAK — sign-up and sign-in', () => {
     const res = await request(s.app).get('/api/v1/auth/takatak/start');
     expect(res.status).toBe(303);
     expect(res.headers.location).toBe('/login?takatak=unavailable');
-    expect((await request(s.app).get('/api/v1/auth/takatak/config')).body).toEqual({ configured: false });
+    expect((await request(s.app).get('/api/v1/auth/takatak/config')).body).toEqual({ configured: false, google: false });
   });
 });
 

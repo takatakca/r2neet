@@ -48,6 +48,15 @@ suite('TAKATAK sign-in real PostgreSQL transactions', () => {
         configured: true,
         authorizationUrl: async ({ state }) => `https://auth.takatak.example/authorize?state=${state}`,
         exchangeCode: async () => full,
+        googleConfigured: false,
+        sendEmailCode: async () => undefined,
+        verifyEmailCode: async () => { throw new Error('not used'); },
+        googleAuthorizationUrl: () => 'https://auth.takatak.example/authorize',
+        exchangeGoogleCode: async () => { throw new Error('not used'); },
+        beginAuthorization: async () => { throw new Error('not used'); },
+        authorizationDetails: async () => { throw new Error('not used'); },
+        decideConsent: async () => { throw new Error('not used'); },
+        revokeSession: async () => undefined,
       },
     });
     return { app, identity: full };
