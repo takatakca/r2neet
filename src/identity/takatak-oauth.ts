@@ -112,7 +112,10 @@ export class SupabaseTakatakOAuthProvider implements TakatakOAuthProvider {
   get configured(): boolean {
     if (!this.issuer || !this.clientId) return false;
     try {
-      return new URL(this.issuer).protocol === 'https:';
+      const url = new URL(this.issuer);
+      // https everywhere; plain http only for a hub stub on this machine.
+      const local = url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname);
+      return url.protocol === 'https:' || local;
     } catch {
       return false;
     }

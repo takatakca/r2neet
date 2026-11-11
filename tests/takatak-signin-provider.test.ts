@@ -61,6 +61,14 @@ describe('TAKATAK hub: email code', () => {
   });
 });
 
+describe('TAKATAK hub: configuration', () => {
+  it('accepts http only on the local machine, as the Google provider does', () => {
+    expect(new SupabaseTakatakOAuthProvider({ ...env, TAKATAK_SUPABASE_URL: 'http://127.0.0.1:3200' }).configured).toBe(true);
+    expect(new SupabaseTakatakOAuthProvider({ ...env, TAKATAK_SUPABASE_URL: 'http://localhost:3200' }).configured).toBe(true);
+    expect(new SupabaseTakatakOAuthProvider({ ...env, TAKATAK_SUPABASE_URL: 'http://evil.example' }).configured).toBe(false);
+  });
+});
+
 describe('TAKATAK hub: Google', () => {
   it('is on only with the anon key, and builds the authorize url with state and PKCE', () => {
     expect(new SupabaseTakatakOAuthProvider({ ...env, TAKATAK_SUPABASE_ANON_KEY: '' }).googleConfigured).toBe(false);

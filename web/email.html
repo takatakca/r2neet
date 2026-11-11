@@ -1,7 +1,70 @@
 <!doctype html>
-<!-- Codex — assistant OpenAI · 2026-10-29 · TAKATAK sign-in: Claude (Anthropic) · 2026-11-10 -->
-<html lang="fr-CA"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,follow"><title>Votre compte — R2NETTE</title><link rel="icon" href="/assets/brand/icon.svg"><link rel="stylesheet" href="/experience.css"></head>
-<body class="account-entry"><main class="entry-card"><a href="/"><img class="entry-logo" src="/assets/brand/r2nette-logo.svg" alt="R2NETTE"></a><button class="language-switch" id="language" type="button">EN</button><p class="eyebrow" id="eyebrow">Votre compte, simplement</p><h1 id="title">Votre courriel.<br>Votre prochain ménage.</h1><p id="intro">Recevez un code par courriel pour vous inscrire ou vous connecter. Aucun mot de passe. Aucun SMS à cette étape.</p>
-<section class="takatak-entry" id="takatakBlock" hidden aria-labelledby="takatakHint"><p class="takatak-status" id="takatakStatus" role="status" aria-live="polite" hidden></p><a class="takatak-button" id="takatak" href="/api/v1/auth/takatak/start">Continuer avec TAKATAK</a><p class="fine" id="takatakHint">Un seul compte TAKATAK pour R2NETTE et tous les sites du Groupe TAKATAK.</p><label class="check"><input id="takatakTerms" type="checkbox"><span id="takatakTermsLabel">Nouveau client : j’accepte les conditions et la politique de confidentialité.</span></label><p class="takatak-divider" id="orEmail">ou par courriel</p></section><form id="emailForm"><label for="email" id="emailLabel">Adresse courriel</label><input id="email" type="email" autocomplete="email" maxlength="254" required><button class="primary" id="send" type="submit">Recevoir mon code</button></form>
-<form id="codeForm" hidden><label for="code" id="codeLabel">Code reçu par courriel</label><input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required><label class="check"><input id="terms" type="checkbox" required><span id="termsLabel">J’accepte les conditions et la politique de confidentialité.</span></label><p class="fine"><a href="/terms" id="termsLink">Conditions</a> · <a href="/privacy" id="privacyLink">Confidentialité</a></p><button class="primary" id="verify" type="submit">Vérifier et continuer</button><button type="button" class="secondary" id="change">Changer de courriel</button></form>
-<p role="status" aria-live="polite" id="status"></p><p class="fine" id="smsNote">Après votre premier paiement, vous pourrez vérifier votre téléphone pour les confirmations SMS.</p><a href="/phone-login" id="legacy">Déjà un compte avec téléphone ?</a><p class="fine"><a href="/" id="back">Retour au site</a></p></main><script type="module" src="/src/lib/email-entry.ts"></script></body></html>
+<!-- Codex — assistant OpenAI · 2026-10-29 · TAKATAK sign-in on r2nette.ca: Claude (Anthropic) · 2026-11-11 -->
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow">
+<title>Votre compte — R2NETTE</title>
+<link rel="icon" href="/assets/brand/icon.svg">
+<link rel="stylesheet" href="/experience.css">
+</head>
+<body class="account-entry">
+<main class="entry-card">
+<a href="/"><img class="entry-logo" src="/assets/brand/r2nette-logo.svg" alt="R2NETTE"></a>
+<button class="language-switch" id="language" type="button">EN</button>
+<p class="eyebrow" id="eyebrow">Votre compte, simplement</p>
+<h1 id="title">Votre courriel.<br>Votre prochain ménage.</h1>
+<p id="intro">Connectez-vous ou créez votre compte TAKATAK. Un seul compte pour R2NETTE et tous les sites du Groupe TAKATAK. Aucun mot de passe.</p>
+
+<section id="chooseStep">
+<form id="emailForm">
+<label for="email" id="emailLabel">Adresse courriel</label>
+<input id="email" type="email" autocomplete="email" maxlength="254" required>
+<button class="primary" id="send" type="submit">Recevoir mon code</button>
+</form>
+<p class="entry-divider" id="orGoogle">ou</p>
+<a class="google-button" id="googleButton" href="/api/v1/auth/takatak/google/start" hidden>
+<svg class="google-mark" viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.7 2.6 30.2 0 24 0 14.6 0 6.5 5.4 2.5 13.3l7.8 6.1C12.2 13.6 17.6 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17.5z"/><path fill="#FBBC05" d="M10.3 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.1.8-4.6l-7.8-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.5 10.7l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.4 0-11.8-4.1-13.7-9.9l-7.8 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+<span id="googleLabel">Continuer avec Google</span>
+</a>
+<label class="check">
+<input id="terms" type="checkbox">
+<span id="termsLabel">Nouveau client : j’accepte les conditions et la politique de confidentialité.</span>
+</label>
+<p class="fine"><a href="/terms" id="termsLink">Conditions</a> · <a href="/privacy" id="privacyLink">Confidentialité</a></p>
+</section>
+
+<form id="codeForm" hidden>
+<label for="code" id="codeLabel">Code reçu par courriel</label>
+<input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required>
+<button class="primary" id="verify" type="submit">Vérifier et continuer</button>
+<button type="button" class="secondary" id="change">Changer de courriel</button>
+</form>
+
+<section class="consent-card" id="consentCard" hidden aria-labelledby="consentTitle">
+<p class="consent-eyebrow">GROUPE TAKATAK</p>
+<p class="consent-tagline">Digital Solutions. Real Results.</p>
+<h2 id="consentTitle">Autoriser l’accès</h2>
+<p class="consent-intro" id="consentIntro">R2NETTE demande l’accès à votre compte TAKATAK.</p>
+<dl class="consent-rows">
+<dt id="consentAppLabel">Application</dt><dd id="consentApp"></dd>
+<dt id="consentReturnLabel">Adresse de retour</dt><dd class="consent-address" id="consentReturn"></dd>
+<dt id="consentAccountLabel">Compte</dt><dd id="consentAccount"></dd>
+<dt id="consentScopesLabel">Accès demandé</dt><dd><ul class="consent-scopes" id="consentScopes"></ul></dd>
+</dl>
+<p class="consent-note" id="consentNote">TAKATAK ne transmet votre choix qu’à cette adresse de retour.</p>
+<div class="consent-actions">
+<button class="consent-approve" id="approve" type="button">Autoriser</button>
+<button class="consent-deny" id="deny" type="button">Refuser</button>
+</div>
+</section>
+
+<p role="status" aria-live="polite" id="status"></p>
+<p class="fine" id="smsNote">Après votre premier paiement, vous pourrez vérifier votre téléphone pour les confirmations SMS.</p>
+<a href="/phone-login" id="legacy">Déjà un compte avec téléphone ?</a>
+<p class="fine"><a href="/" id="back">Retour au site</a></p>
+</main>
+<script type="module" src="/src/lib/email-entry.ts"></script>
+</body>
+</html>

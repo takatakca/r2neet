@@ -151,6 +151,16 @@ describe('Sign in on r2nette.ca — email code', () => {
     expect(customers[0]!.termsAcceptedAt).toBeInstanceOf(Date);
   });
 
+  it('renders the consent details in the language the page asks for', async () => {
+    const { app, provider } = setup();
+    const jar = new Jar();
+    await post(app, jar, 'email/verify', { email: 'marie@example.ca', code: '123456', locale: 'fr', terms: true });
+    expect((await get(app, jar, 'consent?locale=en')).status).toBe(200);
+    expect(provider.authorizationDetails).toHaveBeenLastCalledWith(expect.objectContaining({ locale: 'en' }));
+    expect((await get(app, jar, 'consent?locale=xx')).status).toBe(200);
+    expect(provider.authorizationDetails).toHaveBeenLastCalledWith(expect.objectContaining({ locale: 'fr' }));
+  });
+
   it('skips the consent screen when the hub reports an earlier approval', async () => {
     const { app, provider, begun } = setup();
     provider.authorizationDetails.mockImplementation(async () => ({ kind: 'approved', redirectUrl: `${CALLBACK}?code=abc&state=${begun.state}` }));

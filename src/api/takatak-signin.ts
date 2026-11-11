@@ -203,11 +203,13 @@ export function takatakSignInRoutes(
   router.get('/auth/takatak/consent', run(async (req, res) => {
     const base = requireBase();
     const { handoff, pending } = readHandoff(req);
+    // The page may switch language on the consent screen; the wording follows.
+    const locale = req.query.locale === 'en' ? 'en' : req.query.locale === 'fr' ? 'fr' : pending.locale;
     const view = await provider.authorizationDetails({
       authorizationId: handoff.authorizationId,
       accessToken: handoff.accessToken,
       subject: handoff.subject,
-      locale: pending.locale,
+      locale,
     });
     if (view.kind === 'approved') {
       clearConsentCookie(res);
