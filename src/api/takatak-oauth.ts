@@ -12,69 +12,31 @@
 // over; its owner signs in with their existing method and links TAKATAK from
 // there (intent=link).
 import { Router, type Request, type Response } from 'express';
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { SESSION_COOKIE } from './app.js';
 import { PrismaSessionStore } from '../db/durable-stores.js';
 import { enqueueCustomerProfile } from '../integrations/takatak-sync.js';
 import type { TakatakIdentity, TakatakOAuthProvider } from '../identity/takatak-oauth.js';
+import {
+  CALLBACK_PATH,
+  DEFAULT_RETURN,
+  Stop,
+  TAKATAK_OAUTH_COOKIE,
+  backToLogin,
+  challengeOf,
+  clearPending,
+  newPending,
+  publicOrigin,
+  readPending,
+  safeReturn,
+  sameSecret,
+  writePending,
+  type Pending,
+} from './takatak-shared.js';
 
-export const TAKATAK_OAUTH_COOKIE = 'r2n_takatak_oauth';
-const COOKIE_PATH = '/api/v1/auth/takatak';
-const CALLBACK_PATH = '/api/v1/auth/takatak/callback';
-const TTL_MS = 10 * 60_000;
-const DEFAULT_RETURN = '/#book';
+export { TAKATAK_OAUTH_COOKIE };
 const TERMS_VERSION = '2026-10-29';
 const PRIVACY_VERSION = '2026-10-29';
-
-interface Pending {
-  v: 1;
-  state: string;
-  verifier: string;
-  returnTo: string;
-  locale: 'fr' | 'en';
-  terms: boolean;
-  /** Signed-in R2NETTE customer who asked to link TAKATAK. */
-  link: string | null;
-  createdAt: number;
-}
-
-/** A redirect back to the sign-in page with a reason the page can explain. */
-class Stop extends Error {
-  constructor(readonly reason: string) {
-    super(reason);
-  }
-}
-
-const sha = (s: string) => createHash('sha256').update(s).digest();
-
-function sameSecret(a: string, b: string): boolean {
-  return timingSafeEqual(sha(a), sha(b));
-}
-
-function readPending(raw: unknown, now: number): Pending | null {
-  if (typeof raw !== 'string' || raw.length > 4096) return null;
-  try {
-    const p = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Partial<Pending>;
-    if (
-      p.v !== 1 ||
-      typeof p.state !== 'string' || p.state.length < 32 ||
-      typeof p.verifier !== 'string' || p.verifier.length < 43 ||
-      typeof p.returnTo !== 'string' ||
-      (p.locale !== 'fr' && p.locale !== 'en') ||
-      typeof p.terms !== 'boolean' ||
-      (p.link !== null && typeof p.link !== 'string') ||
-      typeof p.createdAt !== 'number' ||
-      p.createdAt > now + 60_000 ||
-      now - p.createdAt > TTL_MS
-    ) {
-      return null;
-    }
-    return p as Pending;
-  } catch {
-    return null;
-  }
-}
 
 function splitName(name: string | null): { firstName: string | null; lastName: string | null } {
   const parts = (name ?? '').split(/\s+/).filter(Boolean);
@@ -99,40 +61,7 @@ export function takatakOAuthRoutes(
     next();
   });
 
-  function origin(): string | null {
-    if (!options.publicUrl) return null;
-    try {
-      const url = new URL(options.publicUrl);
-      const local = url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname);
-      if (!url.hostname || url.username || url.password || url.search || url.hash || (url.protocol !== 'https:' && !local)) {
-        return null;
-      }
-      return url.origin;
-    } catch {
-      return null;
-    }
-  }
-
-  function safeReturn(value: unknown, base: string): string {
-    if (typeof value !== 'string' || !value || value.length > 2048) return DEFAULT_RETURN;
-    try {
-      const url = new URL(value, base);
-      if (url.origin !== base) return DEFAULT_RETURN;
-      // Never bounce back into an API route or the sign-in pages themselves.
-      if (url.pathname.startsWith('/api/') || /^\/(login|signup|auth)(\/|$)/.test(url.pathname)) return DEFAULT_RETURN;
-      return url.pathname + url.search + url.hash;
-    } catch {
-      return DEFAULT_RETURN;
-    }
-  }
-
-  function backToLogin(res: Response, reason: string, returnTo = DEFAULT_RETURN, path = '/login') {
-    const query = new URLSearchParams({ takatak: reason });
-    if (returnTo !== DEFAULT_RETURN && path !== '/account') query.set('returnTo', returnTo);
-    res.redirect(303, `${path}?${query.toString()}`);
-  }
-
-  const clearPending = (res: Response) => res.clearCookie(TAKATAK_OAUTH_COOKIE, { path: COOKIE_PATH });
+  const origin = () => publicOrigin(options.publicUrl);
 
   router.get('/auth/takatak/config', (_req, res) => {
     res.json({ configured: provider.configured && origin() !== null });
@@ -160,30 +89,21 @@ export function takatakOAuthRoutes(
       backToLogin(res, 'signin-first', '/account');
       return;
     }
-    const pending: Pending = {
-      v: 1,
-      state: randomBytes(32).toString('base64url'),
-      verifier: randomBytes(32).toString('base64url'),
+    const pending: Pending = newPending({
       returnTo: linking ? safeReturn(req.query.returnTo ?? '/account', base) : returnTo,
       locale: req.query.locale === 'en' ? 'en' : 'fr',
       terms: req.query.terms === '1',
       link: linking ? req.customerId! : null,
-      createdAt: now().getTime(),
-    };
+      now: now().getTime(),
+    });
     try {
       const authorizeUrl = await provider.authorizationUrl({
         redirectUri: `${base}${CALLBACK_PATH}`,
-        challenge: createHash('sha256').update(pending.verifier).digest('base64url'),
+        challenge: challengeOf(pending.verifier),
         state: pending.state,
         locale: pending.locale,
       });
-      res.cookie(TAKATAK_OAUTH_COOKIE, Buffer.from(JSON.stringify(pending)).toString('base64url'), {
-        httpOnly: true,
-        secure,
-        sameSite: 'lax',
-        path: COOKIE_PATH,
-        maxAge: TTL_MS,
-      });
+      writePending(res, pending, secure);
       res.redirect(303, authorizeUrl);
     } catch {
       backToLogin(res, 'unavailable', returnTo, linking ? '/account' : '/login');
