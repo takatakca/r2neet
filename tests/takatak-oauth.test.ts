@@ -251,7 +251,7 @@ describe('Continuer avec TAKATAK — sign-up and sign-in', () => {
     const res = await request(s.app).get('/api/v1/auth/takatak/start');
     expect(res.status).toBe(303);
     expect(res.headers.location).toBe('/login?takatak=unavailable');
-    expect((await request(s.app).get('/api/v1/auth/takatak/config')).body).toEqual({ configured: false });
+    expect((await request(s.app).get('/api/v1/auth/takatak/config')).body).toEqual({ configured: false, google: false });
   });
 });
 

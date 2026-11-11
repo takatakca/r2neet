@@ -64,7 +64,8 @@ export function takatakOAuthRoutes(
   const origin = () => publicOrigin(options.publicUrl);
 
   router.get('/auth/takatak/config', (_req, res) => {
-    res.json({ configured: provider.configured && origin() !== null });
+    const configured = provider.configured && origin() !== null;
+    res.json({ configured, google: configured && provider.googleConfigured });
   });
 
   router.get('/account/takatak', async (req: Request, res: Response) => {
