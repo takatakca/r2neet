@@ -2175,7 +2175,13 @@ async function onAddressType(value: string): Promise<void> {
     } catch (e) {
       const err = $('addrErr');
       if (err) {
-        err.textContent = translateError(locale, e instanceof ApiError ? e.code : undefined);
+        const code = e instanceof ApiError ? e.code : undefined;
+        // Without a Google Maps key the server cannot look up addresses or
+        // price the travel; point the customer to the phone line instead of
+        // a generic "not available".
+        err.textContent = code === 'INTEGRATION_NOT_CONFIGURED'
+          ? t('address.lookupOff')
+          : translateError(locale, code);
         err.hidden = false;
       }
     }
@@ -2260,4 +2266,36 @@ async function loadPublicProfiles(): Promise<void> {
       const link = document.createElement('a');link.href = url.href;link.target = '_blank';link.rel = 'noopener noreferrer';link.textContent = String(profile.platform);box.append(link);
     }
   } catch { /* Existing content stays available when optional profiles fail. */ }
+}
+
+/*
+ * Claude (Anthropic) · 2026-11-11 — booking dock (CSS in index.html).
+ * On phones and tablets #nav is fixed to the bottom edge and the price bar
+ * sits on top of it. Measure both instead of assuming a height: the price
+ * bar keeps its height while hidden (it only slides away), and the nav
+ * grows with the safe area, larger text or a longer label.
+ */
+function syncDock(): void {
+  const nav = $('nav');
+  const sticky = $('sticky');
+  const navOn = !!nav && nav.style.display !== 'none' && getComputedStyle(nav).position === 'fixed';
+  const totalOn = !!sticky && !sticky.hidden;
+  document.body.classList.toggle('dock-nav', navOn);
+  const navHeight = navOn && nav ? nav.offsetHeight : 0;
+  const stickyHeight = totalOn && sticky ? sticky.offsetHeight : 0;
+  document.documentElement.style.setProperty('--dock-nav-h', `${navHeight}px`);
+  document.documentElement.style.setProperty('--dock-h', `${navHeight + stickyHeight}px`);
+}
+{
+  const watch = (): void => syncDock();
+  const attributes = new MutationObserver(watch);
+  const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(watch) : null;
+  for (const id of ['nav', 'sticky']) {
+    const el = $(id);
+    if (!el) continue;
+    attributes.observe(el, { attributes: true, attributeFilter: ['hidden', 'style'] });
+    sizes?.observe(el);
+  }
+  window.addEventListener('resize', watch);
+  syncDock();
 }

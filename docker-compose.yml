@@ -47,7 +47,7 @@ services:
   migrate:
     <<: *app
     restart: "no"
-    command: npx prisma migrate deploy
+    command: sh -c "npx prisma migrate deploy && npx vite-node scripts/seed-catalogue.ts"
 
   web:
     <<: *app

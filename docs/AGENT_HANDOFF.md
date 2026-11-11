@@ -1,5 +1,13 @@
 # R2NETTE — Agent handoff
 
+## 2026-11-11 — Claude (Anthropic) : réservation mobile (adresse, prix, barre du bas)
+
+Signalé par le propriétaire (captures téléphone) : recherche d’adresse en échec et barre Retour/Continuer flottante au milieu de l’écran.
+
+- **Prix jamais affiché en production** : `POST /api/v1/quotes` → 500 `Quote_serviceOptionId_fkey`. La base de production n’a jamais reçu le catalogue (`ServiceOption` vide) ; `npm run db:seed` ne faisait rien sous vite-node (contrôle `argv[1]`). Correctif : `scripts/seed-catalogue.ts` (upserts seulement, aucune suppression) lancé par le service `migrate` après `prisma migrate deploy` à chaque déploiement ; `db:seed` pointe dessus. Reproduit localement (base migrée sans catalogue : 500/404/500/400 comme en ligne) puis 200 après synchro, deux fois de suite.
+- **Barre du bas** : `#nav` était fixé à 82 px du bas (place réservée à la barre de prix, absente à l’étape adresse). Désormais, jusqu’à 999 px : Retour/Continuer collé au bord inférieur, total juste au-dessus (son propre Continuer masqué), « Need help? » au-dessus ; hauteurs mesurées par `syncDock()` (main.ts). Tablettes : barre de prix claire (le total était bleu marine sur fond bleu marine, donc invisible) et dialogue de réservation plein écran comme sur téléphone. Vérifié dans Chromium : 12 cas (iPhone SE, Galaxy S9+, iPad Mini × intégré/dialogue × avec/sans prix) : écart 0 px, aucun chevauchement ; bureau inchangé.
+- **Adresse** : la recherche exige `GOOGLE_MAPS_API_KEY` (Places API (New) + Routes API) et `BUSINESS_ORIGIN_LAT/LNG` ; le prix dépend de la distance (20 km inclus, puis par km), donc pas de saisie manuelle sans clé. En attendant, message clair qui renvoie au (514) 825-2825 (FR/EN). Reste au propriétaire : créer la clé et la poser dans GitHub › Environments › production, puis Server setup et Deploy.
+
 ## 2026-11-10 16:30 UTC — Claude (Anthropic) : zéro PR ouverte, drill réparé
 
 Sur ordre du propriétaire (« no pull request, no code issue ») :
