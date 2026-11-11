@@ -171,6 +171,7 @@ const en: Dict = {
   'address.unit': 'Unit / apartment (optional)',
   'address.change': 'Change',
   'address.confirming': 'Checking your price…',
+  'address.lookupOff': 'Online address search is not available yet. Call (514) 825-2825 and we will book your cleaning by phone.',
 
   'slots.title': 'When should we come?',
   'slots.loading': 'Finding open times…',
@@ -545,6 +546,7 @@ const fr: Dict = {
   'address.unit': 'Unité / appartement (facultatif)',
   'address.change': 'Modifier',
   'address.confirming': 'Calcul de votre prix…',
+  'address.lookupOff': 'La recherche d’adresse en ligne n’est pas encore offerte. Appelez le (514) 825-2825 et nous réserverons votre ménage par téléphone.',
 
   'slots.title': 'Quand devons-nous venir?',
   'slots.loading': 'Recherche des plages libres…',

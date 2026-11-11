@@ -78,7 +78,10 @@ services:
   migrate:
     <<: *app
     restart: "no"
-    command: ["./node_modules/.bin/prisma", "migrate", "deploy"]
+    # Migrate, then sync the service catalogue: quotes and bookings reference
+    # ServiceOption by foreign key, so an empty catalogue breaks every quote.
+    # The sync is upsert-only (scripts/seed-catalogue.ts).
+    command: ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node ./node_modules/vite-node/vite-node.mjs scripts/seed-catalogue.ts"]
     networks:
       - private
 
