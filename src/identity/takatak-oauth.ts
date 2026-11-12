@@ -49,7 +49,8 @@ export interface TakatakOAuthProvider {
   // Claude (Anthropic) · 2026-11-11 — sign-in on r2nette.ca without visiting takatak.ca.
   sendEmailCode(email: string): Promise<void>;
   verifyEmailCode(email: string, code: string): Promise<HubSession>;
-  googleAuthorizationUrl(input: { redirectUri: string; challenge: string; state: string }): string;
+  /** The hub keeps its own state for Google and never returns ours; PKCE binds the code to this browser. */
+  googleAuthorizationUrl(input: { redirectUri: string; challenge: string }): string;
   exchangeGoogleCode(input: { code: string; verifier: string }): Promise<HubSession>;
   /** Opens the R2NETTE authorization in the hub; returns its id without a browser. */
   beginAuthorization(input: { redirectUri: string; challenge: string; state: string; locale: 'fr' | 'en' }): Promise<string>;
@@ -179,14 +180,13 @@ export class SupabaseTakatakOAuthProvider implements TakatakOAuthProvider {
     return session;
   }
 
-  googleAuthorizationUrl(input: { redirectUri: string; challenge: string; state: string }): string {
+  googleAuthorizationUrl(input: { redirectUri: string; challenge: string }): string {
     if (!this.googleConfigured) {
       throw new IdentityError('TAKATAK Google authentication is not configured.', 'GOOGLE_AUTH_NOT_CONFIGURED');
     }
     const url = new URL(`${this.issuer}/authorize`);
     url.searchParams.set('provider', 'google');
     url.searchParams.set('redirect_to', input.redirectUri);
-    url.searchParams.set('state', input.state);
     url.searchParams.set('code_challenge', input.challenge);
     url.searchParams.set('code_challenge_method', 's256');
     return url.toString();
@@ -239,6 +239,7 @@ export class SupabaseTakatakOAuthProvider implements TakatakOAuthProvider {
   async authorizationDetails(input: { authorizationId: string; accessToken: string; subject: string; locale: 'fr' | 'en' }): Promise<AuthorizationView> {
     const response = await this.hub(`/oauth/authorizations/${input.authorizationId}`, { headers: this.hubHeaders(input.accessToken) });
     const invalid = () => new IdentityError('TAKATAK cannot read this authorization.', 'CONSENT_INVALID');
+    if (response.status === 404 || response.status === 410) throw SupabaseTakatakOAuthProvider.gone();
     if (!response.ok) throw invalid();
     const data = await SupabaseTakatakOAuthProvider.body(response);
     if (!data) throw invalid();
@@ -274,6 +275,7 @@ export class SupabaseTakatakOAuthProvider implements TakatakOAuthProvider {
       body: JSON.stringify({ action: input.decision }),
     });
     const invalid = () => new IdentityError('TAKATAK could not record this choice.', 'CONSENT_INVALID');
+    if (response.status === 404 || response.status === 410) throw SupabaseTakatakOAuthProvider.gone();
     if (!response.ok) throw invalid();
     const data = await SupabaseTakatakOAuthProvider.body(response);
     const redirectUrl = text(data?.redirect_url, 2048);
@@ -288,6 +290,11 @@ export class SupabaseTakatakOAuthProvider implements TakatakOAuthProvider {
     } catch {
       // Best effort: the R2NETTE session is what the customer uses from here.
     }
+  }
+
+  /** The hub no longer knows the authorization (expired or already decided). */
+  private static gone(): IdentityError {
+    return new IdentityError('This sign-in expired. Start again.', 'CONSENT_EXPIRED');
   }
 
   private unavailable(): never {

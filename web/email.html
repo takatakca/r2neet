@@ -37,7 +37,7 @@
 
 <form id="codeForm" hidden>
 <label for="code" id="codeLabel">Code reçu par courriel</label>
-<input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required>
+<input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="\s*([0-9]\s*){6,10}" minlength="6" maxlength="16" required>
 <button class="primary" id="verify" type="submit">Vérifier et continuer</button>
 <button type="button" class="secondary" id="change">Changer de courriel</button>
 </form>

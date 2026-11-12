@@ -70,16 +70,15 @@ describe('TAKATAK hub: configuration', () => {
 });
 
 describe('TAKATAK hub: Google', () => {
-  it('is on only with the anon key, and builds the authorize url with state and PKCE', () => {
+  it('is on only with the anon key, and builds the authorize url with PKCE and no state of ours', () => {
     expect(new SupabaseTakatakOAuthProvider({ ...env, TAKATAK_SUPABASE_ANON_KEY: '' }).googleConfigured).toBe(false);
     const p = new SupabaseTakatakOAuthProvider(env);
     expect(p.googleConfigured).toBe(true);
-    const url = new URL(p.googleAuthorizationUrl({ redirectUri: 'https://r2nette.ca/api/v1/auth/takatak/google/callback', challenge: 'c'.repeat(43), state: 's'.repeat(43) }));
+    const url = new URL(p.googleAuthorizationUrl({ redirectUri: 'https://r2nette.ca/api/v1/auth/takatak/google/callback', challenge: 'c'.repeat(43) }));
     expect(url.origin + url.pathname).toBe('https://auth.takatak.test/auth/v1/authorize');
     expect(Object.fromEntries(url.searchParams)).toEqual({
       provider: 'google',
       redirect_to: 'https://r2nette.ca/api/v1/auth/takatak/google/callback',
-      state: 's'.repeat(43),
       code_challenge: 'c'.repeat(43),
       code_challenge_method: 's256',
     });
@@ -157,7 +156,9 @@ describe('TAKATAK hub: consent on r2nette.ca', () => {
     await expect(approved.authorizationDetails({ authorizationId: AUTH_ID, accessToken: 'at', subject: 'u1', locale: 'en' })).resolves.toEqual({ kind: 'approved', redirectUrl: `${CALLBACK}?code=x&state=s` });
 
     const gone = new SupabaseTakatakOAuthProvider(env, fakeFetch(() => json({}, 404)).fetcher);
-    await expect(gone.authorizationDetails({ authorizationId: AUTH_ID, accessToken: 'at', subject: 'u1', locale: 'en' })).rejects.toMatchObject({ code: 'CONSENT_INVALID' });
+    await expect(gone.authorizationDetails({ authorizationId: AUTH_ID, accessToken: 'at', subject: 'u1', locale: 'en' })).rejects.toMatchObject({ code: 'CONSENT_EXPIRED' });
+    const refusedRead = new SupabaseTakatakOAuthProvider(env, fakeFetch(() => json({}, 400)).fetcher);
+    await expect(refusedRead.authorizationDetails({ authorizationId: AUTH_ID, accessToken: 'at', subject: 'u1', locale: 'en' })).rejects.toMatchObject({ code: 'CONSENT_INVALID' });
   });
 
   it('approves and denies with the user token and returns redirect_url', async () => {
@@ -173,6 +174,8 @@ describe('TAKATAK hub: consent on r2nette.ca', () => {
 
     const refused = new SupabaseTakatakOAuthProvider(env, fakeFetch(() => json({}, 400)).fetcher);
     await expect(refused.decideConsent({ authorizationId: AUTH_ID, accessToken: 'at', decision: 'approve' })).rejects.toMatchObject({ code: 'CONSENT_INVALID' });
+    const gone = new SupabaseTakatakOAuthProvider(env, fakeFetch(() => json({}, 410)).fetcher);
+    await expect(gone.decideConsent({ authorizationId: AUTH_ID, accessToken: 'at', decision: 'approve' })).rejects.toMatchObject({ code: 'CONSENT_EXPIRED' });
     const empty = new SupabaseTakatakOAuthProvider(env, fakeFetch(() => json({})).fetcher);
     await expect(empty.decideConsent({ authorizationId: AUTH_ID, accessToken: 'at', decision: 'approve' })).rejects.toMatchObject({ code: 'CONSENT_INVALID' });
   });

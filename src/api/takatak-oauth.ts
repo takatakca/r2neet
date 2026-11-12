@@ -140,6 +140,21 @@ export function takatakOAuthRoutes(
         return { id: owner.id, created: false };
       }
 
+      // Linked Google earlier through /phone-login: same TAKATAK user id.
+      const googleOwner = await tx.customer.findUnique({
+        where: { googleAuthSubject: identity.subject },
+        select: { id: true, emailAuthSubject: true },
+      });
+      if (googleOwner && !googleOwner.emailAuthSubject) {
+        const claimed = await tx.customer.updateMany({
+          where: { id: googleOwner.id, emailAuthSubject: null },
+          data: { emailAuthSubject: identity.subject },
+        });
+        if (claimed.count !== 1) throw new Stop('error');
+        await fillMissing(tx, googleOwner.id, identity, at, true);
+        return { id: googleOwner.id, created: false };
+      }
+
       // Same phone already proven on R2NETTE through TAKATAK phone sign-in.
       if (identity.phoneVerified && identity.phone) {
         const phone = await tx.customerPhone.findUnique({
