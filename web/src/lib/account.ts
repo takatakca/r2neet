@@ -157,7 +157,7 @@ function render(): void {
   const sub = $('subline');
   if (sub) {
     sub.textContent = data.upcoming.length
-      ? t('account.nextCount', { n: data.upcoming.length })
+      ? t(data.upcoming.length === 1 ? 'account.nextCount' : 'account.nextCountMany', { n: data.upcoming.length })
       : t('account.noneScheduled');
   }
 
@@ -196,7 +196,7 @@ function render(): void {
             <div><label class="d" style="font-size:13px;font-weight:600">${esc(t('details.email'))}</label>
               <input class="slot" style="width:100%;text-align:left;padding:13px 14px;font-weight:400"
                 id="pfEmail" type="email" readonly value="${esc(data.customer.email ?? '')}"></div>
-            <div class="note">${esc(t('details.verified'))}: <b>${esc(data.customer.verifiedPhone ? maskPhoneDisplay(data.customer.verifiedPhone) : '—')}</b></div>
+            ${data.customer.verifiedPhone ? `<div class="note">${esc(t('details.verified'))}: <b>${esc(maskPhoneDisplay(data.customer.verifiedPhone))}</b></div>` : ''}
           </div>
           <div class="err" id="pfErr" hidden></div>
           <div class="acts"><button class="btn btn-primary" data-action="save-profile">${esc(t('account.save'))}</button></div>
@@ -236,6 +236,11 @@ function render(): void {
             ${m.isDefault ? `<span class="pill ok">${esc(t('account.default'))}</span>` : ''}
           </div></div>`).join('')
           : `<div class="note">${esc(t('account.noCards'))}</div>`}
+      </div>
+
+      <div class="section"><h2>${esc(t('account.session'))}</h2>
+        <div class="card"><div class="addr"><div class="t"><span>${esc(t('account.signOutNote'))}</span></div>
+          <button class="btn btn-ghost" data-action="sign-out">${esc(t('account.signOut'))}</button></div></div>
       </div>`;
   }
 }
@@ -446,6 +451,16 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
     } catch (e) {
       toast(translateError(locale, e instanceof ApiError ? e.code : undefined));
     }
+  },
+  'sign-out': async () => {
+    try {
+      await call('/api/v1/auth/logout', { method: 'POST' });
+    } catch {
+      // The server could not end the session (offline?): stay, so the customer does not think they left.
+      toast(t('error.GENERIC'));
+      return;
+    }
+    location.assign('/');
   },
   'make-default': async (el) => {
     await call(`/api/v1/account/addresses/${el.dataset.id}/default`, { method: 'POST' });
