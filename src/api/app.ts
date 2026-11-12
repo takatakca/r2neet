@@ -347,6 +347,13 @@ export interface ApiDeps {
   takatakOAuth?: TakatakOAuthProvider;
   /** Explicit migration/test compatibility only. Production defaults to email-first registration. */
   legacyPhoneRegistration?: boolean;
+  /**
+   * Phone-number sign-in (SMS code at /phone-login, and the Google link that
+   * asked for a phone). Owner order 2026-11-12: email code and Google only,
+   * so server.ts turns it off unless R2NETTE_PHONE_LOGIN=true. Left on here
+   * so the older integration tests keep exercising those routes.
+   */
+  phoneLogin?: boolean;
   now?: () => Date;
   /** Twilio Voice for the callback dialler. Unset = queue for a manual call. */
   voice?: VoiceProvider | null;
@@ -665,6 +672,14 @@ export function createApi(deps: ApiDeps) {
       throw error;
     }
   }
+
+  app.use(['/api/v1/auth/phone', '/api/v1/auth/registration', '/api/v1/auth/google'], (_req, _res, next) => {
+    if (deps.phoneLogin === false) {
+      next(new ApiError(410, 'PHONE_LOGIN_DISABLED', 'Phone sign-in is turned off. Sign in with your email or Google.'));
+      return;
+    }
+    next();
+  });
 
   app.get(
     '/api/v1/auth/google/start',

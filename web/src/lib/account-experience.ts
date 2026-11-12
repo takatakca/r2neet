@@ -37,30 +37,9 @@ export function setupAccountExperience(locale=detectLocale()):void{
  if(data.truncated)box.insertAdjacentHTML('beforeend',`<p>${say('Affichage limité à 500 visites. Réduisez la période.','Showing up to 500 visits. Narrow the date range.')}</p>`);
  }).catch(()=>{if(callSeq===seq){const box=document.getElementById('calendarEvents');if(box)box.textContent=say('Calendrier indisponible. Vos réservations restent dans la liste ci-dessous.','Calendar unavailable. Your bookings remain in the list below.');}});
  void setupPhone(fr);
- void setupTakatak(fr,locale);
 }
-// Claude (Anthropic) · 2026-11-10 — link this R2NETTE account to the master TAKATAK account.
-const takatakMessages:Record<string,[string,string]>={
- linked:['C’est fait : votre compte R2NETTE est relié à TAKATAK.','Done: your R2NETTE account is linked to TAKATAK.'],
- 'already-linked':['Ce compte TAKATAK est déjà relié à un autre compte R2NETTE. Communiquez avec R2NETTE pour fusionner les comptes.','That TAKATAK account is already linked to another R2NETTE account. Contact R2NETTE to merge them.'],
- 'other-account':['Ce compte R2NETTE est déjà relié à un autre compte TAKATAK.','This R2NETTE account is already linked to a different TAKATAK account.'],
- 'signin-first':['Connectez-vous à R2NETTE, puis reliez TAKATAK.','Sign in to R2NETTE, then link TAKATAK.'],
- cancelled:['Liaison TAKATAK annulée.','TAKATAK linking was cancelled.'],
- expired:['La liaison a expiré. Recommencez.','Linking expired. Please start again.'],
- unavailable:['La liaison TAKATAK n’est pas encore disponible.','TAKATAK linking is not available yet.'],
- error:['La liaison TAKATAK n’a pas fonctionné. Réessayez plus tard.','TAKATAK linking did not work. Try again later.'],
-};
-async function setupTakatak(fr:boolean,locale:string){
- const settings=document.getElementById('settings');if(!settings)return;
- const say=(a:string,b:string)=>fr?a:b;
- let root=document.getElementById('accountTakatak');if(!root){root=document.createElement('section');root.id='accountTakatak';root.className='section';settings.prepend(root);}
- const reason=new URLSearchParams(location.search).get('takatak');const note=reason?(takatakMessages[reason]??takatakMessages.error!):null;
- try{const r=await fetch('/api/v1/account/takatak',{credentials:'same-origin'});if(!r.ok)throw new Error();const s=await r.json() as {linked:boolean;configured:boolean};
- if(!s.linked&&!s.configured&&!note){root.remove();return;}
- const link='/api/v1/auth/takatak/start?'+new URLSearchParams({intent:'link',locale:fr?'fr':locale==='en'?'en':'fr'}).toString();
- root.innerHTML=`<h2>${say('Compte TAKATAK','TAKATAK account')}</h2><div class="card"><p>${s.linked?say('Votre compte est relié à TAKATAK : un seul compte pour R2NETTE et tous les sites du Groupe TAKATAK.','Your account is linked to TAKATAK: one account for R2NETTE and every Groupe TAKATAK website.'):say('Reliez votre compte TAKATAK pour vous connecter partout avec le même compte.','Link your TAKATAK account to sign in everywhere with the same account.')}</p>${!s.linked&&s.configured?`<a class="btn btn-primary" href="${esc(link)}">${say('Relier mon compte TAKATAK','Link my TAKATAK account')}</a>`:''}${note?`<p role="status">${esc(say(note[0],note[1]))}</p>`:''}</div>`;
- }catch{root.remove();}
-}
+// Claude (Anthropic) · 2026-11-12 — the TAKATAK link card is gone: every sign-in goes through TAKATAK now,
+// and the first one claims the profile that carries the same verified email (docs/TAKATAK_INTEGRATION.md).
 async function setupPhone(fr:boolean){
  const settings=document.getElementById('settings');if(!settings)return;
  const say=(a:string,b:string)=>fr?a:b;

@@ -91,7 +91,7 @@ suite('TAKATAK sign-in real PostgreSQL transactions', () => {
     expect(await prisma.customerSession.count({ where: { customerId: customer.id } })).toBe(2);
   });
 
-  it('links a legacy phone customer through the relation lookup and leaves a historic email profile untouched', async () => {
+  it('links a legacy phone customer through the relation lookup and claims a historic email profile, ending its old sessions', async () => {
     const phone = `+1438${String(Math.floor(Math.random() * 1e7)).padStart(7, '0')}`;
     const legacy = await prisma.customer.create({ data: { phones: { create: { phoneE164: phone, verifiedAt: new Date('2026-01-01') } } } });
     customerIds.push(legacy.id);
@@ -103,10 +103,24 @@ suite('TAKATAK sign-in real PostgreSQL transactions', () => {
     const email = `historic-${randomUUID()}@example.test`;
     const historic = await prisma.customer.create({ data: { email } });
     customerIds.push(historic.id);
+    const old = await prisma.customerSession.create({
+      data: { sessionTokenHash: `old-${randomUUID()}`, customerId: historic.id, phoneVerifiedAt: new Date('2026-10-01'), expiresAt: new Date('2027-01-01') },
+    });
     const second = fixture({ email });
-    const refused = await signIn(second.app);
+    const claimed = await signIn(second.app);
+    expect(claimed.headers.location).toBe('/#book');
+    const after = await prisma.customer.findUniqueOrThrow({ where: { id: historic.id } });
+    expect(after.emailAuthSubject).toBe(second.identity.subject);
+    expect(after.emailVerifiedAt).not.toBeNull();
+    expect((await prisma.customerSession.findUniqueOrThrow({ where: { id: old.id } })).revokedAt).not.toBeNull();
+    expect(await prisma.customerSession.count({ where: { customerId: historic.id, revokedAt: null } })).toBe(1);
+
+    // Owned by another TAKATAK identity: still refused.
+    const taken = await prisma.customer.create({ data: { email: `taken-${randomUUID()}@example.test`, emailAuthSubject: `other-${randomUUID()}` } });
+    customerIds.push(taken.id);
+    const third = fixture({ email: taken.email! });
+    const refused = await signIn(third.app);
     expect(refused.headers.location).toBe('/login?takatak=link-required');
-    expect((await prisma.customer.findUniqueOrThrow({ where: { id: historic.id } })).emailAuthSubject).toBeNull();
-    expect(await prisma.customerSession.count({ where: { customerId: historic.id } })).toBe(0);
+    expect(await prisma.customerSession.count({ where: { customerId: taken.id } })).toBe(0);
   });
 });

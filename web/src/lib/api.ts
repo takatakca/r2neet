@@ -258,18 +258,6 @@ export const api = {
       frequencyRules: FrequencyRule[];
     }>('/api/v1/services'),
 
-  sendCode: (phone: string) =>
-    call<{ sent: boolean; message: string; maskedPhone: string }>('/api/v1/auth/phone/send', {
-      method: 'POST',
-      body: JSON.stringify({ phone }),
-    }),
-
-  verifyCode: (phone: string, code: string) =>
-    call<{ customer: { id: string; firstName: string | null; isReturningCustomer: boolean } }>(
-      '/api/v1/auth/phone/verify',
-      { method: 'POST', body: JSON.stringify({ phone, code }) },
-    ),
-
   context: () => call<CustomerContext>('/api/v1/customer/context'),
 
   updateProfile: (input: { firstName?: string; lastName?: string; email?: string }) =>

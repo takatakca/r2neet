@@ -31,6 +31,7 @@ const app = createApi({
     isShuttingDown: () => shuttingDown,
   },
   verification: new SupabasePhoneAuthProvider(),
+  phoneLogin: process.env.R2NETTE_PHONE_LOGIN === 'true',
   stripe: stripe.configured ? stripe : undefined,
   places: places.configured ? places : undefined,
   origin:
@@ -64,8 +65,15 @@ const pages: Record<string, string> = {
   '/terms': 'terms.html',
   '/privacy': 'privacy.html',
 };
+// Phone sign-in is off (owner order 2026-11-12): its pages go to the email and
+// Google sign-in instead of a dead end.
+const phoneLoginPages = new Set(['/phone-login', '/verify', '/profile']);
 for (const [route, file] of Object.entries(pages)) {
   app.get(route, (_req, res) => {
+    if (process.env.R2NETTE_PHONE_LOGIN !== 'true' && phoneLoginPages.has(route)) {
+      res.redirect(302, '/login');
+      return;
+    }
     res.sendFile(path.join(dist, file));
   });
 }

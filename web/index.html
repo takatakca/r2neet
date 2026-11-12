@@ -964,9 +964,59 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
   box-shadow: 0 12px 28px rgba(8, 47, 90, 0.13);
 }
 
-.landing-service-card[aria-pressed="true"] {
+.landing-service-card[aria-expanded="true"] {
   border-color: #168de8;
   box-shadow: 0 0 0 3px rgba(22, 141, 232, 0.15);
+}
+
+/* Claude (Anthropic) · 2026-11-12 — one card + its crew-and-time options, accordion on narrow screens. */
+.family-group {
+  min-width: 0;
+}
+.family-group > .landing-service-card {
+  width: 100%;
+}
+.family-panel {
+  margin-top: 10px;
+  padding: 14px 12px 12px;
+  border: 1px solid #cfe3f3;
+  border-radius: 16px;
+  background: #f3f9fe;
+  animation: family-open 180ms ease-out;
+}
+.family-panel[hidden] {
+  display: none;
+}
+.family-panel .eyebrow {
+  margin: 2px 4px 12px;
+}
+/* Tracks must not outgrow the panel; long names wrap instead. */
+.family-panel .opts {
+  grid-template-columns: minmax(0, 1fr);
+}
+.family-panel .opt {
+  min-width: 0;
+}
+@media (max-width: 430px) {
+  .family-panel { padding: 12px 8px 8px; }
+  /* French titles such as "Déménagement," pushed the arrow out of the card. */
+  .fams .landing-service-content { padding: 12px 12px 12px 14px; gap: 8px; }
+  .fams .landing-service-card { grid-template-columns: 84px minmax(0, 1fr); }
+  .fams .landing-service-photo { min-height: 96px; }
+  .fams .landing-service-copy strong { font-size: 16px; overflow-wrap: break-word; }
+  .fams .landing-service-copy span { font-size: 13px; }
+  .fams .landing-service-arrow { width: 30px; height: 30px; flex-basis: 30px; font-size: 18px; }
+}
+@media (max-width: 380px) {
+  /* The arrow is decoration; on the narrowest phones the title needs its room. */
+  .fams .landing-service-arrow { display: none; }
+}
+@keyframes family-open {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .family-panel { animation: none; }
 }
 
 .landing-service-photo {
@@ -1457,7 +1507,7 @@ footer .f-in{position:relative;max-width:1160px;margin:0 auto}
   .fams{grid-template-columns:1fr}
   .landing-service-card{
     display:grid;
-    grid-template-columns:118px 1fr;
+    grid-template-columns:118px minmax(0,1fr);
     min-height:112px;
   }
   .landing-service-photo{height:100%;min-height:112px}

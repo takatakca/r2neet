@@ -174,9 +174,28 @@ export function takatakOAuthRoutes(
       }
 
       if (!identity.email || !identity.emailVerified) throw new Stop('email-required');
-      // A historic profile email is not proof of a linked login identity.
-      if (await tx.customer.findUnique({ where: { email: identity.email }, select: { id: true } })) {
-        throw new Stop('link-required');
+
+      // TAKATAK has just verified this address with a code, and phone sign-in
+      // is off (decision 20), so the only logins into a profile carrying this
+      // email are TAKATAK ones. Claim it unless another TAKATAK identity
+      // already owns it, and end every older session so nobody who signed in
+      // before keeps access.
+      const historic = await tx.customer.findUnique({
+        where: { email: identity.email },
+        select: { id: true, emailAuthSubject: true, googleAuthSubject: true },
+      });
+      if (historic) {
+        if (historic.emailAuthSubject || (historic.googleAuthSubject && historic.googleAuthSubject !== identity.subject)) {
+          throw new Stop('link-required');
+        }
+        const claimed = await tx.customer.updateMany({
+          where: { id: historic.id, emailAuthSubject: null },
+          data: { emailAuthSubject: identity.subject, emailVerifiedAt: at },
+        });
+        if (claimed.count !== 1) throw new Stop('error');
+        await tx.customerSession.updateMany({ where: { customerId: historic.id, revokedAt: null }, data: { revokedAt: at } });
+        await fillMissing(tx, historic.id, identity, at, true);
+        return { id: historic.id, created: false };
       }
       if (!pending.terms) throw new Stop('terms');
 

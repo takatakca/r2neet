@@ -32,9 +32,15 @@ function setup(opts: { customers?: Row[]; phones?: Row[]; googleConfigured?: boo
       findUnique: async () => null,
       update: async () => ({}),
       create: async ({ data }: any) => { sessions.push(data); return data; },
+      updateMany: async ({ where, data }: any) => {
+        const rows = sessions.filter((row) => row.customerId === where.customerId && row.revokedAt === where.revokedAt);
+        rows.forEach((row) => Object.assign(row, data));
+        return { count: rows.length };
+      },
     },
     customer: {
       findUnique: async ({ where }: any) => customers.find((c) => match(c, where)) ?? null,
+      findFirst: async ({ where }: any) => customers.find((c) => (where.OR as Row[]).some((w) => match(c, w))) ?? null,
       findUniqueOrThrow: async ({ where }: any) => {
         const c = customers.find((row) => match(row, where));
         if (!c) throw new Error('missing');
@@ -131,7 +137,7 @@ describe('Sign in on r2nette.ca — email code', () => {
 
     const consent = await get(app, jar, 'consent');
     expect(consent.status).toBe(200);
-    expect(consent.body).toEqual({ app: 'R2NETTE', returnAddress: CALLBACK, account: 'marie@example.ca', scopes: ['Confirmer que vous êtes connecté à TAKATAK', 'Voir votre adresse courriel', 'Voir votre nom et votre profil', 'Voir votre numéro de téléphone'] });
+    expect(consent.body).toEqual({ app: 'R2NETTE', returnAddress: CALLBACK, account: 'marie@example.ca', scopes: ['Confirmer que vous êtes connecté à TAKATAK', 'Voir votre adresse courriel', 'Voir votre nom et votre profil', 'Voir votre numéro de téléphone'], needsTerms: false });
     expect(provider.authorizationDetails).toHaveBeenCalledWith({ authorizationId: AUTH_ID, accessToken: 'hub-at', subject: 'takatak-user-1', locale: 'fr' });
 
     const approved = await post(app, jar, 'consent', { decision: 'approve' });
@@ -342,6 +348,66 @@ describe('Sign in on r2nette.ca — email code', () => {
     const form = await request(app).post('/api/v1/auth/takatak/email/send').set('Content-Type', 'application/x-www-form-urlencoded').send('email=marie%40example.ca');
     expect(form.status).toBe(403);
     expect(provider.sendEmailCode).not.toHaveBeenCalled();
+  });
+});
+
+describe('Sign in on r2nette.ca — terms and returning customers', () => {
+  const verify = (app: any, jar: Jar, terms: boolean, returnTo = '/account') =>
+    post(app, jar, 'email/verify', { email: 'marie@example.ca', code: '123456', locale: 'fr', terms, returnTo });
+
+  it('asks a first-time customer for the terms on the consent card, then creates the account', async () => {
+    const { app, customers, sessions, provider } = setup();
+    const jar = new Jar();
+    await verify(app, jar, false);
+    const consent = await get(app, jar, 'consent');
+    expect(consent.body.needsTerms).toBe(true);
+
+    // Autoriser without the box: nothing is spent, the card can be ticked and sent again.
+    const refused = await post(app, jar, 'consent', { decision: 'approve' });
+    expect([refused.status, refused.body.error.code]).toEqual([400, 'TERMS_REQUIRED']);
+    expect(provider.decideConsent).not.toHaveBeenCalled();
+    expect(jar.has('r2n_takatak_consent')).toBe(true);
+    expect((await get(app, jar, 'consent')).status).toBe(200);
+
+    const approved = await post(app, jar, 'consent', { decision: 'approve', terms: true });
+    expect(approved.status).toBe(200);
+    expect(decode(jar.get('r2n_takatak_oauth')!)).toMatchObject({ terms: true, returnTo: '/account' });
+    const finished = await get(app, jar, new URL(approved.body.next).pathname + new URL(approved.body.next).search);
+    expect(finished.headers.location).toBe('/account');
+    expect(customers).toHaveLength(1);
+    expect(customers[0]!.termsAcceptedAt).toBeInstanceOf(Date);
+    expect(sessions).toHaveLength(1);
+  });
+
+  it('lets anyone refuse without ticking, and never asks a known customer', async () => {
+    const fresh = setup();
+    const jar = new Jar();
+    await verify(fresh.app, jar, false);
+    const denied = await post(fresh.app, jar, 'consent', { decision: 'deny' });
+    expect(denied.status).toBe(200);
+
+    for (const known of [{ emailAuthSubject: 'takatak-user-1' }, { googleAuthSubject: 'takatak-user-1' }, { email: 'marie@example.ca' }]) {
+      const s = setup({ customers: [{ id: 'c1', ...known }] });
+      const j = new Jar();
+      await verify(s.app, j, false);
+      expect((await get(s.app, j, 'consent')).body.needsTerms).toBe(false);
+      expect((await post(s.app, j, 'consent', { decision: 'approve' })).status).toBe(200);
+    }
+  });
+
+  it('signs in, in one go, a customer whose older profile holds the same address, and ends the older sessions', async () => {
+    const { app, customers, sessions } = setup({ customers: [{ id: 'historic', email: 'marie@example.ca', emailAuthSubject: null, googleAuthSubject: null }] });
+    sessions.push({ customerId: 'historic', revokedAt: null });
+    const jar = new Jar();
+    await verify(app, jar, false, '/#book');
+    const approved = await post(app, jar, 'consent', { decision: 'approve' });
+    const finished = await get(app, jar, new URL(approved.body.next).pathname + new URL(approved.body.next).search);
+    expect(finished.headers.location).toBe('/#book');
+    expect(customers).toHaveLength(1);
+    expect(customers[0]).toMatchObject({ id: 'historic', emailAuthSubject: 'takatak-user-1' });
+    expect(sessions[0]!.revokedAt).toBeInstanceOf(Date);
+    expect(sessions.at(-1)).toMatchObject({ customerId: 'historic' });
+    expect(jar.has('r2n_session') || (finished.headers['set-cookie'] as unknown as string[]).some((c) => c.startsWith('r2n_session='))).toBe(true);
   });
 });
 

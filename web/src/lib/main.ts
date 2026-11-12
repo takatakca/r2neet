@@ -71,7 +71,6 @@ let holdTimer: ReturnType<typeof setInterval> | null = null;
 let addrSession: string | null = null;
 let suggestTimer: ReturnType<typeof setTimeout> | null = null;
 let paymentCfg: PaymentConfig | null = null;
-let phoneRaw = '';
 let verified = false;
 let selectedDay: string | null = null;
 let quoteSeq = 0;
@@ -287,6 +286,18 @@ const FAMILIES = [
   { id: 'cat_other', key: 'fam.other', sub: 'fam.otherSub', art: 'other' },
 ];
 
+/*
+ * Claude (Anthropic) · 2026-11-12 — accordion on narrow screens.
+ * When the three cards are stacked (up to 860 px), the crew-and-time options
+ * of a service open right under their own card, one family at a time; tapping
+ * the open card closes it. Wider screens keep the cards in a row with the
+ * options below them.
+ */
+const stackedQuery = window.matchMedia('(max-width: 860px)');
+/** undefined: follow the family already chosen (draft, deep link); null: all closed. */
+let openFamilyId: string | null | undefined;
+const openId = (): string | null => (openFamilyId === undefined ? S.familyId ?? null : openFamilyId);
+
 function renderFamilies(): void {
   const box = $('families');
   if (!box) return;
@@ -296,58 +307,58 @@ function renderFamilies(): void {
     deep: '/assets/services/deep.jpg',
     other: '/assets/services/specialty.jpg',
   };
+  const stacked = stackedQuery.matches;
+  const open = stacked ? openId() : S.familyId ?? null;
 
   box.innerHTML = FAMILIES.map((family) => {
-    const image =
-      imageByFamily[family.art] ??
-      '/assets/services/specialty.jpg';
+    const image = imageByFamily[family.art] ?? '/assets/services/specialty.jpg';
+    const isOpen = open === family.id;
+    const panelId = `family-panel-${family.id}`;
 
     return `
-      <button
-        type="button"
-        class="landing-service-card"
-        data-action="pick-family"
-        data-family="${esc(family.id)}"
-        aria-pressed="${S.familyId === family.id}"
-      >
-        <span
-          class="landing-service-photo"
-          style="background-image:url('${image}')"
-          aria-hidden="true"
-        ></span>
+      <div class="family-group${isOpen ? ' open' : ''}">
+        <button
+          type="button"
+          class="landing-service-card"
+          data-action="pick-family"
+          data-family="${esc(family.id)}"
+          aria-expanded="${isOpen}"
+          aria-controls="${stacked ? esc(panelId) : 'serviceOpts'}"
+          aria-pressed="${S.familyId === family.id}"
+        >
+          <span
+            class="landing-service-photo"
+            style="background-image:url('${image}')"
+            aria-hidden="true"
+          ></span>
 
-        <span class="landing-service-content">
-          <span class="landing-service-copy">
-            <strong>${esc(t(family.key))}</strong>
-            <span>${esc(t(family.sub))}</span>
-          </span>
+          <span class="landing-service-content">
+            <span class="landing-service-copy">
+              <strong>${esc(t(family.key))}</strong>
+              <span>${esc(t(family.sub))}</span>
+            </span>
 
-          <span class="landing-service-arrow" aria-hidden="true">
-            →
+            <span class="landing-service-arrow" aria-hidden="true">
+              →
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+        ${stacked ? `<div class="family-panel" id="${esc(panelId)}" role="region" aria-label="${esc(t(family.key))}"${isOpen ? '' : ' hidden'}></div>` : ''}
+      </div>
     `;
   }).join('');
 
   renderServiceOptions();
 }
 
-function renderServiceOptions(): void {
-  const box = $('serviceOpts');
-  if (!box) return;
-  if (!S.familyId) {
-    box.innerHTML = '';
-    return;
-  }
-  const list = services.filter((s) => s.categoryId === S.familyId);
-  box.innerHTML =
+function serviceOptionsHtml(familyId: string): string {
+  const list = services.filter((s) => s.categoryId === familyId);
+  return (
     `<div class="eyebrow">${esc(t('service.crew'))}</div><div class="opts">` +
     list
       .map((s) => {
         const hrs = s.appointmentDurationMinutes ? s.appointmentDurationMinutes / 60 : null;
         const crew = `${s.requiredStaffCount} ${s.requiredStaffCount === 1 ? t('service.cleaner') : t('service.cleaners')}`;
-        const dur = hrs ? ` · ${hrs} ${t('service.hours')}` : '';
         const price =
           s.pricingMode === 'QUOTE_REQUIRED'
             ? `<span class="amt sm">${esc(t('service.quote'))}</span>`
@@ -360,8 +371,47 @@ function renderServiceOptions(): void {
           <span class="opt-p">${price}</span></button>`;
       })
       .join('') +
-    '</div>';
+    '</div>'
+  );
 }
+
+/**
+ * Scroll so `target` sits just under the bars that stick to the top of the
+ * booking (the dialog header and the phase bar), whose height changes with
+ * the language and the screen. Measured, not assumed.
+ */
+function scrollBelowStickyBars(target: Element): void {
+  const dialog = $('bookingDialog') as HTMLDialogElement | null;
+  const inDialog = Boolean(dialog?.open && dialog.contains(target));
+  let stuck = 0;
+  for (const bar of document.querySelectorAll<HTMLElement>('.booking-dialog-header, .phases')) {
+    const style = getComputedStyle(bar);
+    if (style.position !== 'sticky' || bar.offsetParent === null) continue;
+    stuck = Math.max(stuck, (parseFloat(style.top) || 0) + bar.offsetHeight);
+  }
+  const viewportTop = inDialog ? dialog!.getBoundingClientRect().top : 0;
+  const top = target.getBoundingClientRect().top - (viewportTop + stuck + 16);
+  const behavior: ScrollBehavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  if (inDialog) dialog!.scrollBy({ top, behavior });
+  else window.scrollBy({ top, behavior });
+}
+
+function renderServiceOptions(): void {
+  const box = $('serviceOpts');
+  if (!box) return;
+  if (stackedQuery.matches) {
+    // Narrow: the options live inside the open card's own panel.
+    box.hidden = true;
+    box.innerHTML = '';
+    const open = openId();
+    const panel = open ? document.getElementById(`family-panel-${open}`) : null;
+    if (panel && open) panel.innerHTML = serviceOptionsHtml(open);
+    return;
+  }
+  box.hidden = !S.familyId;
+  box.innerHTML = S.familyId ? serviceOptionsHtml(S.familyId) : '';
+}
+stackedQuery.addEventListener('change', () => renderFamilies());
 
 /* ------------------------------------------------------------------ */
 /* OTP                                                                 */
@@ -378,118 +428,7 @@ function openSheet(html: string): void {
 }
 const closeSheet = () => $('sheet')?.classList.remove('on');
 
-function openIdentitySheet(): void {
-  openSheet(`<h2>${esc(t('otp.title'))}</h2><p class="s">${esc(t('otp.sub'))}</p>
-    <label class="fl" for="ph">${esc(t('otp.phone'))}</label>
-    <input class="inp" id="ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="(514) 825-2825">
-    <div class="err" id="phErr" hidden></div>
-    <button class="btn btn-primary full" id="sendBtn" data-action="send-code">${esc(t('otp.send'))}</button>`);
-  const ph = $('ph') as HTMLInputElement;
-  ph.addEventListener('input', () => {
-    ph.value = formatPhoneInput(ph.value);
-  });
-  ph.focus();
-}
-
-async function sendCode(): Promise<void> {
-  const btn = $('sendBtn') as HTMLButtonElement | null;
-  const input = $('ph') as HTMLInputElement | null;
-  if (input) phoneRaw = input.value;
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = `<span class="spin"></span> ${esc(t('otp.sending'))}`;
-  }
-  try {
-    const res = await api.sendCode(phoneRaw);
-    openOtpSheet(res.maskedPhone);
-  } catch (e) {
-    const err = $('phErr');
-    if (err) {
-      err.textContent = translateError(locale, e instanceof ApiError ? e.code : undefined);
-      err.hidden = false;
-    } else showError(e);
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = t('otp.send');
-    }
-  }
-}
-
-function openOtpSheet(masked: string): void {
-  openSheet(`<h2>${esc(t('otp.codeTitle'))}</h2><p class="s">${esc(t('otp.codeSub'))} ${esc(masked)}</p>
-    <div class="otp" id="otp">${[1, 2, 3, 4, 5, 6]
-      .map((i) => `<input inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit ${i}">`)
-      .join('')}</div>
-    <div class="err" id="otpErr" hidden></div>
-    <div class="ctr"><button class="link" id="resend" disabled></button></div>
-    <div class="ctr"><button class="link" data-action="change-number">${esc(t('otp.changeNumber'))}</button></div>`);
-
-  const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('#otp input'));
-  inputs[0]?.focus();
-  inputs.forEach((inp, i) => {
-    inp.addEventListener('input', () => {
-      inp.value = inp.value.replace(/\D/g, '').slice(0, 1);
-      if (inp.value && i < 5) inputs[i + 1]?.focus();
-      if (inputs.every((x) => x.value)) void verifyCode(inputs.map((x) => x.value).join(''));
-    });
-    inp.addEventListener('keydown', (e) => {
-      if (e.key === 'Backspace' && !inp.value && i > 0) inputs[i - 1]?.focus();
-    });
-    inp.addEventListener('paste', (e) => {
-      e.preventDefault();
-      const d = (e.clipboardData?.getData('text') ?? '').replace(/\D/g, '').slice(0, 6);
-      d.split('').forEach((c, k) => {
-        if (inputs[k]) inputs[k]!.value = c;
-      });
-      if (d.length === 6) void verifyCode(d);
-      else inputs[Math.min(d.length, 5)]?.focus();
-    });
-  });
-
-  let left = 30;
-  const rb = $('resend') as HTMLButtonElement;
-  rb.textContent = t('otp.resendIn', { s: left });
-  const iv = setInterval(() => {
-    left--;
-    rb.textContent = left > 0 ? t('otp.resendIn', { s: left }) : t('otp.resend');
-    rb.disabled = left > 0;
-    if (left <= 0) {
-      clearInterval(iv);
-      rb.dataset.action = 'send-code';
-    }
-  }, 1000);
-}
-
-async function verifyCode(code: string): Promise<void> {
-  const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('#otp input'));
-  const err = $('otpErr');
-  inputs.forEach((i) => (i.disabled = true));
-  if (err) err.hidden = true;
-  try {
-    await api.verifyCode(phoneRaw, code);
-    verified = true;
-    closeSheet();
-    try {
-      ctx = await api.context();
-    } catch {
-      /* profile is optional to continue */
-    }
-    renderWelcome();
-    goTo('welcome');
-  } catch (e) {
-    inputs.forEach((i) => {
-      i.disabled = false;
-      i.value = '';
-      i.classList.add('bad');
-    });
-    inputs[0]?.focus();
-    if (err) {
-      err.textContent = translateError(locale, e instanceof ApiError ? e.code : undefined);
-      err.hidden = false;
-    }
-    setTimeout(() => inputs.forEach((i) => i.classList.remove('bad')), 1200);
-  }
-}
+// Phone-code sign-in sheets were removed on 2026-11-12 (owner order: email code and Google only).
 
 function renderWelcome(): void {
   const box = $('welcomeBody');
@@ -1703,13 +1642,33 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
   'close-booking': () => { ($('bookingDialog') as HTMLDialogElement)?.close(); },
 
   'pick-family': (el) => {
-    S.familyId = el.dataset.family;
+    const id = el.dataset.family;
+    if (!id) return;
+    const stacked = stackedQuery.matches;
+
+    // Narrow screens: tapping the open card closes it (the choice is kept).
+    if (stacked && openId() === id) {
+      openFamilyId = null;
+      renderFamilies();
+      return;
+    }
+
+    openFamilyId = id;
+    S.familyId = id;
 
     if (svc() && svc()!.categoryId !== S.familyId) {
       S.serviceOptionId = null;
     }
 
     renderFamilies();
+
+    if (stacked) {
+      // Bring the card and its options into view, whatever card was tapped.
+      requestAnimationFrame(() => {
+        const card = document.querySelector(`[data-action="pick-family"][data-family="${CSS.escape(id)}"]`);
+        if (card) scrollBelowStickyBars(card);
+      });
+    }
   },
 
   'pick-service': async (el) => {
@@ -1762,16 +1721,6 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
 
   openBooking();
   goTo('property');
-},
-
-  'send-code': () => {
-    void sendCode();
-  },
-
-  'change-number': () => {
-  window.location.assign(
-    `/login?returnTo=${encodeURIComponent('/#book')}`,
-  );
 },
 
   'close-sheet': () => {
