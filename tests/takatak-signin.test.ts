@@ -67,7 +67,7 @@ function setup(opts: { customers?: Row[]; phones?: Row[]; googleConfigured?: boo
     exchangeCode: vi.fn(async () => identity),
     sendEmailCode: vi.fn(async () => undefined),
     verifyEmailCode: vi.fn(async () => session),
-    googleAuthorizationUrl: vi.fn(({ state, redirectUri }: { state: string; redirectUri: string }) => `https://auth.takatak.test/auth/v1/authorize?provider=google&state=${state}&redirect_to=${encodeURIComponent(redirectUri)}`),
+    googleAuthorizationUrl: vi.fn(({ redirectUri }: { redirectUri: string; challenge: string }) => `https://auth.takatak.test/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUri)}`),
     exchangeGoogleCode: vi.fn(async () => session),
     beginAuthorization: vi.fn(async (input: { state: string; challenge: string }) => { begun.state = input.state; begun.challenge = input.challenge; return AUTH_ID; }),
     authorizationDetails: vi.fn(async (): Promise<AuthorizationView> => details),
@@ -293,6 +293,47 @@ describe('Sign in on r2nette.ca — email code', () => {
     expect(provider.verifyEmailCode).toHaveBeenCalledTimes(5);
   });
 
+  it('keeps the consent cookie under the browser limit, and refuses a token too large to hold', async () => {
+    const big = setup();
+    big.provider.verifyEmailCode.mockResolvedValueOnce({ ...big.session, accessToken: 'x'.repeat(2_400) });
+    const res = await post(big.app, new Jar(), 'email/verify', { email: 'marie@example.ca', code: '123456', locale: 'fr', terms: true });
+    expect(res.status).toBe(200);
+    const line = (res.headers['set-cookie'] as unknown as string[]).find((c) => c.startsWith('r2n_takatak_consent='))!;
+    expect(line.split(';')[0]!.length).toBeLessThan(4_000);
+
+    const huge = setup();
+    huge.provider.verifyEmailCode.mockResolvedValueOnce({ ...huge.session, accessToken: 'x'.repeat(4_000) });
+    const jar = new Jar();
+    const refused = await post(huge.app, jar, 'email/verify', { email: 'marie@example.ca', code: '123456', locale: 'fr', terms: true });
+    expect([refused.status, refused.body.error.code]).toEqual([503, 'TAKATAK_AUTH_UNAVAILABLE']);
+    expect(jar.has('r2n_takatak_consent')).toBe(false);
+    expect(huge.provider.revokeSession).toHaveBeenCalledWith('x'.repeat(4_000));
+  });
+
+  it('limits code checks and consent reads per ip, whatever the email', async () => {
+    const { app, provider } = setup();
+    provider.verifyEmailCode.mockRejectedValue(new IdentityError('bad', 'EMAIL_CODE_INVALID'));
+    for (let i = 0; i < 30; i += 1) {
+      const r = await post(app, new Jar(), 'email/verify', { email: `p${i}@example.ca`, code: '123456', locale: 'fr', terms: true });
+      expect(r.status).toBe(401);
+    }
+    const blocked = await post(app, new Jar(), 'email/verify', { email: 'p99@example.ca', code: '123456', locale: 'fr', terms: true });
+    expect([blocked.status, blocked.body.error.code]).toEqual([429, 'SIGNIN_IP_LIMIT']);
+    expect(provider.verifyEmailCode).toHaveBeenCalledTimes(30);
+
+    for (let i = 0; i < 60; i += 1) expect((await get(app, new Jar(), 'consent')).status).toBe(410);
+    expect((await get(app, new Jar(), 'consent')).status).toBe(429);
+  });
+
+  it('answers 410 when the hub no longer knows the authorization', async () => {
+    const { app, provider } = setup();
+    const jar = new Jar();
+    await post(app, jar, 'email/verify', { email: 'marie@example.ca', code: '123456', locale: 'fr', terms: true });
+    provider.authorizationDetails.mockRejectedValueOnce(new IdentityError('gone', 'CONSENT_EXPIRED'));
+    const res = await get(app, jar, 'consent');
+    expect([res.status, res.body.error.code]).toEqual([410, 'CONSENT_EXPIRED']);
+  });
+
   it('rejects cross-site and non-JSON requests', async () => {
     const { app, provider } = setup();
     const jar = new Jar();
@@ -314,11 +355,13 @@ describe('Sign in on r2nette.ca — Google', () => {
     const google = decode(jar.get('r2n_takatak_google')!);
     expect(google).toMatchObject({ v: 1, returnTo: '/account', locale: 'en', terms: true });
     const target = new URL(started.headers.location!);
-    expect(target.searchParams.get('state')).toBe(google.state);
+    // The hub keeps its own state and never sends ours back: do not send one.
+    expect(target.searchParams.has('state')).toBe(false);
     expect(target.searchParams.get('redirect_to')).toBe(`${ORIGIN}/api/v1/auth/takatak/google/callback`);
-    expect(provider.googleAuthorizationUrl).toHaveBeenCalledWith({ redirectUri: `${ORIGIN}/api/v1/auth/takatak/google/callback`, challenge: sha(google.verifier), state: google.state });
+    expect(provider.googleAuthorizationUrl).toHaveBeenCalledWith({ redirectUri: `${ORIGIN}/api/v1/auth/takatak/google/callback`, challenge: sha(google.verifier) });
 
-    const back = await get(app, jar, `google/callback?code=g&state=${encodeURIComponent(google.state)}`);
+    // What the real hub sends back: the code, nothing else.
+    const back = await get(app, jar, 'google/callback?code=g');
     expect(back.status).toBe(303);
     expect(back.headers.location).toBe('/login?consent=1&returnTo=%2Faccount');
     expect(provider.exchangeGoogleCode).toHaveBeenCalledWith({ code: 'g', verifier: google.verifier });
@@ -334,27 +377,49 @@ describe('Sign in on r2nette.ca — Google', () => {
   });
 
   it('goes straight to the sign-in page when there is nothing to return to, and reports failures as reasons', async () => {
-    const { app, provider } = setup();
+    const { app, provider, tick } = setup();
+    // No Google cookie in this browser: a code from someone else's flow is refused unexchanged.
+    const stranger = await get(app, new Jar(), 'google/callback?code=g');
+    expect(stranger.headers.location).toBe('/login?takatak=expired');
+    expect(provider.exchangeGoogleCode).not.toHaveBeenCalled();
+
     const jar = new Jar();
     await get(app, jar, 'google/start');
-    const google = decode(jar.get('r2n_takatak_google')!);
-    const wrongState = await get(app, jar, 'google/callback?code=g&state=not-the-one');
-    expect(wrongState.headers.location).toBe('/login?takatak=expired');
+    tick(11 * 60_000);
+    expect((await get(app, jar, 'google/callback?code=g')).headers.location).toBe('/login?takatak=expired');
     expect(jar.has('r2n_takatak_google')).toBe(false);
+    expect(provider.exchangeGoogleCode).not.toHaveBeenCalled();
 
     await get(app, jar, 'google/start');
-    const fresh = decode(jar.get('r2n_takatak_google')!);
     provider.exchangeGoogleCode.mockRejectedValueOnce(new IdentityError('no', 'GOOGLE_AUTH_DENIED'));
-    expect((await get(app, jar, `google/callback?code=g&state=${encodeURIComponent(fresh.state)}`)).headers.location).toBe('/login?takatak=error');
+    expect((await get(app, jar, 'google/callback?code=g')).headers.location).toBe('/login?takatak=error');
+
+    // Cancel at Google: the hub sends error fields and no code.
+    await get(app, jar, 'google/start');
+    expect((await get(app, jar, 'google/callback?error=access_denied&error_code=403&error_description=denied')).headers.location).toBe('/login?takatak=cancelled');
+    expect(provider.exchangeGoogleCode).toHaveBeenCalledTimes(1);
 
     await get(app, jar, 'google/start');
-    const again = decode(jar.get('r2n_takatak_google')!);
-    expect((await get(app, jar, `google/callback?error=access_denied&state=${encodeURIComponent(again.state)}`)).headers.location).toBe('/login?takatak=cancelled');
+    expect((await get(app, jar, 'google/callback')).headers.location).toBe('/login?takatak=expired');
 
     await get(app, jar, 'google/start');
     const ok = decode(jar.get('r2n_takatak_google')!);
-    expect((await get(app, jar, `google/callback?code=g&state=${encodeURIComponent(ok.state)}`)).headers.location).toBe('/login?consent=1');
-    expect(google.state).not.toBe(ok.state);
+    expect((await get(app, jar, 'google/callback?code=g')).headers.location).toBe('/login?consent=1');
+    expect(provider.exchangeGoogleCode).toHaveBeenLastCalledWith({ code: 'g', verifier: ok.verifier });
+  });
+
+  it('signs in a customer who linked Google earlier on /phone-login, without a second account', async () => {
+    const { app, customers, sessions } = setup({ customers: [{ id: 'c-google', googleAuthSubject: 'takatak-user-1', emailAuthSubject: null, email: null }] });
+    const jar = new Jar();
+    await get(app, jar, 'google/start?terms=1');
+    await get(app, jar, 'google/callback?code=g');
+    const approved = await post(app, jar, 'consent', { decision: 'approve' });
+    const finished = await get(app, jar, new URL(approved.body.next).pathname + new URL(approved.body.next).search);
+    expect(finished.status).toBe(303);
+    expect(finished.headers.location).toBe('/#book');
+    expect(customers).toHaveLength(1);
+    expect(customers[0]).toMatchObject({ id: 'c-google', emailAuthSubject: 'takatak-user-1', googleAuthSubject: 'takatak-user-1' });
+    expect(sessions).toHaveLength(1);
   });
 
   it('refuses to start when Google is off at the hub', async () => {

@@ -58,6 +58,29 @@ const verifySchema = z
 const decisionSchema = z.object({ decision: z.enum(['approve', 'deny']) }).strict();
 
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
+
+/**
+ * Every hub call leaves from this one server, so the hub's own per-IP limits
+ * apply to all customers together. Per-visitor ceilings here keep one client
+ * (cycling through email addresses) from spending that shared budget.
+ */
+const CHECKS_PER_IP_PER_HOUR = 30;
+const CONSENT_CALLS_PER_IP_PER_HOUR = 60;
+
+class SlidingWindow {
+  private readonly hits = new Map<string, number[]>();
+  constructor(private readonly limit: number, private readonly clock: () => number) {}
+  take(key: string): void {
+    const at = this.clock();
+    const recent = (this.hits.get(key) ?? []).filter((t) => t > at - 3_600_000);
+    if (recent.length >= this.limit) {
+      this.hits.set(key, recent);
+      throw new IdentityError('Too many attempts. Try again later.', 'SIGNIN_IP_LIMIT');
+    }
+    recent.push(at);
+    this.hits.set(key, recent);
+  }
+}
 const encodePending = (p: Pending) => Buffer.from(JSON.stringify(p)).toString('base64url');
 
 /** Hub failures keep their code; the HTTP status follows the spec. */
@@ -66,6 +89,7 @@ function toApiError(error: unknown): unknown {
   const { code } = error;
   const status =
     code === 'EMAIL_CODE_INVALID' || code === 'GOOGLE_AUTH_DENIED' ? 401
+      : code === 'CONSENT_EXPIRED' ? 410
       : code === 'CONSENT_INVALID' ? 502
         : code.includes('LIMIT') || code === 'OTP_COOLDOWN' ? 429
           : code.includes('UNAVAILABLE') || code.includes('NOT_CONFIGURED') ? 503
@@ -83,6 +107,9 @@ export function takatakSignInRoutes(
   const { now } = options;
   const secure = process.env.NODE_ENV === 'production';
   const limiter = new RateLimiter(undefined, () => now().getTime());
+  const checksPerIp = new SlidingWindow(CHECKS_PER_IP_PER_HOUR, () => now().getTime());
+  const consentPerIp = new SlidingWindow(CONSENT_CALLS_PER_IP_PER_HOUR, () => now().getTime());
+  const ipOf = (req: Request) => req.ip ?? 'unknown';
 
   router.use('/auth/takatak', (_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -155,7 +182,11 @@ export function takatakSignInRoutes(
       if (!next) throw new ApiError(502, 'CONSENT_INVALID', 'TAKATAK answered with an unexpected address.');
       return { next };
     }
-    writeConsentCookie(res, { authorizationId, accessToken: session.accessToken, subject: session.subject, createdAt: at }, secure);
+    if (!writeConsentCookie(res, { authorizationId, accessToken: session.accessToken, subject: session.subject, createdAt: at }, secure)) {
+      console.error('[takatak-signin] hub session too large for the consent cookie; sign-in refused');
+      await provider.revokeSession(session.accessToken);
+      throw new ApiError(503, 'TAKATAK_AUTH_UNAVAILABLE', 'TAKATAK sign-in is not available right now.');
+    }
     return { consent: true };
   }
 
@@ -186,6 +217,7 @@ export function takatakSignInRoutes(
     const input = verifySchema.parse(req.body);
     const base = requireBase();
     const key = hash(input.email);
+    checksPerIp.take(ipOf(req));
     limiter.assertCanCheck(key);
     // Count every attempt, including malformed hub replies and failures.
     limiter.recordFailedCheck(key);
@@ -202,6 +234,7 @@ export function takatakSignInRoutes(
 
   router.get('/auth/takatak/consent', run(async (req, res) => {
     const base = requireBase();
+    consentPerIp.take(ipOf(req));
     const { handoff, pending } = readHandoff(req);
     // The page may switch language on the consent screen; the wording follows.
     const locale = req.query.locale === 'en' ? 'en' : req.query.locale === 'fr' ? 'fr' : pending.locale;
@@ -226,6 +259,7 @@ export function takatakSignInRoutes(
   router.post('/auth/takatak/consent', run(async (req, res) => {
     const { decision } = decisionSchema.parse(req.body);
     const base = requireBase();
+    consentPerIp.take(ipOf(req));
     const { handoff, pending } = readHandoff(req);
     // One decision per handoff: the cookie goes whatever the hub answers.
     clearConsentCookie(res);
@@ -259,7 +293,6 @@ export function takatakSignInRoutes(
       const url = provider.googleAuthorizationUrl({
         redirectUri: `${base}${GOOGLE_CALLBACK_PATH}`,
         challenge: challengeOf(pending.verifier),
-        state: pending.state,
       });
       res.cookie(TAKATAK_GOOGLE_COOKIE, encodePending(pending), { httpOnly: true, secure, sameSite: 'lax', path: GOOGLE_PATH, maxAge: TTL_MS });
       res.redirect(303, url);
@@ -278,8 +311,10 @@ export function takatakSignInRoutes(
       backToLogin(res, 'unavailable', returnTo);
       return;
     }
-    const state = typeof req.query.state === 'string' ? req.query.state : null;
-    if (!pending || !state || !sameSecret(state, pending.state)) {
+    // The hub returns only `code` (or `error`): it keeps its own state for
+    // Google. This browser's fresh cookie plus PKCE bind the code to it: a
+    // code from anyone else's flow cannot be exchanged with this verifier.
+    if (!pending) {
       backToLogin(res, 'expired', returnTo);
       return;
     }

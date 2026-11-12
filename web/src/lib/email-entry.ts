@@ -112,7 +112,8 @@ async function call(path: string, method: 'GET' | 'POST', body?: unknown): Promi
 function explain(e: unknown): void {
   const code = e instanceof CallError ? e.code : '';
   const expired = e instanceof CallError && e.httpStatus === 410;
-  if (expired) { consent = null; show('choose'); }
+  // The handoff is single-use: after a refused decision only a new start works.
+  if (expired || code === 'CONSENT_INVALID') { consent = null; show('choose'); }
   status(
     expired ? reasons.expired![locale === 'fr' ? 0 : 1]
       : code === 'EMAIL_CODE_INVALID' ? say('Code invalide ou expiré. Vérifiez votre courriel ou demandez un nouveau code.', 'Invalid or expired code. Check your email or request a new code.')

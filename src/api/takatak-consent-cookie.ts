@@ -20,24 +20,39 @@ export interface ConsentHandoff {
 
 type Env = Record<string, string | undefined>;
 
-/** base64url JSON `{ v, id, subject, token, createdAt }`; `token` is ciphertext. */
+/**
+ * Browsers silently drop a cookie whose name and value exceed 4096 bytes, so
+ * the handoff is refused well before that instead of looping on "expired".
+ */
+export const MAX_CONSENT_COOKIE_BYTES = 3_900;
+
+/**
+ * The whole handoff `{ v, id, subject, token, createdAt }` is encrypted once
+ * (AES-GCM, `encryptSecret` format), so every field is authenticated and the
+ * value is encoded a single time.
+ */
 export function encodeConsent(handoff: ConsentHandoff, env: Env = process.env): string {
   const payload = {
-    v: 1,
+    v: 2,
     id: handoff.authorizationId,
     subject: handoff.subject,
-    token: encryptSecret(handoff.accessToken, env),
+    token: handoff.accessToken,
     createdAt: handoff.createdAt,
   };
-  return Buffer.from(JSON.stringify(payload)).toString('base64url');
+  return encryptSecret(JSON.stringify(payload), env);
+}
+
+/** Cookie bytes as the browser counts them (name, `=`, encoded value). */
+export function consentCookieBytes(value: string): number {
+  return TAKATAK_CONSENT_COOKIE.length + 1 + encodeURIComponent(value).length;
 }
 
 export function decodeConsent(raw: unknown, now: number, env: Env = process.env): ConsentHandoff | null {
   if (typeof raw !== 'string' || !raw || raw.length > 8192) return null;
   try {
-    const p = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Record<string, unknown>;
+    const p = JSON.parse(decryptSecret(raw, env)) as Record<string, unknown>;
     if (
-      p.v !== 1 ||
+      p.v !== 2 ||
       typeof p.id !== 'string' || !p.id ||
       typeof p.subject !== 'string' || !p.subject ||
       typeof p.token !== 'string' || !p.token ||
@@ -47,22 +62,24 @@ export function decodeConsent(raw: unknown, now: number, env: Env = process.env)
     ) {
       return null;
     }
-    const accessToken = decryptSecret(p.token, env);
-    if (!accessToken) return null;
-    return { authorizationId: p.id, accessToken, subject: p.subject, createdAt: p.createdAt };
+    return { authorizationId: p.id, accessToken: p.token, subject: p.subject, createdAt: p.createdAt };
   } catch {
     return null;
   }
 }
 
-export function writeConsentCookie(res: Response, handoff: ConsentHandoff, secure: boolean, env: Env = process.env): void {
-  res.cookie(TAKATAK_CONSENT_COOKIE, encodeConsent(handoff, env), {
+/** Returns false, setting nothing, when the handoff is too large for a cookie. */
+export function writeConsentCookie(res: Response, handoff: ConsentHandoff, secure: boolean, env: Env = process.env): boolean {
+  const value = encodeConsent(handoff, env);
+  if (consentCookieBytes(value) > MAX_CONSENT_COOKIE_BYTES) return false;
+  res.cookie(TAKATAK_CONSENT_COOKIE, value, {
     httpOnly: true,
     secure,
     sameSite: 'lax',
     path: COOKIE_PATH,
     maxAge: TTL_MS,
   });
+  return true;
 }
 
 export function clearConsentCookie(res: Response): void {

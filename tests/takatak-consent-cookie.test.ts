@@ -28,7 +28,24 @@ describe('TAKATAK consent cookie', () => {
     const raw = encodeConsent(handoff, env);
     expect(raw).not.toContain('at-secret-token');
     expect(Buffer.from(raw, 'base64url').toString('utf8')).not.toContain('at-secret-token');
+    // Every field is inside the authenticated ciphertext, so none can be edited.
+    expect(raw).not.toContain(handoff.subject);
+    expect(raw).not.toContain(handoff.authorizationId);
     expect(decodeConsent(raw, now + 60_000, env)).toEqual(handoff);
+  });
+
+  it('encodes once, so a 2.4 KB token still fits a browser cookie', () => {
+    const raw = encodeConsent({ ...handoff, accessToken: 'x'.repeat(2_400) }, env);
+    expect(TAKATAK_CONSENT_COOKIE.length + 1 + encodeURIComponent(raw).length).toBeLessThan(4_000);
+  });
+
+  it('rejects a cookie whose ciphertext was tampered with', () => {
+    const raw = encodeConsent(handoff, env);
+    const parts = raw.split(':');
+    const body = Buffer.from(parts[4]!, 'base64url');
+    body[0] = body[0]! ^ 1;
+    parts[4] = body.toString('base64url');
+    expect(decodeConsent(parts.join(':'), now, env)).toBeNull();
   });
 
   it('rejects a stale, malformed, or foreign-key cookie', () => {
