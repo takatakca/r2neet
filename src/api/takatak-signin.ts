@@ -216,13 +216,14 @@ export function takatakSignInRoutes(
 
   router.post('/auth/takatak/email/send', run(async (req, res) => {
     const input = sendSchema.parse(req.body);
-    requireBase();
+    const base = requireBase();
     const key = hash(input.email);
     const ip = req.ip ?? 'unknown';
     limiter.assertCanSend(key, ip);
     // Reserve the quota before awaiting the network to bound concurrent sends.
     limiter.recordSend(key, ip);
-    await provider.sendEmailCode(input.email);
+    // The brand marker for the hub's email template: this site's own (allow-listed) address.
+    await provider.sendEmailCode(input.email, { redirectTo: `${base}${GOOGLE_CALLBACK_PATH}` });
     // The same answer whether or not the hub knows this address.
     res.json({ sent: true });
   }));

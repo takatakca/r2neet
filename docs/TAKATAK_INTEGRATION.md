@@ -134,23 +134,34 @@ Flow (page `/login`, `web/email.html` + `web/src/lib/email-entry.ts`; API `src/a
 
 Owner steps in the TAKATAK Supabase dashboard (not done by the agent; the hub echoes any redirect so the agent cannot verify them):
 
-1. **Authentication › Email Templates › Magic Link** (existing accounts get this one). Today it reads "You've been invited — Join a TAKATAK workspace", which is wrong for a sign-in code. Replace with:
-   - Subject: `Votre code de connexion TAKATAK / Your TAKATAK sign-in code`
-   - Body (HTML allowed):
+1. **Authentication › Email Templates › Magic Link** — one email per site (owner order 2026-11-12: a code email must speak only about the site that asked, never about another brand). r2nette.ca now sends `redirect_to=https://r2nette.ca/api/v1/auth/takatak/google/callback` with every code request; the template reads it as `{{ .RedirectTo }}` and answers in R2NETTE's voice for that address, and in TAKATAK's voice for everything else (takatak.ca, invitations). The hub ignores a `redirect_to` that is not in the allow-list (step 4), and then falls back to the TAKATAK wording, so nothing breaks while it is not set. Paste:
 
-     ```html
-     <h2>Code de connexion / Sign-in code</h2>
-     <p>Saisissez ce code sur la page où vous l’avez demandé : <strong>{{ .Token }}</strong></p>
-     <p>Enter this code only on the page where you requested it.</p>
-     <p>Si vous n’avez pas demandé ce code, ignorez ce courriel. / If you did not request this code, ignore this email.</p>
-     <p style="font-size:12px;color:#666">Ou ouvrez ce lien / Or open this link: {{ .ConfirmationURL }}</p>
-     ```
+   ```html
+   {{ if eq .RedirectTo "https://r2nette.ca/api/v1/auth/takatak/google/callback" }}
+   <div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;color:#0a2547">
+   <p style="font-size:20px;font-weight:bold;color:#0b4da2;margin:0 0 4px">R2NETTE</p>
+   <p style="margin:0 0 20px;color:#6a8298;font-size:13px">Cleaning Services · r2nette.ca</p>
+   <h2 style="margin:0 0 10px">Code de connexion / Sign-in code</h2>
+   <p>Saisissez ce code sur r2nette.ca pour vous connecter :</p>
+   <p style="font-size:30px;font-weight:bold;letter-spacing:6px;margin:8px 0 16px">{{ .Token }}</p>
+   <p>Enter this code on r2nette.ca to sign in. Never share it.</p>
+   <p>Si vous n’avez pas demandé ce code, ignorez ce courriel. / If you did not request this code, ignore this email.</p>
+   <p style="color:#6a8298;font-size:12px">R2NETTE · (514) 825-2825</p>
+   </div>
+   {{ else }}
+   ...the current TAKATAK template, unchanged (its invitation text, link and code)...
+   {{ end }}
+   ```
 
-   The live email of 2026-11-12 had a broken link (`https://takatak.ca&token_hash=…&type=magiclink`). If the template builds its own link instead of `{{ .ConfirmationURL }}`, it must be `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=magiclink`, the address takatak.ca's callback reads.
+   Subject: try `{{ if eq .RedirectTo "https://r2nette.ca/api/v1/auth/takatak/google/callback" }}Votre code de connexion R2NETTE / Your R2NETTE sign-in code{{ else }}You've been invited{{ end }}`. If the dashboard does not accept a template in the subject, use the neutral `Votre code de connexion / Your sign-in code`.
 
-2. **Authentication › Email Templates › Confirm signup** (a brand-new address gets this one when "Confirm email" is on, and the hub data of 2026-11-12 shows unconfirmed email accounts, so it may be on). Add the same code line, `{{ .Token }}`, so a new customer receives a code on r2nette.ca; keep the existing link for takatak.ca. Then test once with an address that has never signed in.
-3. **The link in both emails stays**: takatak.ca team invitations and account access open it (`emailRedirectTo` in takatak-v1). Known risk, owner's choice: some company mail filters (for example Microsoft Defender Safe Links) open links on delivery, which uses up the same one-time code, so the code then reads "invalid or expired". If customers report that, the fix is on takatak.ca: point the link to a page that needs a click before it verifies.
-4. **Authentication › URL Configuration › Redirect URLs**: add `https://r2nette.ca/api/v1/auth/takatak/google/callback` (Google button). Without it the hub sends the Google return to its Site URL (takatak.ca), not back to r2nette.ca.
+   Adding a site later is one more `{{ else if eq .RedirectTo "https://<site>/api/v1/auth/takatak/google/callback" }}` branch with that site's wording, and that site sending the same `redirect_to` (and the address in the allow-list).
+
+   **Limit, said plainly:** the sender line (`TAKATAK <noreply@mimt.ca>`) is one project-wide setting (Authentication › SMTP Settings), so the *content* can change per site but the *From name* cannot. To remove TAKATAK from the sender line of R2NETTE's codes too, the hub needs a Send Email Hook (an edge function that picks the sender and the wording per site) — a separate piece of work.
+
+2. **Authentication › Email Templates › Confirm signup** (a brand-new address gets this one when "Confirm email" is on, and the hub data of 2026-11-12 shows unconfirmed email accounts, so it may be on): put the same `{{ if eq .RedirectTo … }} … {{ else }} current template {{ end }}` wrapper around it, with `{{ .Token }}` in the R2NETTE branch, so a new R2NETTE customer receives the R2NETTE-worded code. Then test once with an address that has never signed in.
+3. **The link in the TAKATAK branch stays** (takatak.ca team invitations and account access open it; `emailRedirectTo` in takatak-v1). The R2NETTE branch has no link at all, so a mail scanner that opens links on delivery cannot use up the code. The live TAKATAK email of 2026-11-12 had a broken link (`https://takatak.ca&token_hash=…&type=magiclink`); a template that builds its own link must use `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=magiclink`, the address takatak.ca's callback reads.
+4. **Authentication › URL Configuration › Redirect URLs**: add `https://r2nette.ca/api/v1/auth/takatak/google/callback` (Google button, and the marker that makes the code email speak for R2NETTE, step 1). Without it the hub sends the Google return to its Site URL (takatak.ca), not back to r2nette.ca, and the code email keeps the TAKATAK wording.
 5. **Authentication › Rate Limits**: review the email-sent and token-verification limits with r2nette.ca as one server-side client (point 7 above). With custom SMTP the email limit is project-wide, so it is shared by every TAKATAK site.
 
 Local check: `tests/takatak-signin.test.ts` (routes, forged redirect, expiry, limits), `tests/takatak-signin-provider.test.ts` (hub calls), `tests/takatak-consent-cookie.test.ts`; the Chromium run of 2026-11-11 used a local hub stub (phone + desktop, FR + EN, approve, refuse, Google, wrong code).

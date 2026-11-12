@@ -121,7 +121,8 @@ describe('Sign in on r2nette.ca — email code', () => {
     const sent = await post(app, jar, 'email/send', { email: '  Marie@Example.CA ' });
     expect(sent.status).toBe(200);
     expect(sent.body).toEqual({ sent: true });
-    expect(provider.sendEmailCode).toHaveBeenCalledWith('marie@example.ca');
+    // The hub's email template reads this address to word the code email for this site.
+    expect(provider.sendEmailCode).toHaveBeenCalledWith('marie@example.ca', { redirectTo: `${ORIGIN}/api/v1/auth/takatak/google/callback` });
 
     const verified = await post(app, jar, 'email/verify', { email: 'marie@example.ca', code: '123456', locale: 'fr', terms: true });
     expect(verified.status).toBe(200);
