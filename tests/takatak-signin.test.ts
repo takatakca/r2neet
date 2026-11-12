@@ -168,6 +168,16 @@ describe('Sign in on r2nette.ca — email code', () => {
     expect(provider.authorizationDetails).toHaveBeenLastCalledWith(expect.objectContaining({ locale: 'fr' }));
   });
 
+  it('replaces a forged same-origin returnTo ("https://site//evil") with the default', async () => {
+    const { app } = setup();
+    for (const forged of [`${ORIGIN}//evil.example`, `${ORIGIN}/\\evil.example`]) {
+      const jar = new Jar();
+      const verified = await post(app, jar, 'email/verify', { email: 'marie@example.ca', code: '123456', locale: 'fr', terms: true, returnTo: forged });
+      expect(verified.status).toBe(200);
+      expect(decode(jar.get('r2n_takatak_oauth')!).returnTo).toBe('/#book');
+    }
+  });
+
   describe('when the hub already holds an earlier approval', () => {
     // Owner order 2026-11-12: every sign-in ends with the "Autoriser l’accès" card, then the
     // customer goes back to the page they left, even when TAKATAK approved R2NETTE before.

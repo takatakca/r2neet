@@ -537,7 +537,9 @@ export function createApi(deps: ApiDeps) {
     try {
       const url = new URL(requested, origin);
       if (url.origin === origin) {
-        return url.pathname + url.search + url.hash;
+        const path = url.pathname + url.search + url.hash;
+        // 'https://this.site//evil.example' is not ours: the path '//evil.example' leaves for another site.
+        if (!/^\/[\/\\]/.test(path)) return path;
       }
     } catch {
       // Invalid paths return to the account page.

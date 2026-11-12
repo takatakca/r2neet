@@ -1,4 +1,5 @@
 import './consent.js';
+import { sameSitePath } from './safe-path.js';
 import {
   formatCanadianPhoneInput,
   IdentityError,
@@ -91,18 +92,9 @@ function safeReturnPath(): string {
     sessionStorage.getItem('r2nette.returnTo') ??
     '/account';
 
-  // Resolve it the way the browser will, then require our own origin. A
-  // prefix check is not enough: browsers read '/\evil.example' and
-  // '/<tab>/evil.example' as '//evil.example', another site.
-  try {
-    const url = new URL(requested, window.location.origin);
-    if (url.origin === window.location.origin) {
-      return url.pathname + url.search + url.hash;
-    }
-  } catch {
-    // Unparseable: fall through to the default.
-  }
-  return '/account';
+  // Resolve it the way the browser will, require our own origin AND a single-slash path:
+  // 'https://this.site//evil.example' has our origin but the path '//evil.example', another site.
+  return sameSitePath(requested, window.location.origin) ?? '/account';
 }
 
 async function apiRequest<T>(

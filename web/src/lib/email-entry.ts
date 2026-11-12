@@ -1,4 +1,5 @@
 import './consent.js';
+import { sameSitePath } from './safe-path.js';
 // Codex — assistant OpenAI · 2026-10-29 · Claude (Anthropic) · 2026-11-11
 //
 // Sign in or sign up on r2nette.ca with the TAKATAK account as the master:
@@ -72,11 +73,8 @@ function translate(): void {
 
 function returnTo(): string {
   const requested = new URLSearchParams(location.search).get('returnTo') || '/#book';
-  try {
-    const target = new URL(requested, location.origin);
-    if (target.origin === location.origin && !target.pathname.startsWith('/api/')) return target.pathname + target.search + target.hash;
-  } catch { /* default */ }
-  return '/#book';
+  const path = sameSitePath(requested, location.origin);
+  return path && !path.startsWith('/api/') ? path : '/#book';
 }
 
 function googleLink(): void {
