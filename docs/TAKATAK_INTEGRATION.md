@@ -146,6 +146,8 @@ Owner steps in the TAKATAK Supabase dashboard (not done by the agent; the hub ec
      <p style="font-size:12px;color:#666">Ou ouvrez ce lien / Or open this link: {{ .ConfirmationURL }}</p>
      ```
 
+   The live email of 2026-11-12 had a broken link (`https://takatak.ca&token_hash=…&type=magiclink`). If the template builds its own link instead of `{{ .ConfirmationURL }}`, it must be `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=magiclink`, the address takatak.ca's callback reads.
+
 2. **Authentication › Email Templates › Confirm signup** (a brand-new address gets this one when "Confirm email" is on, and the hub data of 2026-11-12 shows unconfirmed email accounts, so it may be on). Add the same code line, `{{ .Token }}`, so a new customer receives a code on r2nette.ca; keep the existing link for takatak.ca. Then test once with an address that has never signed in.
 3. **The link in both emails stays**: takatak.ca team invitations and account access open it (`emailRedirectTo` in takatak-v1). Known risk, owner's choice: some company mail filters (for example Microsoft Defender Safe Links) open links on delivery, which uses up the same one-time code, so the code then reads "invalid or expired". If customers report that, the fix is on takatak.ca: point the link to a page that needs a click before it verifies.
 4. **Authentication › URL Configuration › Redirect URLs**: add `https://r2nette.ca/api/v1/auth/takatak/google/callback` (Google button). Without it the hub sends the Google return to its Site URL (takatak.ca), not back to r2nette.ca.
