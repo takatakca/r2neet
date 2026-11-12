@@ -172,6 +172,9 @@ const en: Dict = {
   'address.change': 'Change',
   'address.confirming': 'Checking your price…',
   'address.lookupOff': 'Online address search is not available yet. Call (514) 825-2825 and we will book your cleaning by phone.',
+  'error.ROUTES_NO_ROUTE': 'We could not work out the trip to that address online. Call (514) 825-2825 and we will finish your booking by phone.',
+  'error.ROUTES_ERROR': 'We could not work out the trip to that address online. Call (514) 825-2825 and we will finish your booking by phone.',
+  'error.PLACES_ERROR': 'Address search had a problem. Try again, or call (514) 825-2825 and we will book your cleaning by phone.',
 
   'slots.title': 'When should we come?',
   'slots.loading': 'Finding open times…',
@@ -563,6 +566,9 @@ const fr: Dict = {
   'address.change': 'Modifier',
   'address.confirming': 'Calcul de votre prix…',
   'address.lookupOff': 'La recherche d’adresse en ligne n’est pas encore offerte. Appelez le (514) 825-2825 et nous réserverons votre ménage par téléphone.',
+  'error.ROUTES_NO_ROUTE': 'Nous n’avons pas pu calculer le trajet jusqu’à cette adresse en ligne. Appelez le (514) 825-2825 et nous finaliserons votre réservation par téléphone.',
+  'error.ROUTES_ERROR': 'Nous n’avons pas pu calculer le trajet jusqu’à cette adresse en ligne. Appelez le (514) 825-2825 et nous finaliserons votre réservation par téléphone.',
+  'error.PLACES_ERROR': 'La recherche d’adresse a eu un problème. Réessayez, ou appelez le (514) 825-2825 et nous réserverons votre ménage par téléphone.',
 
   'slots.title': 'Quand devons-nous venir?',
   'slots.loading': 'Recherche des plages libres…',

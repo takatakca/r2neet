@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   composePublishesDatabase,
+  implausibleOrigin,
   unexpectedHostPorts,
   validateProductionEnvironment,
 } from '../scripts/deploy/validate-production-env.js';
@@ -203,5 +204,29 @@ services:
     const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: { start: string } };
     expect(pkg.scripts.start).toContain('--env-file-if-exists=.env');
     expect(pkg.scripts.start).not.toContain('--env-file=.env');
+  });
+});
+
+describe('dispatch origin sanity', () => {
+  it('accepts Montréal coordinates and an unset origin', () => {
+    expect(implausibleOrigin({ BUSINESS_ORIGIN_LAT: '45.4419', BUSINESS_ORIGIN_LNG: '-73.6764' })).toBeNull();
+    expect(implausibleOrigin({})).toBeNull();
+    expect(implausibleOrigin({ BUSINESS_ORIGIN_LAT: '', BUSINESS_ORIGIN_LNG: '' })).toBeNull();
+  });
+  it('flags a missing minus sign, swapped values and text', () => {
+    for (const env of [
+      { BUSINESS_ORIGIN_LAT: '45.4419', BUSINESS_ORIGIN_LNG: '73.6764' },
+      { BUSINESS_ORIGIN_LAT: '-73.6764', BUSINESS_ORIGIN_LNG: '45.4419' },
+      { BUSINESS_ORIGIN_LAT: '45,4419', BUSINESS_ORIGIN_LNG: '-73,6764' },
+      { BUSINESS_ORIGIN_LAT: '0', BUSINESS_ORIGIN_LNG: '0' },
+    ]) {
+      expect(implausibleOrigin(env)).toMatch(/not in Greater Montréal/);
+    }
+  });
+  it('is a warning, never a fatal, in the production validation', () => {
+    const env = productionEnv({ BUSINESS_ORIGIN_LAT: '45.4419', BUSINESS_ORIGIN_LNG: '73.6764' });
+    const issues = validateProductionEnvironment(env, compose);
+    expect(issues.some((i) => i.severity === 'WARN' && /not in Greater Montréal/.test(i.message))).toBe(true);
+    expect(issues.some((i) => i.severity === 'FATAL' && /Greater Montréal/.test(i.message))).toBe(false);
   });
 });
