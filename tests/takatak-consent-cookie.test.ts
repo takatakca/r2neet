@@ -4,6 +4,8 @@ import { describe, it, expect } from 'vitest';
 import { generateEncryptionKey } from '../src/auth/encryption.js';
 import { TTL_MS } from '../src/api/takatak-shared.js';
 import {
+  MAX_CONSENT_COOKIE_BYTES,
+  consentCookieBytes,
   TAKATAK_CONSENT_COOKIE,
   decodeConsent,
   encodeConsent,
@@ -33,7 +35,23 @@ describe('TAKATAK consent cookie', () => {
     expect(raw).not.toContain(handoff.subject);
     expect(raw).not.toContain(handoff.authorizationId);
     expect(raw).not.toContain('marie@example.ca');
-    expect(decodeConsent(raw, now + 60_000, env)).toEqual(handoff);
+    expect(decodeConsent(raw, now + 60_000, env)).toEqual({ ...handoff, approvedRedirect: null });
+  });
+
+  it('keeps the address the hub issued for an earlier approval, encrypted, and returns it', () => {
+    const approvedRedirect = 'https://r2nette.ca/api/v1/auth/takatak/callback?code=hub-code-123&state=abc';
+    const raw = encodeConsent({ ...handoff, approvedRedirect }, env);
+    expect(raw).not.toContain('hub-code-123');
+    expect(decodeConsent(raw, now + 1_000, env)).toEqual({ ...handoff, approvedRedirect });
+    // An oversized or non-text value is dropped, never trusted.
+    const long = encodeConsent({ ...handoff, approvedRedirect: 'https://r2nette.ca/' + 'a'.repeat(2_100) }, env);
+    expect(decodeConsent(long, now + 1_000, env)?.approvedRedirect).toBeNull();
+  });
+
+  it('still fits a browser cookie with a typical hub token and the earlier-approval address', () => {
+    const approvedRedirect = 'https://r2nette.ca/api/v1/auth/takatak/callback?code=' + 'c'.repeat(60) + '&state=' + 's'.repeat(43);
+    const raw = encodeConsent({ ...handoff, accessToken: 'x'.repeat(1_500), approvedRedirect }, env);
+    expect(consentCookieBytes(raw)).toBeLessThan(MAX_CONSENT_COOKIE_BYTES);
   });
 
   it('encodes once, so a 2.4 KB token still fits a browser cookie', () => {

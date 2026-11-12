@@ -243,6 +243,25 @@ input('terms').addEventListener('change', googleLink);
 translate();
 input('send').disabled = true;
 const params = new URLSearchParams(location.search);
+
+/**
+ * Already signed in? Then the sign-in page has nothing to ask: go where the customer was
+ * headed, or to their account. (The Account menu link used to land here and showed the form
+ * to a signed-in customer.) Not while a sign-in is in progress or just failed, and not right
+ * after the account page sent the visitor here, so the two can never send each other back.
+ */
+async function leaveIfSignedIn(): Promise<void> {
+  if (params.get('consent') === '1' || params.get('takatak')) return;
+  try {
+    if (sessionStorage.getItem('r2n.signInBounce')) { sessionStorage.removeItem('r2n.signInBounce'); return; }
+  } catch { /* private mode */ }
+  try {
+    const response = await fetch('/api/v1/customer/context', { credentials: 'same-origin' });
+    if (!response.ok) return;
+  } catch { return; }
+  location.replace(params.get('returnTo') ? returnTo() : '/account');
+}
+void leaveIfSignedIn();
 fetch('/api/v1/auth/takatak/config', { credentials: 'same-origin' })
   .then((r) => r.json())
   .catch(() => ({}))

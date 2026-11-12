@@ -95,6 +95,11 @@ interface Discovery {
 }
 
 const SCOPE = 'openid email profile phone';
+
+/** The access lines of this site's own request, for the card shown when the hub already holds the approval. */
+export function requestedScopeText(locale: 'fr' | 'en'): string[] {
+  return consentScopeText(SCOPE, locale);
+}
 const E164 = /^\+[1-9]\d{6,14}$/;
 const text = (v: unknown, max = 254): string | null =>
   typeof v === 'string' && v.trim() && v.length <= max ? v.trim() : null;

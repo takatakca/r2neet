@@ -268,6 +268,12 @@ async function load(): Promise<void> {
   } catch (e) {
     const up = $('upcoming');
     const unauth = e instanceof ApiError && e.code === 'UNAUTHORIZED';
+    if (unauth) {
+      // Not signed in: go straight to the sign-in page and come back here after it.
+      // The flag stops the sign-in page from sending us back at once if the two ever disagree.
+      try { sessionStorage.setItem('r2n.signInBounce', '1'); } catch { /* private mode */ }
+      location.replace('/login?returnTo=%2Faccount');
+    }
     if (up) {
       up.innerHTML = `<div class="empty"><div class="ic">${unauth ? '🔐' : '⚠'}</div>
         <div class="t">${esc(unauth ? t('account.signInTitle') : t('error.GENERIC'))}</div>

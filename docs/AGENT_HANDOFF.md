@@ -1,5 +1,13 @@
 # R2NETTE — Agent handoff
 
+## 2026-11-12 (soir) — Claude (Anthropic) : carte « Autoriser l’accès » à chaque connexion, lien Compte, courriel du code
+
+- **Carte d’autorisation à chaque connexion** (décision 22) : après le code (ou Google), le client voit toujours la carte « Autoriser l’accès », puis revient à la page qu’il avait quittée. Avant, un client déjà connu du centre TAKATAK passait directement et ne la voyait jamais. Quand le centre détient déjà l’approbation, R2NETTE garde l’adresse de fin qu’il a émise dans le cookie chiffré (`approvedRedirect`) et affiche la carte (application R2NETTE, adresse de retour, courriel vérifié, quatre lignes d’accès) ; Autoriser utilise cette adresse, Refuser met fin à la connexion comme un refus du centre.
+- **Lien « Compte » du menu** : il pointait vers `/auth` (la page de connexion), donc un client connecté devait se reconnecter. Il va maintenant à `/account` ; `/auth` redirige vers `/account` ; la page de connexion renvoie un client déjà connecté vers `returnTo` ou `/account` ; la page Compte envoie un visiteur non connecté vers `/login?returnTo=/account` (un drapeau `r2n.signInBounce` évite toute boucle).
+- **Onglets** : l’onglet allumé prend la largeur de son contenu (étiquettes « Coordonnées », « Confirmer » coupées sur téléphone).
+- **Courriel du code** : son texte est un réglage du centre (modèles de courriel Supabase), que ce dépôt ne peut pas changer ; le propriétaire a refusé de donner un jeton Supabase. Texte à coller : `docs/HUB_EMAIL_PASTE.md` (modèles Magic Link et Confirm signup + URL de redirection `https://r2nette.ca/api/v1/auth/takatak/google/callback`). Limite : le nom d’expéditeur « TAKATAK » est un réglage SMTP unique du projet.
+- **Preuves** : 840/840 tests, invariants, typecheck ; parcours réel dans Chromium contre une copie locale et un faux centre (30 vérifications : première connexion, deuxième connexion déjà approuvée, Refuser, lien Compte connecté et déconnecté, téléphone et bureau). À refaire en direct après la fusion.
+
 ## 2026-11-12 — Claude (Anthropic) : connexion qui aboutit, téléphone retiré, accordéon de réservation
 
 Ordre du propriétaire : après la connexion on revenait à l’écran de connexion ; pas de connexion par téléphone nulle part (r2nette.ca et takatak.ca), seulement courriel et Google ; sur téléphone, les options « équipe et durée » doivent s’ouvrir sous la carte choisie, une à la fois (accordéon). Branche `claude/email-google-only-login`.
