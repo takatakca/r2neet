@@ -47,7 +47,12 @@ export interface TakatakOAuthProvider {
   authorizationUrl(input: { redirectUri: string; challenge: string; state: string; locale: 'fr' | 'en' }): Promise<string>;
   exchangeCode(input: { code: string; verifier: string; redirectUri: string }): Promise<TakatakIdentity>;
   // Claude (Anthropic) · 2026-11-11 — sign-in on r2nette.ca without visiting takatak.ca.
-  sendEmailCode(email: string): Promise<void>;
+  /**
+   * Ask the hub to email a sign-in code. `redirectTo` names the site that asked: the hub's
+   * email template reads it ({{ .RedirectTo }}) so each site's code email speaks about
+   * that site and not another. A value the hub does not allow is ignored (it answers 200).
+   */
+  sendEmailCode(email: string, options?: { redirectTo?: string }): Promise<void>;
   verifyEmailCode(email: string, code: string): Promise<HubSession>;
   /** The hub keeps its own state for Google and never returns ours; PKCE binds the code to this browser. */
   googleAuthorizationUrl(input: { redirectUri: string; challenge: string }): string;
@@ -161,8 +166,9 @@ export class SupabaseTakatakOAuthProvider implements TakatakOAuthProvider {
     return { accessToken, subject, email, phone: phone && E164.test(phone) ? phone : null };
   }
 
-  async sendEmailCode(email: string): Promise<void> {
-    const response = await this.hub('/otp', { method: 'POST', headers: this.hubHeaders(), body: JSON.stringify({ email, create_user: true }) });
+  async sendEmailCode(email: string, options: { redirectTo?: string } = {}): Promise<void> {
+    const query = options.redirectTo ? `?redirect_to=${encodeURIComponent(options.redirectTo)}` : '';
+    const response = await this.hub(`/otp${query}`, { method: 'POST', headers: this.hubHeaders(), body: JSON.stringify({ email, create_user: true }) });
     if (response.status === 429) throw new IdentityError('Please wait before trying again.', 'OTP_PROVIDER_LIMIT');
     if (!response.ok) this.unavailable();
   }

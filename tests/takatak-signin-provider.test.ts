@@ -34,6 +34,13 @@ describe('TAKATAK hub: email code', () => {
     expect(headersOf(calls[0]!).apikey).toBe('public-anon');
   });
 
+  it('tells the hub which site asked, so its email can speak for that site', async () => {
+    const { calls, fetcher } = fakeFetch(() => json({}));
+    await new SupabaseTakatakOAuthProvider(env, fetcher).sendEmailCode('marie@example.ca', { redirectTo: 'https://r2nette.ca/api/v1/auth/takatak/google/callback' });
+    expect(calls[0]!.url).toBe('https://auth.takatak.test/auth/v1/otp?redirect_to=https%3A%2F%2Fr2nette.ca%2Fapi%2Fv1%2Fauth%2Ftakatak%2Fgoogle%2Fcallback');
+    expect(bodyOf(calls[0]!)).toEqual({ email: 'marie@example.ca', create_user: true });
+  });
+
   it('verifies the code and returns the hub session only for a confirmed matching email', async () => {
     const user = { id: 'u1', email: 'marie@example.ca', email_confirmed_at: '2026-11-11T00:00:00Z', phone: '15145551212' };
     const ok = fakeFetch(() => json({ access_token: 'at', user }));
