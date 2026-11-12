@@ -90,19 +90,8 @@ const STEPS = [
   'confirmation',
 ] as const;
 
-/* Four phases the customer perceives, regardless of internal steps. */
-const PHASE: Record<string, 'CLEAN' | 'HOME' | 'TIME' | 'CONFIRM'> = {
-  service: 'CLEAN',
-  welcome: 'CLEAN',
-  property: 'HOME',
-  products: 'CLEAN',
-  frequency: 'CLEAN',
-  address: 'HOME',
-  slots: 'TIME',
-  details: 'CONFIRM',
-  checkout: 'CONFIRM',
-  confirmation: 'CONFIRM',
-};
+/** Furthest step reached (index in STEPS): later tabs stay locked until the customer gets there. */
+let furthestStep = 0;
 
 const $ = (id: string) => document.getElementById(id);
 
@@ -1263,116 +1252,73 @@ function goTo(step: string): void {
 }
 
 let navigationBusy = false;
-async function goNext(): Promise<void> {
-  if (S.step === 'checkout') { await submitBooking(); return; }
-  if (navigationBusy) return;
+/** What must be true to leave each step; shared by Continue and the step tabs. */
+const STEP_GUARDS: Record<string, () => boolean> = {
+  service: () => !!S.serviceOptionId,
+  property: () => !!S.propertyType,
+  products: () => {
+    const s = svc();
+    return !s || s.productSupplyMode === 'NOT_APPLICABLE' || !!S.productSupplyOption;
+  },
+  frequency: () => !!S.frequency,
+  address: () => !!S.addressId,
+  slots: () => !!hold,
+  details: () =>
+    !!($('nm') as HTMLInputElement)?.value.trim() &&
+    /\S+@\S+\.\S{2,}/.test(($('em') as HTMLInputElement)?.value ?? ''),
+};
+
+/** Continue. Resolves true when the booking moved on to the next step. */
+async function goNext(): Promise<boolean> {
+  if (S.step === 'checkout') { await submitBooking(); return false; }
+  if (navigationBusy) return false;
   navigationBusy = true;
   const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-action="next"]'));
   buttons.forEach(button => { button.disabled = true; });
   try {
   const order = visibleSteps();
   const i = order.indexOf(S.step);
-  const guards: Record<string, () => boolean> = {
-    service: () => !!S.serviceOptionId,
-    property: () => !!S.propertyType,
-    products: () => {
-      const s = svc();
-      return !s || s.productSupplyMode === 'NOT_APPLICABLE' || !!S.productSupplyOption;
-    },
-    frequency: () => !!S.frequency,
-    address: () => !!S.addressId,
-    slots: () => !!hold,
-    details: () =>
-      !!($('nm') as HTMLInputElement)?.value.trim() &&
-      /\S+@\S+\.\S{2,}/.test(($('em') as HTMLInputElement)?.value ?? ''),
-  };
-  const g = guards[S.step];
+  const g = STEP_GUARDS[S.step];
   if (g && !g()) {
     toast(t('guard.' + S.step));
-    return;
+    return false;
   }
-  if (order[i + 1] === 'address' && !verified) { S.step = 'address'; saveDraft(S); location.assign('/login?returnTo=%2F%23book'); return; }
+  if (order[i + 1] === 'address' && !verified) { S.step = 'address'; saveDraft(S); location.assign('/login?returnTo=%2F%23book'); return false; }
   if (S.step === 'frequency' || S.step === 'address') await refreshQuote();
   if (S.step === 'details') {
     try {
       await persistBookingContact();
     } catch (error) {
       showError(error);
-      return;
+      return false;
     }
   }
   goTo(order[Math.min(i + 1, order.length - 1)]!);
+  return true;
   } finally {
     navigationBusy = false;
     buttons.forEach(button => { if (button.dataset.action === 'next') button.disabled = false; });
   }
 }
 
-function goToPhase(requestedPhase: string): void {
-  const service = svc();
-
-  if (requestedPhase === 'CLEAN') {
-    goTo('service');
+/**
+ * A tab was tapped. Earlier steps open at once. A later step opens only by
+ * walking the steps in between with the same checks and side effects as
+ * Continue, so the price, the address and the held time are never skipped.
+ */
+async function goToStepTab(target: string): Promise<void> {
+  const order = visibleSteps();
+  const to = order.indexOf(target);
+  const from = order.indexOf(S.step);
+  if (to < 0 || to === from) return;
+  if (target === 'confirmation') {
+    if (bookingResult) goTo('confirmation');
     return;
   }
-
-  if (!service) {
-    toast(t('guard.service'));
-    goTo('service');
-    return;
-  }
-
-  if (requestedPhase === 'HOME') {
-    goTo('property');
-    return;
-  }
-
-  if (!S.propertyType) {
-    toast(t('guard.property'));
-    goTo('property');
-    return;
-  }
-
-  if (
-    service.productSupplyMode === 'REQUIRED_SELECTION' &&
-    !S.productSupplyOption
-  ) {
-    toast(t('guard.products'));
-    goTo('products');
-    return;
-  }
-
-  if (!S.frequency) {
-    toast(t('guard.frequency'));
-    goTo('frequency');
-    return;
-  }
-
-  if (requestedPhase === 'TIME') {
-    if (!S.addressId) {
-      toast(t('guard.address'));
-      goTo('address');
-      return;
-    }
-
-    goTo('slots');
-    return;
-  }
-
-  if (requestedPhase === 'CONFIRM') {
-    if (!S.addressId) {
-      toast(t('guard.address'));
-      goTo('address');
-      return;
-    }
-
-    if (!hold) {
-      toast(t('guard.slots'));
-      goTo('slots');
-      return;
-    }
-
-    goTo('details');
+  if (S.step === 'confirmation') return;
+  if (to < from) { goTo(target); return; }
+  while (order.indexOf(S.step) < to && S.step !== 'checkout') {
+    if (!(await goNext())) return;
   }
 }
 
@@ -1490,6 +1436,33 @@ function renderLiveBookingSummary(): void {
   ).join('');
 }
 
+/**
+ * The tab bar mirrors the real steps (the same list as the "4 / 9" counter):
+ * one tab each, the current one lit, earlier ones ticked, steps not reached
+ * yet locked. Tapping a reachable tab opens that step's own content.
+ */
+function renderStepTabs(): void {
+  const bar = $('phases');
+  if (!bar) return;
+  const order = visibleSteps();
+  const current = order.indexOf(S.step);
+  furthestStep = Math.max(furthestStep, STEPS.indexOf(S.step as (typeof STEPS)[number]));
+  bar.innerHTML = order
+    .map((step, i) => {
+      const state = i === current ? ' on' : i < current ? ' done' : '';
+      const reachable =
+        step === 'confirmation' ? !!bookingResult : STEPS.indexOf(step as (typeof STEPS)[number]) <= furthestStep;
+      const label = esc(t(`phase.${step}`));
+      return `<button type="button" class="phase${state}" data-action="go-step" data-step="${esc(step)}" data-number="${i + 1}" aria-label="${i + 1}. ${label}"${i === current ? ' aria-current="step"' : ''}${reachable ? '' : ' disabled'}><span class="phase-label">${label}</span></button>`;
+    })
+    .join('');
+  // Narrow screens scroll the bar; keep the current tab in view.
+  const active = bar.querySelector<HTMLElement>('.phase.on');
+  if (active && bar.scrollWidth > bar.clientWidth) {
+    bar.scrollLeft = Math.max(0, active.offsetLeft - (bar.clientWidth - active.offsetWidth) / 2);
+  }
+}
+
 function renderBookingJourney(): void {
   const order = visibleSteps();
   const current = Math.max(0, order.indexOf(S.step));
@@ -1554,13 +1527,7 @@ function render(): void {
   document.querySelectorAll<HTMLElement>('.step').forEach((el) => {
     el.classList.toggle('on', el.dataset.step === S.step);
   });
-  const phase = PHASE[S.step] ?? 'CLEAN';
-  document.querySelectorAll<HTMLElement>('.phase').forEach((el) => {
-    const p = el.dataset.phase!;
-    const order = ['CLEAN', 'HOME', 'TIME', 'CONFIRM'];
-    el.classList.toggle('on', p === phase);
-    el.classList.toggle('done', order.indexOf(p) < order.indexOf(phase));
-  });
+  renderStepTabs();
 
   const stickyNext = document.querySelector<HTMLButtonElement>('#sticky .btn-primary');
   if (stickyNext) {
@@ -1731,8 +1698,8 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
     goTo(el.dataset.step!);
   },
 
-  'go-phase': (el) => {
-    goToPhase(el.dataset.phase!);
+  'go-step': (el) => {
+    void goToStepTab(el.dataset.step!);
   },
 
   next: () => {
@@ -2025,13 +1992,13 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
           block: 'center',
         });
       } else {
-        goToPhase('HOME');
+        void goToStepTab('property');
       }
       return;
     }
 
     if (helpAction === 'times') {
-      goToPhase('TIME');
+      void goToStepTab('slots');
       return;
     }
 
