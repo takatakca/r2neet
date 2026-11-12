@@ -1,5 +1,11 @@
 # R2NETTE — Agent handoff
 
+## 2026-11-12 (fin de journée) — Claude (Anthropic) : PR #62 fusionnée et vérifiée en direct
+
+- **Fusionnée** par le propriétaire (03dfe0e), déployée (Deploy réussi), puis éprouvée sur r2nette.ca dans un navigateur réel avec un vrai code reçu par courriel : la carte « Autoriser l’accès » apparaît à chaque connexion (même quand TAKATAK a déjà approuvé R2NETTE) puis ramène à la page quittée ; le lien « Compte » ouvre `/account` ; `/auth` et `/login` (déjà connecté) mènent au compte ou à `returnTo` ; une adresse de retour piégée (`https://r2nette.ca//evil.example`, `/\evil.example`, `//evil.example`) reste sur le site ; « Se déconnecter » met fin à la session ; les quatre choix de l’aide ouvrent la réservation ; les étiquettes d’onglets tiennent de 320 à 820 px (FR et EN).
+- **Toujours bloqué, côté propriétaire** : (1) réservation en ligne impossible à l’étape adresse (502 `ROUTES_NO_ROUTE`, voir plus bas) et aucune plage horaire dans les 30 prochains jours ; (2) texte du courriel du code : `docs/HUB_EMAIL_PASTE.md` ; (3) décision sur la règle de réclamation du profil (décision 21) ; (4) suppression douce des adresses (optionnelle).
+- **Méthode** : parcours en direct avec Playwright (scripts de la session, non versionnés), code lu dans la boîte du propriétaire via l’outil Gmail et jamais enregistré ; aucune réservation créée en production.
+
 ## 2026-11-12 (soir) — Claude (Anthropic) : carte « Autoriser l’accès » à chaque connexion, lien Compte, courriel du code
 
 - **Carte d’autorisation à chaque connexion** (décision 22) : après le code (ou Google), le client voit toujours la carte « Autoriser l’accès », puis revient à la page qu’il avait quittée. Avant, un client déjà connu du centre TAKATAK passait directement et ne la voyait jamais. Quand le centre détient déjà l’approbation, R2NETTE garde l’adresse de fin qu’il a émise dans le cookie chiffré (`approvedRedirect`) et affiche la carte (application R2NETTE, adresse de retour, courriel vérifié, quatre lignes d’accès) ; Autoriser utilise cette adresse, Refuser met fin à la connexion comme un refus du centre.
