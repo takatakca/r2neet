@@ -1,5 +1,19 @@
 # R2NETTE — Agent handoff
 
+## 2026-11-12 — Claude (Anthropic) : corrections de la revue finale (connexion r2nette.ca)
+
+PR #57 fusionnée par le propriétaire le 2026-11-11 à 19:07 UTC (afa49b0) ; CI 43084202963 verte. **Deploy 43084427769 en échec** pendant la construction de l’image : le téléchargement de la clé PostgreSQL sur postgresql.org a été coupé (`curl: (18)`), sans lien avec le code ; rien n’a été déployé, la production sert toujours l’ancienne page (`/healthz`, `/readyz` OK). Volontairement pas relancé : la revue finale a trouvé un défaut bloquant pour Google.
+
+Branche `claude/takatak-signin-review-fixes` :
+
+- **Google (critique)** : le centre TAKATAK ne renvoie jamais notre `state` (sonde du 2026-11-12 : l’URL envoyée à Google porte l’identifiant du centre) ; notre retour exigeait ce `state`, donc chaque connexion Google réelle finissait sur « expiré ». Désormais : aucun `state` envoyé, retour accepté avec le cookie frais de ce navigateur + PKCE, `error` → « annulé ».
+- **Cookie de consentement** : tout le passage est chiffré une seule fois (AES-GCM, tous les champs authentifiés) ; un jeton de 2,4 Ko tient sous la limite de 4 Ko du navigateur ; au-delà de 3 900 octets, refus 503 et session TAKATAK révoquée au lieu d’une boucle « expiré ».
+- **Limites** : tous les appels au centre partent du même serveur, donc ses limites par IP valent pour tous nos clients ; plafonds ajoutés par visiteur : vérifications de code 30/h par IP, lecture et décision du consentement 60/h par IP (`SIGNIN_IP_LIMIT`).
+- **Clients Google anciens** : un client qui avait lié Google sur `/phone-login` (même identifiant TAKATAK dans `googleAuthSubject`) est reconnu au lieu d’obtenir un second compte.
+- **Petits points** : autorisation inconnue du centre (404/410) → 410 `CONSENT_EXPIRED` ; la page revient au début après un refus du centre ; un code collé avec une espace est accepté.
+- **Propriétaire, en plus du modèle « Magic Link » et de l’adresse de retour Google** : ajouter `{{ .Token }}` au modèle « Confirm signup » (les adresses neuves le reçoivent si « Confirm email » est actif) ; garder le lien dans les deux courriels (takatak.ca l’utilise ; risque des filtres qui ouvrent les liens noté) ; revoir Authentication › Rate Limits. Détails : `docs/TAKATAK_INTEGRATION.md`.
+- **Preuves locales** : voir la PR (tsc, vitest complet sur PostgreSQL 16 UTC, invariants, build, contrôle Chromium contre un faux centre qui, comme le vrai, ne renvoie pas de `state`).
+
 ## 2026-11-11 — Claude (Anthropic) : connexion sur r2nette.ca par code courriel ou Google, TAKATAK comme centre
 
 Ordre du propriétaire : se connecter ou créer son compte sur r2nette.ca sans passer par takatak.ca, le compte restant dans TAKATAK (centre de toutes les données), puis l’écran TAKATAK « Autoriser l’accès » affiché sur r2nette.ca. Le bouton sombre « Continuer avec TAKATAK » est retiré (choix du propriétaire). Branche `claude/takatak-embedded-signin` ; spec et plan dans `docs/superpowers/`.
