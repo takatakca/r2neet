@@ -101,6 +101,21 @@ export function unexpectedHostPorts(compose: string): string[] {
   return publishedHostPorts(compose).filter((port) => port !== '80' && port !== '443');
 }
 
+/**
+ * R2NETTE cleans in Greater Montréal (about 45.5, -73.6). A dispatch origin outside that area is almost always a
+ * mistyped sign or swapped values, and it makes every address fail with "No route to that address" (live, 2026-11-12).
+ */
+export function implausibleOrigin(env: Record<string, string | undefined>): string | null {
+  const rawLat = env.BUSINESS_ORIGIN_LAT?.trim();
+  const rawLng = env.BUSINESS_ORIGIN_LNG?.trim();
+  if (!rawLat || !rawLng) return null;
+  const lat = Number(rawLat);
+  const lng = Number(rawLng);
+  const inMontreal = Number.isFinite(lat) && Number.isFinite(lng) && lat >= 44.5 && lat <= 46.8 && lng >= -75.5 && lng <= -72;
+  if (inMontreal) return null;
+  return `BUSINESS_ORIGIN_LAT/LNG (${rawLat}, ${rawLng}) is not in Greater Montréal (about 45.5, -73.6): check the sign and the order. A wrong origin makes every address fail with "No route to that address", so nobody can book online.`;
+}
+
 function warnIfOptional(
   issues: ProductionIssue[],
   env: Record<string, string | undefined>,
@@ -343,6 +358,8 @@ export function validateProductionEnvironment(
   }
   warnIfOptional(issues, env, 'Google Maps', ['GOOGLE_MAPS_API_KEY']);
   warnIfOptional(issues, env, 'Dispatch origin', ['BUSINESS_ORIGIN_LAT', 'BUSINESS_ORIGIN_LNG']);
+  const originIssue = implausibleOrigin(env);
+  if (originIssue) issues.push({ severity: 'WARN', message: originIssue });
   warnIfOptional(issues, env, 'Off-host backup', [
     'BACKUP_S3_BUCKET',
     'BACKUP_S3_REGION',

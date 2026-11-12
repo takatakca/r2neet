@@ -168,16 +168,85 @@ describe('Sign in on r2nette.ca — email code', () => {
     expect(provider.authorizationDetails).toHaveBeenLastCalledWith(expect.objectContaining({ locale: 'fr' }));
   });
 
-  it('skips the consent screen when the hub reports an earlier approval', async () => {
-    const { app, provider, begun } = setup();
-    provider.authorizationDetails.mockImplementation(async () => ({ kind: 'approved', redirectUrl: `${CALLBACK}?code=abc&state=${begun.state}` }));
-    const jar = new Jar();
-    const verified = await post(app, jar, 'email/verify', { email: 'marie@example.ca', code: '123456', locale: 'en', terms: false });
-    expect(verified.status).toBe(200);
-    expect(verified.body).toEqual({ next: `${CALLBACK}?code=abc&state=${begun.state}` });
-    expect(jar.has('r2n_takatak_consent')).toBe(false);
-    expect(jar.has('r2n_takatak_oauth')).toBe(true);
-    expect(provider.revokeSession).toHaveBeenCalledWith('hub-at');
+  it('replaces a forged same-origin returnTo ("https://site//evil") with the default', async () => {
+    const { app } = setup();
+    for (const forged of [`${ORIGIN}//evil.example`, `${ORIGIN}/\\evil.example`]) {
+      const jar = new Jar();
+      const verified = await post(app, jar, 'email/verify', { email: 'marie@example.ca', code: '123456', locale: 'fr', terms: true, returnTo: forged });
+      expect(verified.status).toBe(200);
+      expect(decode(jar.get('r2n_takatak_oauth')!).returnTo).toBe('/#book');
+    }
+  });
+
+  describe('when the hub already holds an earlier approval', () => {
+    // Owner order 2026-11-12: every sign-in ends with the "Autoriser l’accès" card, then the
+    // customer goes back to the page they left, even when TAKATAK approved R2NETTE before.
+    async function earlier(locale: 'fr' | 'en' = 'fr') {
+      const ctx = setup();
+      ctx.provider.authorizationDetails.mockImplementation(async () => ({ kind: 'approved', redirectUrl: `${CALLBACK}?code=abc&state=${ctx.begun.state}` }));
+      const jar = new Jar();
+      const verified = await post(ctx.app, jar, 'email/verify', { email: 'marie@example.ca', code: '123456', locale, terms: true, returnTo: '/#book' });
+      return { ...ctx, jar, verified };
+    }
+
+    it('still shows the consent card after the code', async () => {
+      const { app, provider, jar, verified } = await earlier('fr');
+      expect(verified.status).toBe(200);
+      expect(verified.body).toEqual({ consent: true });
+      expect(jar.has('r2n_takatak_consent')).toBe(true);
+      expect(provider.revokeSession).not.toHaveBeenCalled();
+      // The hub has no details to give for an approved request: the card comes from this site's own request.
+      provider.authorizationDetails.mockClear();
+      const card = await get(app, jar, 'consent');
+      expect(card.status).toBe(200);
+      expect(card.body).toEqual({ app: 'R2NETTE', returnAddress: CALLBACK, account: 'marie@example.ca', scopes: ['Confirmer que vous êtes connecté à TAKATAK', 'Voir votre adresse courriel', 'Voir votre nom et votre profil', 'Voir votre numéro de téléphone'], needsTerms: false });
+      expect(provider.authorizationDetails).not.toHaveBeenCalled();
+      const en = await get(app, jar, 'consent?locale=en');
+      expect(en.body.scopes[1]).toBe('See your email address');
+    });
+
+    it('Autoriser finishes the sign-in and returns to the page the customer left', async () => {
+      const { app, provider, jar, sessions, begun } = await earlier('fr');
+      const approved = await post(app, jar, 'consent', { decision: 'approve' });
+      expect(approved.status).toBe(200);
+      expect(approved.body).toEqual({ next: `${CALLBACK}?code=abc&state=${begun.state}` });
+      expect(provider.decideConsent).not.toHaveBeenCalled();
+      expect(provider.revokeSession).toHaveBeenCalledWith('hub-at');
+      expect(jar.has('r2n_takatak_consent')).toBe(false);
+      const finished = await get(app, jar, new URL(approved.body.next).pathname + new URL(approved.body.next).search);
+      expect(finished.status).toBe(303);
+      expect(finished.headers.location).toBe('/#book');
+      expect(sessions).toHaveLength(1);
+    });
+
+    it('Refuser ends the sign-in without a session', async () => {
+      const { app, provider, jar, sessions } = await earlier('en');
+      const denied = await post(app, jar, 'consent', { decision: 'deny' });
+      expect(denied.status).toBe(200);
+      expect(provider.decideConsent).not.toHaveBeenCalled();
+      expect(provider.revokeSession).toHaveBeenCalledWith('hub-at');
+      const finished = await get(app, jar, new URL(denied.body.next).pathname + new URL(denied.body.next).search);
+      expect(finished.status).toBe(303);
+      expect(finished.headers.location).toContain('/login?takatak=cancelled');
+      expect(sessions).toHaveLength(0);
+    });
+
+    it('is used once: a second answer finds no card', async () => {
+      const { app, jar } = await earlier('fr');
+      expect((await post(app, jar, 'consent', { decision: 'approve' })).status).toBe(200);
+      expect((await post(app, jar, 'consent', { decision: 'approve' })).status).toBe(410);
+    });
+
+    it('refuses an earlier-approval address that points to another host', async () => {
+      const ctx = setup();
+      ctx.provider.authorizationDetails.mockImplementation(async () => ({ kind: 'approved', redirectUrl: `https://evil.example/api/v1/auth/takatak/callback?code=abc&state=${ctx.begun.state}` }));
+      const jar = new Jar();
+      const verified = await post(ctx.app, jar, 'email/verify', { email: 'marie@example.ca', code: '123456', locale: 'fr', terms: true });
+      expect(verified.status).toBe(502);
+      expect(verified.body.error.code).toBe('CONSENT_INVALID');
+      expect(jar.has('r2n_takatak_consent')).toBe(false);
+      expect(ctx.provider.revokeSession).toHaveBeenCalledWith('hub-at');
+    });
   });
 
   it('refuses a redirect_url with another state or another host', async () => {

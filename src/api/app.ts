@@ -537,7 +537,9 @@ export function createApi(deps: ApiDeps) {
     try {
       const url = new URL(requested, origin);
       if (url.origin === origin) {
-        return url.pathname + url.search + url.hash;
+        const path = url.pathname + url.search + url.hash;
+        // 'https://this.site//evil.example' is not ours: the path '//evil.example' leaves for another site.
+        if (!/^\/[\/\\]/.test(path)) return path;
       }
     } catch {
       // Invalid paths return to the account page.
@@ -1861,18 +1863,34 @@ export function createApi(deps: ApiDeps) {
         res.json({ ok: true }); // idempotent
         return;
       }
-      const inUse = await prisma.booking.count({
-        where: {
-          addressId: addr.id,
-          startAt: { gte: now() },
-          status: { notIn: ['CANCELLED'] },
-        },
-      });
-      if (inUse > 0) {
+      // A booking or a recurring plan keeps pointing at its address (the database refuses to
+      // delete it). Upcoming cleanings and live plans: ask the customer to move or cancel them.
+      // Past or cancelled ones: say so plainly, instead of failing with a server error.
+      const [inUse, activePlans, history] = await Promise.all([
+        prisma.booking.count({
+          where: {
+            addressId: addr.id,
+            startAt: { gte: now() },
+            status: { notIn: ['CANCELLED'] },
+          },
+        }),
+        prisma.recurrenceSeries.count({
+          where: { addressId: addr.id, status: { in: ['ACTIVE', 'PAUSED'] } },
+        }),
+        prisma.booking.count({ where: { addressId: addr.id } }),
+      ]);
+      if (inUse > 0 || activePlans > 0) {
         throw new ApiError(
           409,
           'ADDRESS_IN_USE',
           'This address has an upcoming cleaning. Cancel or move it first.',
+        );
+      }
+      if (history > 0 || (await prisma.recurrenceSeries.count({ where: { addressId: addr.id } })) > 0) {
+        throw new ApiError(
+          409,
+          'ADDRESS_HAS_HISTORY',
+          'This address is part of past or cancelled cleanings, so it cannot be removed.',
         );
       }
       await prisma.$transaction(async (transaction) => {

@@ -395,6 +395,36 @@ d('customer account', () => {
     expect(res.body.error.code).toBe('ADDRESS_IN_USE');
   });
 
+  it('explains, instead of failing, when an address only has past or cancelled cleanings', async () => {
+    const { cookie, customerId } = await login('514 825 2825');
+    const past = await makeBooking(customerId, -72);
+    const cancelled = await makeBooking(customerId, 72);
+    await prisma.booking.update({ where: { id: cancelled.booking.id }, data: { status: 'CANCELLED' } });
+    for (const { addressId } of [past, cancelled]) {
+      const res = await request(app).delete(`/api/v1/account/addresses/${addressId}`).set('Cookie', cookie);
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('ADDRESS_HAS_HISTORY');
+      expect(await prisma.customerAddress.count({ where: { id: addressId } })).toBe(1);
+    }
+  });
+
+  it('refuses to delete an address a live recurring plan uses, and one a past plan used', async () => {
+    const { cookie, customerId } = await login('514 825 2825');
+    const address = await prisma.customerAddress.create({
+      data: { customerId, formattedAddress: '12 Rue Z', city: 'Laval', postalCode: 'H7N3S8' },
+    });
+    const plan = await prisma.recurrenceSeries.create({
+      data: { customerId, serviceOptionId: 'svc_basic_2x3', addressId: address.id, frequency: 'WEEKLY', status: 'ACTIVE', startAt: new Date(Date.now() + 7 * 86400_000) },
+    });
+    const live = await request(app).delete(`/api/v1/account/addresses/${address.id}`).set('Cookie', cookie);
+    expect(live.status).toBe(409);
+    expect(live.body.error.code).toBe('ADDRESS_IN_USE');
+    await prisma.recurrenceSeries.update({ where: { id: plan.id }, data: { status: 'CANCELLED' } });
+    const ended = await request(app).delete(`/api/v1/account/addresses/${address.id}`).set('Cookie', cookie);
+    expect(ended.status).toBe(409);
+    expect(ended.body.error.code).toBe('ADDRESS_HAS_HISTORY');
+  });
+
   it('deletes an unused address, and repeating is harmless', async () => {
     const { cookie, customerId } = await login('514 825 2825');
     const spare = await prisma.customerAddress.create({

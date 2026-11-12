@@ -70,6 +70,12 @@ const pages: Record<string, string> = {
 const phoneLoginPages = new Set(['/phone-login', '/verify', '/profile']);
 for (const [route, file] of Object.entries(pages)) {
   app.get(route, (_req, res) => {
+    // "/auth" used to be the Account menu link and showed the sign-in page even to a
+    // signed-in customer. The menu now goes to /account; old links and bookmarks follow it.
+    if (route === '/auth') {
+      res.redirect(302, '/account');
+      return;
+    }
     if (process.env.R2NETTE_PHONE_LOGIN !== 'true' && phoneLoginPages.has(route)) {
       res.redirect(302, '/login');
       return;

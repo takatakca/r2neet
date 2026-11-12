@@ -17,7 +17,7 @@ import { z } from 'zod';
 import { ApiError } from './app.js';
 import { encryptionConfigured } from '../auth/encryption.js';
 import { IdentityError, RateLimiter } from '../identity/identity.js';
-import type { HubSession, TakatakOAuthProvider } from '../identity/takatak-oauth.js';
+import { requestedScopeText, type HubSession, type TakatakOAuthProvider } from '../identity/takatak-oauth.js';
 import {
   CALLBACK_PATH,
   DEFAULT_RETURN,
@@ -147,16 +147,16 @@ export function takatakSignInRoutes(
   }
 
   /**
-   * Open the R2NETTE authorization for this hub session and either hand the
-   * page the consent details (cookie set) or, when the hub already holds the
-   * person's approval, the address that finishes the sign-in.
+   * Open the R2NETTE authorization for this hub session and hand the page the
+   * consent card (cookie set). When the hub already holds the person's approval
+   * the card is shown all the same; the finishing address waits in the cookie.
    */
   async function beginConsent(
     res: Response,
     session: HubSession,
     input: { returnTo: string; locale: 'fr' | 'en'; terms: boolean },
     base: string,
-  ): Promise<{ consent: true } | { next: string }> {
+  ): Promise<{ consent: true }> {
     if (!encryptionConfigured()) {
       throw new ApiError(503, 'TAKATAK_AUTH_UNAVAILABLE', 'TAKATAK sign-in is not available right now.');
     }
@@ -175,13 +175,18 @@ export function takatakSignInRoutes(
       locale: input.locale,
     });
     writePending(res, pending, secure);
+    // The hub may already hold this person's approval and answer with the finishing
+    // address at once. The card is still shown: every sign-in ends with "Autoriser
+    // l’accès", then the customer is taken back to where they were.
+    let approvedRedirect: string | null = null;
     if (view.kind === 'approved') {
-      const next = acceptRedirect(view.redirectUrl, base, pending);
-      await provider.revokeSession(session.accessToken);
-      if (!next) throw new ApiError(502, 'CONSENT_INVALID', 'TAKATAK answered with an unexpected address.');
-      return { next };
+      approvedRedirect = acceptRedirect(view.redirectUrl, base, pending);
+      if (!approvedRedirect) {
+        await provider.revokeSession(session.accessToken);
+        throw new ApiError(502, 'CONSENT_INVALID', 'TAKATAK answered with an unexpected address.');
+      }
     }
-    if (!writeConsentCookie(res, { authorizationId, accessToken: session.accessToken, subject: session.subject, email: session.email, createdAt: at }, secure)) {
+    if (!writeConsentCookie(res, { authorizationId, accessToken: session.accessToken, subject: session.subject, email: session.email, createdAt: at, approvedRedirect }, secure)) {
       console.error('[takatak-signin] hub session too large for the consent cookie; sign-in refused');
       await provider.revokeSession(session.accessToken);
       throw new ApiError(503, 'TAKATAK_AUTH_UNAVAILABLE', 'TAKATAK sign-in is not available right now.');
@@ -253,6 +258,18 @@ export function takatakSignInRoutes(
     const { handoff, pending } = readHandoff(req);
     // The page may switch language on the consent screen; the wording follows.
     const locale = req.query.locale === 'en' ? 'en' : req.query.locale === 'fr' ? 'fr' : pending.locale;
+    if (handoff.approvedRedirect) {
+      // The hub already approved this request earlier: it has no details to give, so the
+      // card is filled from what this site asked for and from the verified account.
+      res.json({
+        app: 'R2NETTE',
+        returnAddress: `${base}${CALLBACK_PATH}`,
+        account: handoff.email ?? (locale === 'fr' ? 'Compte TAKATAK connecté' : 'Signed-in TAKATAK account'),
+        scopes: requestedScopeText(locale),
+        needsTerms: await needsTerms(handoff, pending),
+      });
+      return;
+    }
     const view = await provider.authorizationDetails({
       authorizationId: handoff.authorizationId,
       accessToken: handoff.accessToken,
@@ -290,7 +307,13 @@ export function takatakSignInRoutes(
     // One decision per handoff: the cookie goes whatever the hub answers.
     clearConsentCookie(res);
     try {
-      const url = await provider.decideConsent({ authorizationId: handoff.authorizationId, accessToken: handoff.accessToken, decision });
+      // Earlier approval: Autoriser uses the address the hub already issued; Refuser ends
+      // the sign-in the same way a refusal at the hub does (the callback reads `error`).
+      const url = handoff.approvedRedirect
+        ? decision === 'approve'
+          ? handoff.approvedRedirect
+          : `${base}${CALLBACK_PATH}?error=access_denied&state=${encodeURIComponent(pending.state)}`
+        : await provider.decideConsent({ authorizationId: handoff.authorizationId, accessToken: handoff.accessToken, decision });
       const next = acceptRedirect(url, base, pending);
       if (!next) throw new ApiError(502, 'CONSENT_INVALID', 'TAKATAK answered with an unexpected address.');
       res.json({ next });
@@ -355,11 +378,7 @@ export function takatakSignInRoutes(
     }
     try {
       const session = await provider.exchangeGoogleCode({ code, verifier: pending.verifier });
-      const result = await beginConsent(res, session, { returnTo: pending.returnTo, locale: pending.locale, terms: pending.terms }, base);
-      if ('next' in result) {
-        res.redirect(303, result.next);
-        return;
-      }
+      await beginConsent(res, session, { returnTo: pending.returnTo, locale: pending.locale, terms: pending.terms }, base);
       const query = new URLSearchParams({ consent: '1' });
       if (pending.returnTo !== DEFAULT_RETURN) query.set('returnTo', pending.returnTo);
       res.redirect(303, `/login?${query.toString()}`);

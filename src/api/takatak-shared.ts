@@ -123,7 +123,11 @@ export function safeReturn(value: unknown, base: string): string {
     if (url.origin !== base) return DEFAULT_RETURN;
     // Never bounce back into an API route or the sign-in pages themselves.
     if (url.pathname.startsWith('/api/') || /^\/(login|signup|auth)(\/|$)/.test(url.pathname)) return DEFAULT_RETURN;
-    return url.pathname + url.search + url.hash;
+    const path = url.pathname + url.search + url.hash;
+    // 'https://this.site//evil.example' has this origin but the path '//evil.example', which a redirect
+    // to it would turn into another site. Only a single-slash path is ours.
+    if (/^\/[\/\\]/.test(path)) return DEFAULT_RETURN;
+    return path;
   } catch {
     return DEFAULT_RETURN;
   }

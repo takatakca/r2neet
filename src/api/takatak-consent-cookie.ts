@@ -18,6 +18,13 @@ export interface ConsentHandoff {
   /** The address TAKATAK verified, used to tell a returning customer from a new one. */
   email: string | null;
   createdAt: number;
+  /**
+   * Set when the hub already held this person's approval and returned the finishing
+   * address at once. The consent card is still shown (owner order 2026-11-12: every
+   * sign-in ends with "Autoriser l’accès"); Autoriser then uses this address and
+   * Refuser drops it. Null when the hub is waiting for the person's own answer.
+   */
+  approvedRedirect?: string | null;
 }
 
 type Env = Record<string, string | undefined>;
@@ -29,7 +36,7 @@ type Env = Record<string, string | undefined>;
 export const MAX_CONSENT_COOKIE_BYTES = 3_900;
 
 /**
- * The whole handoff `{ v, id, subject, token, createdAt }` is encrypted once
+ * The whole handoff `{ v, id, subject, email, token, ok, createdAt }` is encrypted once
  * (AES-GCM, `encryptSecret` format), so every field is authenticated and the
  * value is encoded a single time.
  */
@@ -40,6 +47,7 @@ export function encodeConsent(handoff: ConsentHandoff, env: Env = process.env): 
     subject: handoff.subject,
     email: handoff.email,
     token: handoff.accessToken,
+    ok: handoff.approvedRedirect ?? null,
     createdAt: handoff.createdAt,
   };
   return encryptSecret(JSON.stringify(payload), env);
@@ -70,6 +78,7 @@ export function decodeConsent(raw: unknown, now: number, env: Env = process.env)
       accessToken: p.token,
       subject: p.subject,
       email: typeof p.email === 'string' && p.email ? p.email : null,
+      approvedRedirect: typeof p.ok === 'string' && p.ok && p.ok.length <= 2048 ? p.ok : null,
       createdAt: p.createdAt,
     };
   } catch {

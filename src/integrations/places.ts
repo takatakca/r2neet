@@ -208,12 +208,23 @@ export class GooglePlacesProvider implements PlacesProvider {
         routingPreference: 'TRAFFIC_UNAWARE',
       }),
     });
-    if (!res.ok) throw new PlacesError('Could not calculate travel distance.', 'ROUTES_ERROR');
+    if (!res.ok) {
+      // Operators need the reason (Routes API not enabled for the key, key restrictions, quota…); the key is never logged.
+      const detail = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 240);
+      console.error(`[places] Routes API answered HTTP ${res.status} for place ${destination.placeId}: ${detail}`);
+      throw new PlacesError('Could not calculate travel distance.', 'ROUTES_ERROR');
+    }
     const json = (await res.json()) as {
       routes?: { distanceMeters?: number; duration?: string }[];
     };
     const route = json.routes?.[0];
     if (!route?.distanceMeters) {
+      // Every address failing this way points at the starting point, not at the addresses: a wrong sign or
+      // swapped BUSINESS_ORIGIN_LAT / BUSINESS_ORIGIN_LNG (Montréal is about 45.5, -73.6) or a point that is not on a road.
+      console.error(
+        `[places] Routes API found no route from ${origin.latitude},${origin.longitude} to place ${destination.placeId}. ` +
+          'If this happens for every address, check BUSINESS_ORIGIN_LAT / BUSINESS_ORIGIN_LNG (Montréal is about 45.5, -73.6).',
+      );
       throw new PlacesError('No route to that address.', 'ROUTES_NO_ROUTE');
     }
     return {
