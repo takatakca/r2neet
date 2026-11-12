@@ -2162,12 +2162,16 @@ button.addon-card{cursor:pointer}
   .phases{gap:3px}
   .phase{flex:1 1 0;min-width:26px;padding:6px 1px}
   .phase:not(.on) .phase-label{display:none}
-  .phase.on{flex:2.6 1 0;min-width:84px;padding:6px 6px}
+  /* The lit tab is as wide as its own content (number + label), never a fixed pill:
+     a long label such as « Coordonnées » used to be cut and push the number out.
+     The bar scrolls and keeps the lit tab in view when all nine do not fit. */
+  .phase.on{flex:0 0 auto;min-width:84px;padding:6px 10px}
+  .phase.on .phase-label{overflow:visible}
 }
 @media(max-width:380px){
   .phases{gap:2px;padding-inline:4px}
   .phase{min-width:23px}
-  .phase.on{min-width:78px}
+  .phase.on{min-width:78px;padding:6px 8px;font-size:11px}
   .phase:before{width:19px;height:19px}
 }
 </style>
