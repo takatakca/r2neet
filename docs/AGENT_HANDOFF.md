@@ -1,5 +1,12 @@
 # R2NETTE — Agent handoff
 
+## 2026-11-12 01:35 UTC — Claude (Anthropic) : connexion r2nette.ca en ligne, essai réel
+
+- **En production** : PR #58 fusionnée par le propriétaire (f5b8674) ; CI 43134584807 verte ; Deploy 43134768377 « Deploy verified for commit f5b86740… », `/healthz` et `/readyz` OK. `/api/v1/auth/takatak/config` → `{"configured":true,"google":true}` ; `/login` montre le courriel et Google, plus de bouton TAKATAK sombre ; `google/start` → 303 vers le centre TAKATAK sans `state`.
+- **Essai réel (téléphone Galaxy S9+, compte du propriétaire, accord du 2026-11-11)** : code demandé sur r2nette.ca, courriel reçu en 1 s, code saisi (jamais recopié ailleurs) → `email/verify` 200 → carte « Autoriser l’accès » (R2NETTE, `https://r2nette.ca/api/v1/auth/takatak/callback`, 4 accès) → Autoriser 200 → retour du centre sur notre `/callback` → **`/login?takatak=link-required`**, aucune session, aucune erreur de page. Cause attendue (décision 19) : un ancien profil R2NETTE porte déjà ce courriel sans être relié à ce compte TAKATAK ; il n’est jamais pris par simple correspondance de courriel. Le propriétaire se connecte comme d’habitude puis « Relier mon compte TAKATAK » sur `/account` (ce lien passe encore par takatak.ca).
+- **Courriel de code en ligne** : sujet « You’ve been invited », en-tête « Join a TAKATAK workspace » puis une section « Code de connexion / Sign-in code » avec le code (fonctionne). Le lien du courriel est cassé : `https://takatak.ca&token_hash=…&type=magiclink` ; takatak.ca attend `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=magiclink` (takatak-v1 `src/app/auth/callback/route.ts`).
+- **Reste** : propriétaire — modèles Magic Link (sujet, texte, lien corrigé) et Confirm signup (`{{ .Token }}`), adresse de retour Google, limites ; essai Google par le propriétaire ; essai avec une adresse neuve ; relier l’ancien profil. Ensuite phase 2 : bouton Google sur takatak.ca (takatak-v1, tableau des agents).
+
 ## 2026-11-12 — Claude (Anthropic) : corrections de la revue finale (connexion r2nette.ca)
 
 PR #57 fusionnée par le propriétaire le 2026-11-11 à 19:07 UTC (afa49b0) ; CI 43084202963 verte. **Deploy 43084427769 en échec** pendant la construction de l’image : le téléchargement de la clé PostgreSQL sur postgresql.org a été coupé (`curl: (18)`), sans lien avec le code ; rien n’a été déployé, la production sert toujours l’ancienne page (`/healthz`, `/readyz` OK). Volontairement pas relancé : la revue finale a trouvé un défaut bloquant pour Google.
