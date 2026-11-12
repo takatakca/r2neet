@@ -1979,6 +1979,9 @@ const ACTIONS: Record<string, (el: HTMLElement) => void | Promise<void>> = {
     }
 
     closeSheet();
+    // The booking lives in a pop-up that only « Book now » used to open: without this, these
+    // choices changed a step nobody could see and looked like they did nothing.
+    openBooking();
 
     if (helpAction === 'choose') {
       goTo('service');
