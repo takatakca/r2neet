@@ -16,12 +16,12 @@ const CALLBACK = `${ORIGIN}/api/v1/auth/takatak/callback`;
 
 type Row = Record<string, any>;
 
-function setup(opts: { identity?: Partial<TakatakIdentity>; customers?: Row[]; phones?: Row[]; sessionCustomer?: string | null } = {}) {
+function setup(opts: { identity?: Partial<TakatakIdentity>; customers?: Row[]; phones?: Row[]; sessions?: Row[]; sessionCustomer?: string | null } = {}) {
   const defaults = { firstName: null, lastName: null, email: null, preferredLocale: 'fr', registrationCompletedAt: null, termsAcceptedAt: null,
     privacyAcceptedAt: null, marketingConsent: false, marketingConsentUpdatedAt: null, createdAt: at, updatedAt: at };
   const customers: Row[] = (opts.customers ?? []).map((c) => ({ ...defaults, ...c }));
   const phones: Row[] = [...(opts.phones ?? [])];
-  const sessions: Row[] = [];
+  const sessions: Row[] = [...(opts.sessions ?? [])];
   const syncEvents: Row[] = [];
   const match = (row: Row, where: Row) => Object.entries(where).every(([k, v]) => row[k] === v);
   const prisma: any = {
@@ -29,6 +29,11 @@ function setup(opts: { identity?: Partial<TakatakIdentity>; customers?: Row[]; p
       findUnique: async () => (opts.sessionCustomer ? { customerId: opts.sessionCustomer, revokedAt: null, expiresAt: new Date('2027-01-01') } : null),
       update: async () => ({}),
       create: async ({ data }: any) => { sessions.push(data); return data; },
+      updateMany: async ({ where, data }: any) => {
+        const rows = sessions.filter((row) => row.customerId === where.customerId && row.revokedAt === where.revokedAt);
+        rows.forEach((row) => Object.assign(row, data));
+        return { count: rows.length };
+      },
     },
     customer: {
       findUnique: async ({ where }: any) => customers.find((c) => match(c, where)) ?? null,
@@ -167,13 +172,39 @@ describe('Continuer avec TAKATAK — sign-up and sign-in', () => {
     expect(s.sessions).toHaveLength(0);
   });
 
-  it('never takes over a historic profile that only lists the same email', async () => {
-    const s = setup({ customers: [{ id: 'historic', email: 'marie@example.ca', emailAuthSubject: null }] });
-    const { target, cookie } = await start(s.app);
+  it('claims the historic profile that carries the address TAKATAK just verified, and ends its older sessions', async () => {
+    const s = setup({
+      customers: [{ id: 'historic', email: 'marie@example.ca', emailAuthSubject: null, googleAuthSubject: null, firstName: 'Marie', lastName: 'T' }],
+      sessions: [{ customerId: 'historic', revokedAt: null, sessionTokenHash: 'old-phone-session' }, { customerId: 'someone-else', revokedAt: null }],
+    });
+    const { target, cookie } = await start(s.app, 'locale=fr&returnTo=%2Faccount');
     const res = await callback(s.app, cookie, target.searchParams.get('state')!);
-    expect(res.headers.location).toBe('/login?takatak=link-required');
-    expect(s.customers[0]!.emailAuthSubject).toBeNull();
-    expect(s.sessions).toHaveLength(0);
+    expect(res.headers.location).toBe('/account');
+    expect(s.customers).toHaveLength(1);
+    expect(s.customers[0]).toMatchObject({ id: 'historic', emailAuthSubject: 'takatak-user-1', emailVerifiedAt: at });
+    expect(s.sessions[0]!.revokedAt).toEqual(at);
+    expect(s.sessions[1]!.revokedAt).toBeNull();
+    expect(s.sessions.at(-1)).toMatchObject({ customerId: 'historic', emailVerifiedAt: at });
+    expect(s.syncEvents.at(-1)).toMatchObject({ eventType: 'PROFILE_UPDATED' });
+  });
+
+  it('claims it with no terms box ticked: the customer already exists', async () => {
+    const s = setup({ customers: [{ id: 'historic', email: 'marie@example.ca', emailAuthSubject: null, googleAuthSubject: null }] });
+    const { target, cookie } = await start(s.app, 'locale=fr');
+    const res = await callback(s.app, cookie, target.searchParams.get('state')!);
+    expect(res.headers.location).toBe('/#book');
+    expect(s.customers[0]!.emailAuthSubject).toBe('takatak-user-1');
+  });
+
+  it('refuses a profile another TAKATAK identity already owns', async () => {
+    for (const owner of [{ emailAuthSubject: 'someone-else', googleAuthSubject: null }, { emailAuthSubject: null, googleAuthSubject: 'someone-else' }]) {
+      const s = setup({ customers: [{ id: 'historic', email: 'marie@example.ca', ...owner }] });
+      const { target, cookie } = await start(s.app);
+      const res = await callback(s.app, cookie, target.searchParams.get('state')!);
+      expect(res.headers.location).toBe('/login?takatak=link-required');
+      expect(s.customers[0]!.emailAuthSubject).toBe(owner.emailAuthSubject);
+      expect(s.sessions).toHaveLength(0);
+    }
   });
 
   it('links a legacy phone customer when TAKATAK verified the same phone', async () => {

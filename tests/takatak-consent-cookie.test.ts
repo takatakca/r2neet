@@ -16,6 +16,7 @@ const handoff: ConsentHandoff = {
   authorizationId: 'abcdefghijklmnopqrstuvwxyz234567',
   accessToken: 'at-secret-token',
   subject: 'takatak-user-1',
+  email: 'marie@example.ca',
   createdAt: now,
 };
 
@@ -31,6 +32,7 @@ describe('TAKATAK consent cookie', () => {
     // Every field is inside the authenticated ciphertext, so none can be edited.
     expect(raw).not.toContain(handoff.subject);
     expect(raw).not.toContain(handoff.authorizationId);
+    expect(raw).not.toContain('marie@example.ca');
     expect(decodeConsent(raw, now + 60_000, env)).toEqual(handoff);
   });
 

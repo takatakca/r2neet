@@ -54,6 +54,10 @@
 <dt id="consentScopesLabel">Accès demandé</dt><dd><ul class="consent-scopes" id="consentScopes"></ul></dd>
 </dl>
 <p class="consent-note" id="consentNote">TAKATAK ne transmet votre choix qu’à cette adresse de retour.</p>
+<label class="check" id="consentTermsRow" hidden>
+<input id="consentTerms" type="checkbox">
+<span><span id="consentTermsLabel">Nouveau client : j’accepte les conditions et la politique de confidentialité.</span> <a href="/terms" target="_blank" rel="noopener" id="consentTermsLink">Conditions</a> · <a href="/privacy" target="_blank" rel="noopener" id="consentPrivacyLink">Confidentialité</a></span>
+</label>
 <div class="consent-actions">
 <button class="consent-approve" id="approve" type="button">Autoriser</button>
 <button class="consent-deny" id="deny" type="button">Refuser</button>
@@ -62,7 +66,6 @@
 
 <p role="status" aria-live="polite" id="status"></p>
 <p class="fine" id="smsNote">Après votre premier paiement, vous pourrez vérifier votre téléphone pour les confirmations SMS.</p>
-<a href="/phone-login" id="legacy">Déjà un compte avec téléphone ?</a>
 <p class="fine"><a href="/" id="back">Retour au site</a></p>
 </main>
 <script type="module" src="/src/lib/email-entry.ts"></script>

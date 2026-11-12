@@ -15,6 +15,8 @@ export interface ConsentHandoff {
   accessToken: string;
   /** TAKATAK user id the token belongs to; the consent details must name it. */
   subject: string;
+  /** The address TAKATAK verified, used to tell a returning customer from a new one. */
+  email: string | null;
   createdAt: number;
 }
 
@@ -36,6 +38,7 @@ export function encodeConsent(handoff: ConsentHandoff, env: Env = process.env): 
     v: 2,
     id: handoff.authorizationId,
     subject: handoff.subject,
+    email: handoff.email,
     token: handoff.accessToken,
     createdAt: handoff.createdAt,
   };
@@ -62,7 +65,13 @@ export function decodeConsent(raw: unknown, now: number, env: Env = process.env)
     ) {
       return null;
     }
-    return { authorizationId: p.id, accessToken: p.token, subject: p.subject, createdAt: p.createdAt };
+    return {
+      authorizationId: p.id,
+      accessToken: p.token,
+      subject: p.subject,
+      email: typeof p.email === 'string' && p.email ? p.email : null,
+      createdAt: p.createdAt,
+    };
   } catch {
     return null;
   }

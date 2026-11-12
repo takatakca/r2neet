@@ -33,3 +33,8 @@
 /* Keep the entry page's buttons above the cookie banner while it is shown (height set by email-entry.ts). */
 .account-entry{padding-bottom:calc(28px + var(--privacy-banner-h,0px))}
 html{scroll-padding-bottom:calc(var(--privacy-banner-h,0px) + 24px)}
+
+/* Claude (Anthropic) · 2026-11-12 — terms row on the dark consent card. */
+.consent-card .check { color: #f5f8fc; margin: 4px 0 18px; }
+.consent-card .check a { color: #8cc8ff; }
+.consent-card .check a:hover { color: #fff; }

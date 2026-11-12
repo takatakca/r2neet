@@ -55,7 +55,7 @@ const verifySchema = z
     returnTo: z.string().max(2048).optional(),
   })
   .strict();
-const decisionSchema = z.object({ decision: z.enum(['approve', 'deny']) }).strict();
+const decisionSchema = z.object({ decision: z.enum(['approve', 'deny']), terms: z.boolean().optional() }).strict();
 
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 
@@ -102,7 +102,6 @@ export function takatakSignInRoutes(
   provider: TakatakOAuthProvider,
   options: { publicUrl?: string; now: () => Date },
 ) {
-  void prisma; // the customer is created by the existing callback, not here
   const router = Router();
   const { now } = options;
   const secure = process.env.NODE_ENV === 'production';
@@ -182,12 +181,27 @@ export function takatakSignInRoutes(
       if (!next) throw new ApiError(502, 'CONSENT_INVALID', 'TAKATAK answered with an unexpected address.');
       return { next };
     }
-    if (!writeConsentCookie(res, { authorizationId, accessToken: session.accessToken, subject: session.subject, createdAt: at }, secure)) {
+    if (!writeConsentCookie(res, { authorizationId, accessToken: session.accessToken, subject: session.subject, email: session.email, createdAt: at }, secure)) {
       console.error('[takatak-signin] hub session too large for the consent cookie; sign-in refused');
       await provider.revokeSession(session.accessToken);
       throw new ApiError(503, 'TAKATAK_AUTH_UNAVAILABLE', 'TAKATAK sign-in is not available right now.');
     }
     return { consent: true };
+  }
+
+  /**
+   * A first-time customer has to accept the terms before an account is made.
+   * Ask on the consent card, where the person is, instead of failing after
+   * the code and Autoriser. Known customers (same TAKATAK id, or the same
+   * address) already accepted them.
+   */
+  async function needsTerms(handoff: { subject: string; email: string | null }, pending: Pending): Promise<boolean> {
+    if (pending.terms) return false;
+    const known = await prisma.customer.findFirst({
+      where: { OR: [{ emailAuthSubject: handoff.subject }, { googleAuthSubject: handoff.subject }, ...(handoff.email ? [{ email: handoff.email }] : [])] },
+      select: { id: true },
+    });
+    return !known;
   }
 
   function readHandoff(req: Request) {
@@ -253,14 +267,25 @@ export function takatakSignInRoutes(
       return;
     }
     const { appName, returnAddress, account, scopes } = view.details;
-    res.json({ app: appName, returnAddress, account, scopes });
+    res.json({ app: appName, returnAddress, account, scopes, needsTerms: await needsTerms(handoff, pending) });
   }));
 
   router.post('/auth/takatak/consent', run(async (req, res) => {
-    const { decision } = decisionSchema.parse(req.body);
+    const { decision, terms } = decisionSchema.parse(req.body);
     const base = requireBase();
     consentPerIp.take(ipOf(req));
-    const { handoff, pending } = readHandoff(req);
+    const { handoff, pending: stored } = readHandoff(req);
+    let pending = stored;
+    if (decision === 'approve') {
+      if (terms === true && !pending.terms) {
+        pending = { ...pending, terms: true };
+        // The callback reads the terms from this cookie when it creates the account.
+        writePending(res, pending, secure);
+      } else if (await needsTerms(handoff, pending)) {
+        // Nothing is spent: the handoff stays so the card can be ticked and sent again.
+        throw new ApiError(400, 'TERMS_REQUIRED', 'Accept the terms to create your account.');
+      }
+    }
     // One decision per handoff: the cookie goes whatever the hub answers.
     clearConsentCookie(res);
     try {

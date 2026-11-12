@@ -1,5 +1,16 @@
 # R2NETTE — Agent handoff
 
+## 2026-11-12 — Claude (Anthropic) : connexion qui aboutit, téléphone retiré, accordéon de réservation
+
+Ordre du propriétaire : après la connexion on revenait à l’écran de connexion ; pas de connexion par téléphone nulle part (r2nette.ca et takatak.ca), seulement courriel et Google ; sur téléphone, les options « équipe et durée » doivent s’ouvrir sous la carte choisie, une à la fois (accordéon). Branche `claude/email-google-only-login`.
+
+- **Cause du retour à la connexion** : l’essai réel du 2026-11-12 (compte du propriétaire) a montré que le code, la carte « Autoriser l’accès » et Autoriser fonctionnaient, puis `link-required` : un ancien profil R2NETTE portait déjà ce courriel et la règle de la décision 19 refusait de le reprendre, sans session. Même impasse possible : case des conditions oubliée (`terms`).
+- **Correctif** (décision 21) : le courriel que TAKATAK vient de vérifier réclame le profil existant (`emailAuthSubject`, `emailVerifiedAt`, sessions anciennes révoquées, connexion immédiate, retour à la page d’où l’on vient) sauf si une autre identité TAKATAK le possède. Les conditions se cochent sur la carte pour un nouveau client. Le bloc « Relier TAKATAK » du compte est retiré.
+- **Téléphone** : pages `/phone-login`, `/verify`, `/profile` → `/login` ; routes `auth/phone`, `auth/registration`, `auth/google` (liée au téléphone) → 410 sauf `R2NETTE_PHONE_LOGIN=true` ; code mort du téléphone retiré de la page de réservation. Les confirmations SMS facultatives après paiement restent (notifications). Conséquence : un client qui n’avait qu’un téléphone sur son profil, sans courriel, devient un nouveau client à sa première connexion par courriel. takatak.ca : traité séparément (takatak-v1).
+- **Accordéon** : jusqu’à 860 px, chaque carte (Ménage de base, Grand ménage, Déménagement…) ouvre ses options juste en dessous, une famille à la fois ; toucher la carte ouverte la ferme ; le défilement tient compte des barres collantes ; cartes ajustées pour 360 px (titre français « Déménagement, tapis et vitres »). Écran large inchangé.
+- **Preuves locales** : tsc OK ; vitest 833/833 sur PostgreSQL 16 UTC ; invariants 34/34 ; build OK ; Chromium (faux centre TAKATAK, vraie base) : ancien profil → `/account` avec session et contexte de réservation, nouveau client → carte des conditions → `/#book`, anciennes sessions révoquées, pages téléphone → `/login`, API téléphone 410 ; accordéon téléphone, tablette étroite, ordinateur.
+- **Reste** : PR, CI, fusion, Deploy, essai réel en ligne avec le compte du propriétaire (code lu dans sa boîte, jamais recopié) ; réglages Supabase du propriétaire (modèles de courriel, adresse de retour Google).
+
 ## 2026-11-12 — Claude (Anthropic) : corrections de la revue finale (connexion r2nette.ca)
 
 PR #57 fusionnée par le propriétaire le 2026-11-11 à 19:07 UTC (afa49b0) ; CI 43084202963 verte. **Deploy 43084427769 en échec** pendant la construction de l’image : le téléchargement de la clé PostgreSQL sur postgresql.org a été coupé (`curl: (18)`), sans lien avec le code ; rien n’a été déployé, la production sert toujours l’ancienne page (`/healthz`, `/readyz` OK). Volontairement pas relancé : la revue finale a trouvé un défaut bloquant pour Google.

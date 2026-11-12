@@ -12,7 +12,7 @@ let locale = detectLocale();
 let busy = false;
 let configured = false;
 let step: Step = 'choose';
-let consent: { app: string; returnAddress: string; account: string; scopes: string[] } | null = null;
+let consent: { app: string; returnAddress: string; account: string; scopes: string[]; needsTerms: boolean } | null = null;
 
 const $ = (id: string) => document.getElementById(id)!;
 const input = (id: string) => $(id) as HTMLInputElement;
@@ -42,18 +42,21 @@ const copy: Record<string, [string, string]> = {
   consentAccountLabel: ['Compte', 'Account'],
   consentScopesLabel: ['Accès demandé', 'Requested access'],
   consentNote: ['TAKATAK ne transmet votre choix qu’à cette adresse de retour.', 'TAKATAK sends your choice only to this return address.'],
+  consentTermsLabel: ['Nouveau client : j’accepte les conditions et la politique de confidentialité.', 'New customer: I accept the terms and privacy policy.'],
+  consentTermsLink: ['Conditions', 'Terms'],
+  consentPrivacyLink: ['Confidentialité', 'Privacy'],
   approve: ['Autoriser', 'Authorize'],
   deny: ['Refuser', 'Refuse'],
   smsNote: ['Après votre premier paiement, vous pourrez vérifier votre téléphone pour les confirmations SMS.', 'After your first payment, you can verify your phone for SMS confirmations.'],
-  legacy: ['Déjà un compte avec téléphone ?', 'Already have a phone-based account?'],
   back: ['Retour au site', 'Back to the website'],
 };
 
 const reasons: Record<string, [string, string]> = {
-  terms: ['Bienvenue ! Cochez la case des conditions, puis recommencez pour créer votre compte R2NETTE.', 'Welcome! Tick the terms box, then start again to create your R2NETTE account.'],
+  terms: ['Bienvenue ! Acceptez les conditions pour créer votre compte R2NETTE, puis recommencez.', 'Welcome! Accept the terms to create your R2NETTE account, then start again.'],
+  'terms-needed': ['Cochez la case des conditions pour créer votre compte, puis touchez Autoriser.', 'Tick the terms box to create your account, then tap Authorize.'],
   cancelled: ['Vous avez refusé l’accès. Vous pouvez recommencer quand vous voulez.', 'You refused access. You can start again whenever you like.'],
   expired: ['La connexion a expiré. Recommencez.', 'The sign-in expired. Start again.'],
-  'link-required': ['Un compte R2NETTE existe déjà avec ce courriel ou ce téléphone. Connectez-vous avec votre méthode habituelle, puis reliez TAKATAK depuis votre compte.', 'An R2NETTE account already uses this email or phone. Sign in with your usual method, then link TAKATAK from your account.'],
+  'link-required': ['Un autre compte TAKATAK est déjà relié au compte R2NETTE de ce courriel. Utilisez ce compte, ou appelez le (514) 825-2825.', 'Another TAKATAK account is already linked to the R2NETTE account for this email. Use that account, or call (514) 825-2825.'],
   'email-required': ['Votre compte TAKATAK n’a pas de courriel confirmé. Utilisez le code par courriel ci-dessus.', 'Your TAKATAK account has no confirmed email. Use the email code above.'],
   unavailable: ['Connexion indisponible pour le moment. Réessayez ou appelez le (514) 825-2825.', 'Sign-in is unavailable right now. Try again or call (514) 825-2825.'],
   error: ['La connexion n’a pas fonctionné. Réessayez.', 'The sign-in did not work. Try again.'],
@@ -88,7 +91,6 @@ function show(next: Step): void {
   $('codeForm').hidden = next !== 'code';
   $('consentCard').hidden = next !== 'consent';
   $('smsNote').hidden = next === 'consent';
-  $('legacy').hidden = next === 'consent';
 }
 
 function status(text: string): void { $('status').textContent = text; }
@@ -112,6 +114,7 @@ async function call(path: string, method: 'GET' | 'POST', body?: unknown): Promi
 function explain(e: unknown): void {
   const code = e instanceof CallError ? e.code : '';
   const expired = e instanceof CallError && e.httpStatus === 410;
+  if (code === 'TERMS_REQUIRED' && consent) { consent.needsTerms = true; renderConsent(); status(reasons['terms-needed']![locale === 'fr' ? 0 : 1]); return; }
   // The handoff is single-use: after a refused decision only a new start works.
   if (expired || code === 'CONSENT_INVALID') { consent = null; show('choose'); }
   status(
@@ -140,6 +143,8 @@ function renderConsent(): void {
     item.textContent = scope;
     list.append(item);
   }
+  // A first-time customer accepts the terms here, where they are, not after a failure.
+  $('consentTermsRow').hidden = !consent.needsTerms;
 }
 
 /** After a code or Google: fetch the authorization details and show the TAKATAK screen, or finish. */
@@ -151,6 +156,7 @@ async function openConsent(): Promise<void> {
     returnAddress: String(data.returnAddress ?? ''),
     account: String(data.account ?? ''),
     scopes: Array.isArray(data.scopes) ? data.scopes.map(String) : [],
+    needsTerms: data.needsTerms === true,
   };
   renderConsent();
   status('');
@@ -160,9 +166,14 @@ async function openConsent(): Promise<void> {
 
 async function decide(decision: 'approve' | 'deny'): Promise<void> {
   if (busy) return;
+  if (decision === 'approve' && consent?.needsTerms && !input('consentTerms').checked) {
+    status(reasons['terms-needed']![locale === 'fr' ? 0 : 1]);
+    input('consentTerms').focus();
+    return;
+  }
   lock(true);
   try {
-    const data = await call('consent', 'POST', { decision });
+    const data = await call('consent', 'POST', consent?.needsTerms && decision === 'approve' ? { decision, terms: true } : { decision });
     if (typeof data.next === 'string') { location.assign(data.next); return; }
     throw new CallError('UNAVAILABLE', 500);
   } catch (e) {
