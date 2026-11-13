@@ -15,6 +15,10 @@ export const CALLBACK_PATH = '/api/v1/auth/takatak/callback';
 export const TTL_MS = 10 * 60_000;
 export const DEFAULT_RETURN = '/#book';
 
+/** What the customer is doing: signing in, creating an account, or choosing a new password. */
+export type Intent = 'signin' | 'signup' | 'reset';
+const INTENTS: readonly string[] = ['signin', 'signup', 'reset'];
+
 export interface Pending {
   v: 1;
   state: string;
@@ -24,6 +28,8 @@ export interface Pending {
   terms: boolean;
   /** Signed-in R2NETTE customer who asked to link TAKATAK. */
   link: string | null;
+  /** 'signup' and 'reset' stop at the password step; 'signin' (the default) goes straight to the card. */
+  intent: Intent;
   createdAt: number;
 }
 
@@ -49,6 +55,7 @@ export function newPending(input: {
   locale: 'fr' | 'en';
   terms: boolean;
   link: string | null;
+  intent?: Intent;
   now: number;
 }): Pending {
   return {
@@ -59,6 +66,7 @@ export function newPending(input: {
     locale: input.locale,
     terms: input.terms,
     link: input.link,
+    intent: input.intent ?? 'signin',
     createdAt: input.now,
   };
 }
@@ -75,13 +83,15 @@ export function readPending(raw: unknown, now: number): Pending | null {
       (p.locale !== 'fr' && p.locale !== 'en') ||
       typeof p.terms !== 'boolean' ||
       (p.link !== null && typeof p.link !== 'string') ||
+      (p.intent !== undefined && !INTENTS.includes(p.intent)) ||
       typeof p.createdAt !== 'number' ||
       p.createdAt > now + 60_000 ||
       now - p.createdAt > TTL_MS
     ) {
       return null;
     }
-    return p as Pending;
+    // Cookies written before intents existed are plain sign-ins.
+    return { ...p, intent: p.intent ?? 'signin' } as Pending;
   } catch {
     return null;
   }
