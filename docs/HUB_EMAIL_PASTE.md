@@ -62,6 +62,12 @@ opens links on delivery cannot use up the code.
 A brand-new address gets this template. Use the same subject, and the same body as step 2 with one change in the
 TAKATAK half: `type=magiclink` becomes `type=signup`.
 
+**This step is now required for Sign up by email (live check, 2026-11-13 01:46 UTC).** The current Confirm-signup
+template has a link and no code ("Confirm your email address", link to takatak.ca). A brand-new customer who signs up
+by email on r2nette.ca is sent to the code step and never receives a code. Google sign-up and every customer the hub
+already knows (Magic Link template, which does carry the code) are not affected. Until this is pasted, a new customer
+can open the link in that email (it confirms the address), then ask for a code again.
+
 ## 4. Test
 
 On r2nette.ca, request a code with an address and read the email: subject and body must say R2NETTE and never
