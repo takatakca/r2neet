@@ -73,6 +73,8 @@ function setup(opts: { customers?: Row[]; phones?: Row[]; googleConfigured?: boo
     exchangeCode: vi.fn(async () => identity),
     sendEmailCode: vi.fn(async () => undefined),
     verifyEmailCode: vi.fn(async () => session),
+    signInWithPassword: vi.fn(async (_email: string, _password: string) => session),
+    setPassword: vi.fn(async (_accessToken: string, _password: string): Promise<void> => undefined),
     googleAuthorizationUrl: vi.fn(({ redirectUri }: { redirectUri: string; challenge: string }) => `https://auth.takatak.test/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUri)}`),
     exchangeGoogleCode: vi.fn(async () => session),
     beginAuthorization: vi.fn(async (input: { state: string; challenge: string }) => { begun.state = input.state; begun.challenge = input.challenge; return AUTH_ID; }),

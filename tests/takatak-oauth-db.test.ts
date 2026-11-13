@@ -51,6 +51,8 @@ suite('TAKATAK sign-in real PostgreSQL transactions', () => {
         googleConfigured: false,
         sendEmailCode: async () => undefined,
         verifyEmailCode: async () => { throw new Error('not used'); },
+        signInWithPassword: async () => { throw new Error('not used'); },
+        setPassword: async () => { throw new Error('not used'); },
         googleAuthorizationUrl: () => 'https://auth.takatak.example/authorize',
         exchangeGoogleCode: async () => { throw new Error('not used'); },
         beginAuthorization: async () => { throw new Error('not used'); },
