@@ -1,5 +1,13 @@
 # R2NETTE — Agent handoff
 
+## 2026-11-13 (suite 2) — Claude (Anthropic) : courriel d’inscription r2nette.ca appliqué au centre TAKATAK et vérifié en direct
+
+- **Ordre du propriétaire** : le courriel d’inscription doit avoir pour sujet « OTP for r2nette.ca Sign Up » et pour corps « Your one time password is below for r2nette.ca sign up. » suivi du code, au lieu du courriel « Confirm your email address » (lien sans code) du centre.
+- **Fait par l’assistant** avec un jeton d’accès Supabase temporaire donné par le propriétaire (formulaire sécurisé), par l’API de gestion Supabase, projet `pcjfahhlozsseqqevimi` : (1) l’adresse de retour `https://r2nette.ca/api/v1/auth/takatak/google/callback` ajoutée à la liste autorisée — elle manquait (seule l’ancienne `…/api/v1/auth/google/callback` y était), donc le centre ignorait quel site demandait le code, et un retour Google ne pouvait pas revenir sur r2nette.ca ; (2) modèles **Confirm signup** et **Magic Link** remplacés par une condition « si le site est r2nette.ca » dont l’autre moitié est le texte exact que le centre avait avant (les courriels de takatak.ca ne changent pas). Texte exact : `docs/HUB_EMAIL_PASTE.md`. L’ancienne configuration complète a été sauvegardée hors dépôt (dossier de session).
+- **Vérifié en direct (02:36–02:39 UTC)** : adresse neuve sur r2nette.ca → « OTP for r2nette.ca Sign Up » + code ; parcours complet (code → mot de passe → carte → retour à `/terms` → connexion par mot de passe → `/account`) réussi ; adresse déjà connue → « OTP for r2nette.ca » + code ; demandes de type takatak.ca (sans repère r2nette) → toujours « Confirm your email address » et « Join a TAKATAK workspace », inchangés. **Le centre garde les modèles en cache plusieurs minutes** : le premier courriel au nouveau texte est arrivé environ 7 minutes après le changement (journaux : la configuration est rechargée en quelques secondes, le texte suit).
+- **Non vérifié** : Google (inscription et connexion) — l’adresse de retour manquante en était la cause probable ; à essayer une fois par le propriétaire. Le nom de l’expéditeur reste « TAKATAK <noreply@mimt.ca> » (réglage SMTP commun du projet).
+- **À faire par le propriétaire** : révoquer le jeton Supabase temporaire (Supabase → Account → Access Tokens) et le retirer des secrets de l’environnement ; supprimer si voulu les adresses d’essai `takatak.ca+r2test1113{,b,c,d,e,f,g,h}@gmail.com` du centre.
+
 ## 2026-11-13 (suite) — Claude (Anthropic) : mots de passe fusionnés (PR #64, f47d593) et vérifiés en direct
 
 - **Fusionnée** par le propriétaire (f47d593) ; CI et Deploy 43346837229 réussis ; la page en ligne contient les onglets et `password/login` répond `INVALID_CREDENTIALS` pour une adresse inconnue.
