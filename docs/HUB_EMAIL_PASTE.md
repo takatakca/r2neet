@@ -1,9 +1,10 @@
-# Make the sign-in code email say R2NETTE (2 minutes, Supabase dashboard)
+# Make the r2nette.ca code emails say what the owner asked (2 minutes, Supabase dashboard)
 
-Why this is a manual step: the code email is sent by the TAKATAK hub (Supabase project `pcjfahhlozsseqqevimi`), and
-its wording is a project setting that only an account with access to that Supabase project can change. The r2nette.ca
-server already tells the hub which site asked (`redirect_to`). These three pastes make the hub answer in R2NETTE's
-voice for r2nette.ca and keep TAKATAK's wording for takatak.ca.
+Why this is a manual step: the code emails are sent by the TAKATAK hub (Supabase project `pcjfahhlozsseqqevimi`), and
+their wording is a project setting that only an account with access to that Supabase project can change (the
+management API answers "No access token provided" to this session, and no Supabase tool available to it edits Auth
+settings). The r2nette.ca server already tells the hub which site asked (`redirect_to`). These pastes make the hub
+answer in R2NETTE's voice for r2nette.ca and keep TAKATAK's wording for takatak.ca, so takatak.ca's emails do not change.
 
 Open: Supabase dashboard → project `pcjfahhlozsseqqevimi` → **Authentication**.
 
@@ -15,29 +16,50 @@ https://r2nette.ca/api/v1/auth/takatak/google/callback
 
 Without this line the hub ignores the marker and keeps the TAKATAK wording.
 
-## 2. Email Templates → **Magic Link**
+## 2. Email Templates → **Confirm signup** (the sign-up email for a brand-new address)
 
-**Subject** (if the box shows the raw `{{ … }}` text in a test email, use the plain line under it instead):
+**Subject:**
 
 ```
-{{ if eq .RedirectTo "https://r2nette.ca/api/v1/auth/takatak/google/callback" }}Votre code de connexion R2NETTE / Your R2NETTE sign-in code{{ else }}Votre code de connexion / Your sign-in code{{ end }}
+{{ if eq .RedirectTo "https://r2nette.ca/api/v1/auth/takatak/google/callback" }}OTP for r2nette.ca Sign Up{{ else }}Confirm your email address{{ end }}
 ```
-
-Plain fallback: `Votre code de connexion / Your sign-in code`
 
 **Message body** (replace everything in the box):
 
 ```html
 {{ if eq .RedirectTo "https://r2nette.ca/api/v1/auth/takatak/google/callback" }}
 <div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;color:#0a2547">
-<p style="font-size:20px;font-weight:bold;color:#0b4da2;margin:0 0 4px">R2NETTE</p>
-<p style="margin:0 0 20px;color:#6a8298;font-size:13px">Cleaning Services · r2nette.ca</p>
-<h2 style="margin:0 0 10px">Code de connexion / Sign-in code</h2>
-<p>Saisissez ce code sur r2nette.ca pour vous connecter :</p>
+<p>Your one time password is below for r2nette.ca sign up.</p>
 <p style="font-size:30px;font-weight:bold;letter-spacing:6px;margin:8px 0 16px">{{ .Token }}</p>
-<p>Enter this code on r2nette.ca to sign in. Never share it.</p>
-<p>Si vous n’avez pas demandé ce code, ignorez ce courriel. / If you did not request this code, ignore this email.</p>
-<p style="color:#6a8298;font-size:12px">R2NETTE · (514) 825-2825</p>
+</div>
+{{ else }}
+<h2>Confirm your email address</h2>
+<p>Follow the link below to confirm this email address and finish signing up.</p>
+<p><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email">Confirm email address</a></p>
+{{ end }}
+```
+
+The `{{ else }}` half is the email takatak.ca sends today (rebuilt from the message received on 2026-11-13; its link
+is `https://takatak.ca/auth/callback?token_hash=…&type=email`). If the box already holds the exact text you want for
+takatak.ca, keep it in that half. The R2NETTE half has no link on purpose: a mail scanner that opens links on delivery
+cannot use up the code. Optional: add a French line under the English one, for example
+`<p>Votre mot de passe à usage unique pour l’inscription à r2nette.ca :</p>`.
+
+## 3. Email Templates → **Magic Link** (an address the hub already knows: older accounts, "forgot password")
+
+**Subject:**
+
+```
+{{ if eq .RedirectTo "https://r2nette.ca/api/v1/auth/takatak/google/callback" }}OTP for r2nette.ca{{ else }}Votre code de connexion / Your sign-in code{{ end }}
+```
+
+**Message body** (replace everything in the box):
+
+```html
+{{ if eq .RedirectTo "https://r2nette.ca/api/v1/auth/takatak/google/callback" }}
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;color:#0a2547">
+<p>Your one time password is below for r2nette.ca.</p>
+<p style="font-size:30px;font-weight:bold;letter-spacing:6px;margin:8px 0 16px">{{ .Token }}</p>
 </div>
 {{ else }}
 <h2>Join a TAKATAK workspace</h2>
@@ -53,25 +75,21 @@ Plain fallback: `Votre code de connexion / Your sign-in code`
 {{ end }}
 ```
 
-The `{{ else }}` half is the email takatak.ca sends today, rebuilt from the message received on 2026-11-12, with its
-broken link (`https://takatak.ca&token_hash=…`) corrected. The R2NETTE half has no link on purpose: a mail scanner that
-opens links on delivery cannot use up the code.
+This one says "r2nette.ca" without "Sign Up" because it is also what a returning customer gets for "first sign-in or
+forgot password". The `{{ else }}` half is the email takatak.ca sends today (rebuilt from the message received on
+2026-11-12, with its broken link `https://takatak.ca&token_hash=…` corrected).
 
-## 3. Email Templates → **Confirm signup**
-
-A brand-new address gets this template. Use the same subject, and the same body as step 2 with one change in the
-TAKATAK half: `type=magiclink` becomes `type=signup`.
-
-**This step is now required for Sign up by email (live check, 2026-11-13 01:46 UTC).** The current Confirm-signup
-template has a link and no code ("Confirm your email address", link to takatak.ca). A brand-new customer who signs up
-by email on r2nette.ca is sent to the code step and never receives a code. Google sign-up and every customer the hub
-already knows (Magic Link template, which does carry the code) are not affected. Until this is pasted, a new customer
-can open the link in that email (it confirms the address), then ask for a code again.
+**Step 2 is required for Sign up by email** (live check, 2026-11-13 01:46 UTC): the Confirm-signup template that was in
+place had a link and no code, so a brand-new customer was sent to the code step and never received a code. Google
+sign-up and every customer the hub already knows (Magic Link, which carries the code) were not affected.
 
 ## 4. Test
 
-On r2nette.ca, request a code with an address and read the email: subject and body must say R2NETTE and never
-TAKATAK. Then request one on takatak.ca: it must read as before.
+On r2nette.ca (`/login?tab=signup`), sign up with a brand-new address: the email must read
+**OTP for r2nette.ca Sign Up** / *Your one time password is below for r2nette.ca sign up.* and show the code. Then do
+the same with an address the hub already knows, and request a sign-up on takatak.ca: it must read as before.
+If a test email shows raw `{{ … }}` text or the TAKATAK wording on r2nette.ca, step 1 is missing or the subject box does
+not accept templates; tell the assistant what you see.
 
 ## Known limit
 
