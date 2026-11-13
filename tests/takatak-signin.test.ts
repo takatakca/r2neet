@@ -632,7 +632,7 @@ describe('Sign in on r2nette.ca — password step (sign up and forgotten passwor
     const { app, jar } = await waiting();
     expect((await get(app, new Jar(), 'password/status')).status).toBe(410);
     const status = await get(app, jar, 'password/status');
-    expect([status.status, status.body]).toEqual([200, { email: 'marie@example.ca' }]);
+    expect([status.status, status.body]).toEqual([200, { email: 'marie@example.ca', intent: 'signup' }]);
     // Someone mid-way through a plain sign-in has no password step.
     const plain = new Jar();
     await post(app, plain, 'email/verify', verifyBody());
@@ -776,7 +776,7 @@ describe('Sign in on r2nette.ca — password step with Google', () => {
     expect(back.headers.location).toBe('/login?step=password&returnTo=%2Faccount');
     expect(provider.beginAuthorization).not.toHaveBeenCalled();
     expect(customers).toHaveLength(0);
-    expect((await get(app, signup, 'password/status')).body).toEqual({ email: 'marie@example.ca' });
+    expect((await get(app, signup, 'password/status')).body).toEqual({ email: 'marie@example.ca', intent: 'signup' });
     expect((await get(app, signup, 'consent')).status).toBe(409);
     const saved = await post(app, signup, 'password/set', { password: PW, confirm: PW });
     expect([saved.status, saved.body]).toEqual([200, { consent: true }]);

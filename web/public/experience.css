@@ -38,3 +38,25 @@ html{scroll-padding-bottom:calc(var(--privacy-banner-h,0px) + 24px)}
 .consent-card .check { color: #f5f8fc; margin: 4px 0 18px; }
 .consent-card .check a { color: #8cc8ff; }
 .consent-card .check a:hover { color: #fff; }
+/* Claude (Anthropic) · 2026-11-13 — Sign in / Sign up tabs and the password step on /login. */
+.entry-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:5px;margin:22px 0 4px;background:#e7eff8;border-radius:14px}
+.entry-tabs [role=tab]{min-height:46px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-weight:700;padding:8px 10px}
+.entry-tabs [role=tab][aria-selected=true]{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(10,37,71,.18)}
+.entry-tabs [role=tab]:not([aria-selected=true]):hover{color:var(--navy)}
+.password-field{position:relative}
+.password-field input{padding-right:104px}
+.reveal{position:absolute;right:6px;top:50%;transform:translateY(-50%);min-height:38px;padding:6px 12px;border:0;border-radius:9px;background:#e7eff8;color:var(--navy);font-size:14px;font-weight:650}
+.linklike{display:block;min-height:44px;margin-top:6px;padding:10px 0;border:0;background:none;color:var(--blue);font-weight:650;text-decoration:underline;text-align:left}
+.reset-note{margin:16px 0 0;padding:12px 14px;border-radius:12px;background:#eef5fd;border:1px solid var(--line);font-size:14px}
+.password-for{margin:18px 0 0;font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.password-for strong{color:var(--navy)}
+.rules{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px;font-size:14px;color:var(--muted)}
+.rules li{display:flex;align-items:center;gap:9px}
+.rules .mark{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid #b8cbdc;display:grid;place-items:center;font-size:12px;line-height:1;font-weight:800;color:#fff}
+.rules li[data-ok=true]{color:var(--navy)}
+.rules li[data-ok=true] .mark{background:#1a7f4b;border-color:#1a7f4b}
+.rules li[data-ok=true] .mark::before{content:"✓"}
+#matchNote[data-ok=true]{color:#1a7f4b}
+#passwordNote:empty,#matchNote:empty{display:none}
+.sr-only{position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+@media(max-width:380px){.password-field input{padding-right:92px}.reveal{padding:6px 9px}}

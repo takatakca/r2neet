@@ -343,8 +343,9 @@ export function takatakSignInRoutes(
   router.get('/auth/takatak/password/status', run(async (req, res) => {
     requireBase();
     consentPerIp.take(ipOf(req));
-    const { handoff } = readPasswordStage(req);
-    res.json({ email: handoff.email });
+    const { handoff, pending } = readPasswordStage(req);
+    // The intent tells the page whether to word the step as "create" or as "choose a new" password.
+    res.json({ email: handoff.email, intent: pending.intent });
   }));
 
   router.post('/auth/takatak/password/set', run(async (req, res) => {
