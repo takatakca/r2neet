@@ -1,5 +1,13 @@
 # R2NETTE — Agent handoff
 
+## 2026-11-13 (suite) — Claude (Anthropic) : mots de passe fusionnés (PR #64, f47d593) et vérifiés en direct
+
+- **Fusionnée** par le propriétaire (f47d593) ; CI et Deploy 43346837229 réussis ; la page en ligne contient les onglets et `password/login` répond `INVALID_CREDENTIALS` pour une adresse inconnue.
+- **Essai réel sur r2nette.ca** (Chromium taille téléphone, français, 2026-11-13 01:49 UTC, une adresse d’essai étiquetée `takatak.ca+r2test1113@gmail.com` sur la boîte TAKATAK, code lu une fois et non conservé, mot de passe aléatoire non conservé) : onglet S’inscrire → code → **étape mot de passe avant la carte** (mot de passe faible refusé, l’étape reste ouverte) → carte « Autoriser l’accès » (R2NETTE) → retour sur `/terms`, connecté ; puis connexion par mot de passe (mauvais mot de passe refusé, bon mot de passe → carte → `/terms`) et `/account` avec le tableau de bord ; aucune erreur de page. **Compte d’essai laissé** dans le centre TAKATAK et dans R2NETTE (à supprimer si voulu).
+- **À FAIRE PAR LE PROPRIÉTAIRE — constaté en direct** : une adresse **neuve** qui s’inscrit par courriel reçoit le modèle « Confirm signup » du centre, qui contient un lien vers takatak.ca **et aucun code** ; la page attend un code qui n’arrive pas. Les clients déjà connus du centre (modèle « Magic Link », qui contient le code) et l’inscription Google ne sont pas touchés. Correctif : coller le modèle **Confirm signup** (`docs/HUB_EMAIL_PASTE.md`, étape 3). En attendant, un nouveau client peut ouvrir le lien du courriel (il confirme l’adresse) puis redemander un code. Le faux centre des essais locaux accepte tout code, donc il ne pouvait pas montrer ce problème.
+- **Non vérifié en direct** : Google (inscription et connexion), « mot de passe oublié » (même chemin que l’inscription côté serveur), livraison des données vers TAKATAK (désactivée).
+- **Toujours côté propriétaire** : réservation en ligne bloquée (502 `ROUTES_NO_ROUTE`, aucune plage), texte du courriel du code (étapes 1–2 du même fichier), activation de la synchro TAKATAK.
+
 ## 2026-11-13 — Claude (Anthropic) : comptes avec mot de passe sur /login (branche `claude/password-accounts`, pas encore fusionnée)
 
 Ordre du propriétaire : deux onglets sur `/login`, **Se connecter** et **S’inscrire**. Inscription = Google ou courriel + code, puis **mot de passe + confirmation**, puis la carte « Autoriser l’accès », puis retour à la page quittée. Connexion = courriel + mot de passe, ou Google. TAKATAK doit garder les données du client.
