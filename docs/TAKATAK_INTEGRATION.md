@@ -167,3 +167,37 @@ Owner steps in the TAKATAK Supabase dashboard (not done by the agent; the hub ec
 Local check: `tests/takatak-signin.test.ts` (routes, forged redirect, expiry, limits), `tests/takatak-signin-provider.test.ts` (hub calls), `tests/takatak-consent-cookie.test.ts`; the Chromium run of 2026-11-11 used a local hub stub (phone + desktop, FR + EN, approve, refuse, Google, wrong code).
 
 Not changed: `R2NETTE_EMAIL_AUTH_ENABLED` and `/api/v1/auth/email/*` remain in the code but the page no longer uses them (later cleanup).
+
+## Password accounts on r2nette.ca (Claude, Anthropic — 2026-11-13, owner order)
+
+`/login` has two tabs, **Se connecter / Sign in** and **S'inscrire / Sign up** (`?tab=signup`). The password lives in the TAKATAK hub (Supabase Auth) and nowhere in R2NETTE: no hash, no column, no log, no cookie after the step, never in the outbox.
+
+| Road | Steps |
+| --- | --- |
+| Sign up by email | email → code → **choose password + confirm** → « Autoriser l'accès » → back to the page left |
+| Sign up with Google | Google → **choose password + confirm** (`/login?step=password`) → card → back |
+| Sign in | email + password → card → back (no email is sent), or Google → card → back |
+| First sign-in of an older code-only account, or forgot password | « Première connexion ou mot de passe oublié ? » → code → new password → card → back |
+
+Server (`src/api/takatak-signin.ts`, under `/api/v1/auth/takatak`):
+
+- `POST /email/verify {…, intent}`: `signin` (default) goes to the card; `signup` and `reset` stop at the password step and answer `{ password: true, email }`. The hub session waits in the same encrypted handoff cookie, marked `stage: 'password'`, with no authorization yet. `GET`/`POST /consent` answer **409 `PASSWORD_REQUIRED`** while that stage is open.
+- `GET /google/start?intent=signup|reset`: the intent rides in the Google flow cookie; the callback then goes to `/login?step=password` instead of the card.
+- `GET /password/status` → `{ email, intent }` or 410.
+- `POST /password/set { password, confirm }`: checks the rule (`src/shared/password-policy.ts`, the same file the page uses), `PUT /auth/v1/user { password }` at the hub with the held session, then opens the authorization (the card). The hub saying "same password" counts as done, so a retry after a hiccup carries on.
+- `POST /password/login { email, password, locale, terms, returnTo? }`: hub password grant (`POST /auth/v1/token?grant_type=password`), then the card. **One answer, 401 `INVALID_CREDENTIALS`,** for a wrong password, an address with no account and a customer with no password yet.
+
+Limits: 5 password attempts per address per 15 minutes (the sixth is 429 `PASSWORD_LOGIN_LIMIT` and never reaches the hub; an attempt is counted before the hub is asked, given back when the hub could not judge it, cleared by a good password); the existing 30 checks per visitor per hour; the password step lives 10 minutes. A person can lock an address out of password sign-in for 15 minutes by guessing; the code and Google roads stay open, so this is accepted.
+
+**Hub password rule (observed 2026-11-12, a hub setting we do not control):** at least 12 characters and at least one lower-case letter, one upper-case letter, one digit and one symbol from ``!@#$%^&*()_+-=[]{};'\:"|<>?,./`~``; bcrypt reads 72 bytes at most, so longer is refused. The page shows the rules as a live checklist, has show/hide, a confirm field and a « Suggérer un mot de passe fort » button (`crypto.getRandomValues`). If the hub rule changes, change `src/shared/password-policy.ts`.
+
+Every hub call leaves from this server's IP, so the hub's per-IP limits are shared by all r2nette customers; the limits above sit in front of them.
+
+### Customer data to TAKATAK (what the owner asked for)
+
+Nothing new is needed for sign-up: the callback that creates the customer already queues `CUSTOMER_REGISTERED` and `PROFILE_UPDATED`, and addresses and payment summaries queue `ADDRESS_UPDATED` / `PAYMENT_SUMMARY_UPDATED`, in the signed outbox described at the top of this file (profile fields, consent records, saved service addresses, payment status in cents). Proof, local, 2026-11-13: the browser runs created `CUSTOMER_REGISTERED` rows in `TakatakSyncEvent` for every sign-up, with `PENDING` status and no password in the payload. **Bookings are not part of this bridge** (owner scope: profile, addresses, payments); adding a bookings event needs a TAKATAK release too.
+
+Delivery is **off** until the owner turns it on, so those rows wait as `PENDING`. Owner steps, in order (the list under "Production activation sequence" above has the detail): TAKATAK receiver PR #175 merged and released; matching client id and webhook secret on both sides (`TAKATAK_R2NETTE_SYNC_CLIENT_ID`, `TAKATAK_R2NETTE_SYNC_WEBHOOK_SECRET`, `TAKATAK_R2NETTE_SYNC_URL`); `npm run sync:takatak-backfill` once (queues today's customers); then `TAKATAK_R2NETTE_SYNC_ENABLED=true` and a server-setup deploy. Never paste the secret in chat or in the repository.
+
+Local check: `tests/password-policy.test.ts`, `tests/takatak-signin-provider.test.ts` (hub calls, no password in any error), `tests/takatak-consent-cookie.test.ts` (stage, intent), `tests/takatak-signin.test.ts` (steps, stage guard, limits, no password in any cookie or body); real browser: `scripts/dev/signin-browser-check.cjs` against `scripts/dev/hub-stub.cjs` (69 checks, desktop English and phone French, see `RUN.md`).
+

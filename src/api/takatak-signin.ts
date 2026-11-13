@@ -18,6 +18,7 @@ import { ApiError } from './app.js';
 import { encryptionConfigured } from '../auth/encryption.js';
 import { IdentityError, RateLimiter } from '../identity/identity.js';
 import { requestedScopeText, type HubSession, type TakatakOAuthProvider } from '../identity/takatak-oauth.js';
+import { passwordProblems } from '../shared/password-policy.js';
 import {
   CALLBACK_PATH,
   DEFAULT_RETURN,
@@ -31,6 +32,7 @@ import {
   safeReturn,
   sameSecret,
   writePending,
+  type Intent,
   type Pending,
 } from './takatak-shared.js';
 import {
@@ -46,10 +48,25 @@ const GOOGLE_CALLBACK_PATH = '/api/v1/auth/takatak/google/callback';
 
 const email = z.string().trim().email().max(254).transform((s) => s.toLowerCase());
 const sendSchema = z.object({ email }).strict();
+const intentSchema = z.enum(['signin', 'signup', 'reset']);
 const verifySchema = z
   .object({
     email,
     code: z.string().regex(/^\d{6,10}$/),
+    locale: z.enum(['en', 'fr']),
+    terms: z.boolean(),
+    returnTo: z.string().max(2048).optional(),
+    // 'signup' and 'reset' stop at the password step; the default is the plain sign-in.
+    intent: intentSchema.default('signin'),
+  })
+  .strict();
+// Passwords are read exactly as typed (no trim). The cap only keeps a hostile body small.
+const passwordText = z.string().min(1).max(256);
+const setPasswordSchema = z.object({ password: passwordText, confirm: z.string().max(256) }).strict();
+const loginSchema = z
+  .object({
+    email,
+    password: passwordText,
     locale: z.enum(['en', 'fr']),
     terms: z.boolean(),
     returnTo: z.string().max(2048).optional(),
@@ -81,6 +98,43 @@ class SlidingWindow {
     this.hits.set(key, recent);
   }
 }
+/**
+ * Password sign-in attempts per address: 5 in 15 minutes, then 429 until the window passes. An attempt is
+ * counted before the hub is asked (parallel guesses cannot all slip through) and given back when the hub
+ * could not judge it (its own limit, an outage). A good password clears the count.
+ */
+const PASSWORD_ATTEMPTS = 5;
+const PASSWORD_WINDOW_MS = 15 * 60_000;
+
+class AttemptWindow {
+  private readonly hits = new Map<string, number[]>();
+  constructor(private readonly limit: number, private readonly windowMs: number, private readonly clock: () => number) {}
+  private recent(key: string): number[] {
+    const cutoff = this.clock() - this.windowMs;
+    const recent = (this.hits.get(key) ?? []).filter((t) => t > cutoff);
+    if (recent.length) this.hits.set(key, recent);
+    else this.hits.delete(key);
+    return recent;
+  }
+  /** Reserve one attempt, or refuse when the window is full. */
+  take(key: string): void {
+    const recent = this.recent(key);
+    if (recent.length >= this.limit) throw new IdentityError('Too many attempts. Try again in a few minutes.', 'PASSWORD_LOGIN_LIMIT');
+    recent.push(this.clock());
+    this.hits.set(key, recent);
+    if (this.hits.size > 5_000) for (const k of [...this.hits.keys()]) this.recent(k);
+  }
+  /** Give back the latest attempt (the hub never judged it). */
+  giveBack(key: string): void {
+    const recent = this.recent(key);
+    recent.pop();
+    if (recent.length) this.hits.set(key, recent);
+    else this.hits.delete(key);
+  }
+  clear(key: string): void {
+    this.hits.delete(key);
+  }
+}
 const encodePending = (p: Pending) => Buffer.from(JSON.stringify(p)).toString('base64url');
 
 /** Hub failures keep their code; the HTTP status follows the spec. */
@@ -88,7 +142,7 @@ function toApiError(error: unknown): unknown {
   if (!(error instanceof IdentityError)) return error;
   const { code } = error;
   const status =
-    code === 'EMAIL_CODE_INVALID' || code === 'GOOGLE_AUTH_DENIED' ? 401
+    code === 'EMAIL_CODE_INVALID' || code === 'GOOGLE_AUTH_DENIED' || code === 'INVALID_CREDENTIALS' ? 401
       : code === 'CONSENT_EXPIRED' ? 410
       : code === 'CONSENT_INVALID' ? 502
         : code.includes('LIMIT') || code === 'OTP_COOLDOWN' ? 429
@@ -108,6 +162,7 @@ export function takatakSignInRoutes(
   const limiter = new RateLimiter(undefined, () => now().getTime());
   const checksPerIp = new SlidingWindow(CHECKS_PER_IP_PER_HOUR, () => now().getTime());
   const consentPerIp = new SlidingWindow(CONSENT_CALLS_PER_IP_PER_HOUR, () => now().getTime());
+  const passwordAttempts = new AttemptWindow(PASSWORD_ATTEMPTS, PASSWORD_WINDOW_MS, () => now().getTime());
   const ipOf = (req: Request) => req.ip ?? 'unknown';
 
   router.use('/auth/takatak', (_req, res, next) => {
@@ -214,7 +269,39 @@ export function takatakSignInRoutes(
     const handoff = decodeConsent(req.cookies?.[TAKATAK_CONSENT_COOKIE], at);
     const pending = readPending(req.cookies?.[TAKATAK_OAUTH_COOKIE], at);
     if (!handoff || !pending) throw new ApiError(410, 'CONSENT_EXPIRED', 'This sign-in expired. Start again.');
+    // The card comes after the password: never before it.
+    if (handoff.stage === 'password') throw new ApiError(409, 'PASSWORD_REQUIRED', 'Choose your password first.');
     return { handoff, pending };
+  }
+
+  /** The handoff of a customer who still has to choose a password. */
+  function readPasswordStage(req: Request) {
+    const at = now().getTime();
+    const handoff = decodeConsent(req.cookies?.[TAKATAK_CONSENT_COOKIE], at);
+    const pending = readPending(req.cookies?.[TAKATAK_OAUTH_COOKIE], at);
+    if (!handoff || handoff.stage !== 'password' || !pending) throw new ApiError(410, 'CONSENT_EXPIRED', 'This sign-in expired. Start again.');
+    return { handoff, pending };
+  }
+
+  /**
+   * Sign-up and forgotten-password stop here after the code or Google: the hub session waits
+   * (encrypted, 10 minutes) for the password to be chosen. No authorization exists yet.
+   */
+  async function startPasswordStep(
+    res: Response,
+    session: HubSession,
+    input: { returnTo: string; locale: 'fr' | 'en'; terms: boolean; intent: Intent },
+  ): Promise<void> {
+    if (!encryptionConfigured()) {
+      throw new ApiError(503, 'TAKATAK_AUTH_UNAVAILABLE', 'TAKATAK sign-in is not available right now.');
+    }
+    const at = now().getTime();
+    writePending(res, newPending({ returnTo: input.returnTo, locale: input.locale, terms: input.terms, link: null, intent: input.intent, now: at }), secure);
+    if (!writeConsentCookie(res, { authorizationId: '', accessToken: session.accessToken, subject: session.subject, email: session.email, createdAt: at, stage: 'password' }, secure)) {
+      console.error('[takatak-signin] hub session too large for the consent cookie; sign-in refused');
+      await provider.revokeSession(session.accessToken);
+      throw new ApiError(503, 'TAKATAK_AUTH_UNAVAILABLE', 'TAKATAK sign-in is not available right now.');
+    }
   }
 
   /* ---------------- email code ---------------- */
@@ -242,12 +329,59 @@ export function takatakSignInRoutes(
     // Count every attempt, including malformed hub replies and failures.
     limiter.recordFailedCheck(key);
     const session = await provider.verifyEmailCode(input.email, input.code);
-    const result = await beginConsent(res, session, {
-      returnTo: safeReturn(input.returnTo, base),
-      locale: input.locale,
-      terms: input.terms,
-    }, base);
-    res.json(result);
+    const where = { returnTo: safeReturn(input.returnTo, base), locale: input.locale, terms: input.terms };
+    if (input.intent !== 'signin') {
+      await startPasswordStep(res, session, { ...where, intent: input.intent });
+      res.json({ password: true, email: session.email });
+      return;
+    }
+    res.json(await beginConsent(res, session, where, base));
+  }));
+
+  /* ---------------- password ---------------- */
+
+  router.get('/auth/takatak/password/status', run(async (req, res) => {
+    requireBase();
+    consentPerIp.take(ipOf(req));
+    const { handoff, pending } = readPasswordStage(req);
+    // The intent tells the page whether to word the step as "create" or as "choose a new" password.
+    res.json({ email: handoff.email, intent: pending.intent });
+  }));
+
+  router.post('/auth/takatak/password/set', run(async (req, res) => {
+    const { password, confirm } = setPasswordSchema.parse(req.body);
+    const base = requireBase();
+    consentPerIp.take(ipOf(req));
+    const { handoff, pending } = readPasswordStage(req);
+    // Nothing is spent on a mistake: the step stays open so the form can be corrected and sent again.
+    if (password !== confirm) throw new ApiError(400, 'PASSWORD_MISMATCH', 'The two passwords are not the same.');
+    if (passwordProblems(password, handoff.email).length) throw new ApiError(400, 'WEAK_PASSWORD', 'Choose a stronger password.');
+    try {
+      await provider.setPassword(handoff.accessToken, password);
+    } catch (error) {
+      // The hub already has exactly this password (a retry after a hiccup, or the old one retyped): done.
+      if (!(error instanceof IdentityError && error.code === 'PASSWORD_UNCHANGED')) throw error;
+    }
+    const session: HubSession = { accessToken: handoff.accessToken, subject: handoff.subject, email: handoff.email, phone: null };
+    res.json(await beginConsent(res, session, { returnTo: pending.returnTo, locale: pending.locale, terms: pending.terms }, base));
+  }));
+
+  router.post('/auth/takatak/password/login', run(async (req, res) => {
+    const input = loginSchema.parse(req.body);
+    const base = requireBase();
+    const key = hash(input.email);
+    checksPerIp.take(ipOf(req));
+    passwordAttempts.take(key);
+    let session: HubSession;
+    try {
+      session = await provider.signInWithPassword(input.email, input.password);
+    } catch (error) {
+      // Only a verdict on the password counts; a hub limit or outage says nothing about it.
+      if (!(error instanceof IdentityError && error.code === 'INVALID_CREDENTIALS')) passwordAttempts.giveBack(key);
+      throw error;
+    }
+    passwordAttempts.clear(key);
+    res.json(await beginConsent(res, session, { returnTo: safeReturn(input.returnTo, base), locale: input.locale, terms: input.terms }, base));
   }));
 
   /* ---------------- consent screen ---------------- */
@@ -336,6 +470,7 @@ export function takatakSignInRoutes(
       locale: req.query.locale === 'en' ? 'en' : 'fr',
       terms: req.query.terms === '1',
       link: null,
+      intent: req.query.intent === 'signup' ? 'signup' : req.query.intent === 'reset' ? 'reset' : 'signin',
       now: now().getTime(),
     });
     try {
@@ -378,8 +513,12 @@ export function takatakSignInRoutes(
     }
     try {
       const session = await provider.exchangeGoogleCode({ code, verifier: pending.verifier });
-      await beginConsent(res, session, { returnTo: pending.returnTo, locale: pending.locale, terms: pending.terms }, base);
-      const query = new URLSearchParams({ consent: '1' });
+      const where = { returnTo: pending.returnTo, locale: pending.locale, terms: pending.terms };
+      const signingIn = pending.intent === 'signin';
+      if (signingIn) await beginConsent(res, session, where, base);
+      else await startPasswordStep(res, session, { ...where, intent: pending.intent });
+      // Sign-up goes to the password step; a plain Google sign-in goes straight to the card.
+      const query = new URLSearchParams(signingIn ? { consent: '1' } : { step: 'password' });
       if (pending.returnTo !== DEFAULT_RETURN) query.set('returnTo', pending.returnTo);
       res.redirect(303, `/login?${query.toString()}`);
     } catch {

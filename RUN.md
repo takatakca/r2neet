@@ -31,8 +31,9 @@ Everything else is optional and degrades to a NOT_CONFIGURED state.
 - `/admin` — dashboard, dispatch, callbacks, reviews, integrations, cutover
 - `/crew?staffId=<id>` — the cleaner's phone app
 
-`/account` uses the same phone-verified session as booking. There is no
-password and no separate sign-up: verify once and your cleanings are there.
+`/account` uses the same signed-in session as booking. Customers sign in on
+`/login` with email + password or Google, and sign up with Google or an emailed
+code followed by a password (the password lives in the TAKATAK hub, never here).
 
 ## Staff accounts
 
@@ -199,3 +200,20 @@ business consequence spelled out.
 
 A weekly workflow re-runs the restore drill, so recovery is verified on a
 schedule rather than assumed. Require the `CI` check on `main`.
+
+## Checking the sign-in in a browser (no real TAKATAK account needed)
+
+`scripts/dev/hub-stub.cjs` is a stand-in for the TAKATAK hub that enforces the real password rule; `scripts/dev/signin-browser-check.cjs` drives `/login` in Chromium (sign up by email and by Google, sign in by password and by Google, wrong password, forgot password, the card, the return to the page left, a locked address).
+
+```bash
+node scripts/dev/hub-stub.cjs &                       # hub on 127.0.0.1:3200
+DATABASE_URL=postgresql://… PRISMA_DATABASE_URL=postgresql://… HOST=127.0.0.1 PORT=3100 \
+PUBLIC_URL=http://127.0.0.1:3100 TAKATAK_SUPABASE_URL=http://127.0.0.1:3200 \
+TAKATAK_SUPABASE_ANON_KEY=stub-anon TAKATAK_OAUTH_CLIENT_ID=stub-client \
+FIELD_ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))") npm start &
+node scripts/dev/signin-browser-check.cjs             # desktop, English
+MOBILE=1 node scripts/dev/signin-browser-check.cjs    # phone, French (restart the site first: it limits attempts per visitor)
+```
+
+If the machine's Playwright browsers differ from the project's pinned version, set `CHROMIUM=/path/to/chrome`. The check waits 30 s where it reuses an address, because the site allows one code per address every 30 s.
+

@@ -2,7 +2,7 @@
 // and "Autoriser" lives encrypted in a short-lived cookie.
 import { describe, it, expect } from 'vitest';
 import { generateEncryptionKey } from '../src/auth/encryption.js';
-import { TTL_MS } from '../src/api/takatak-shared.js';
+import { TTL_MS, newPending, readPending } from '../src/api/takatak-shared.js';
 import {
   MAX_CONSENT_COOKIE_BYTES,
   consentCookieBytes,
@@ -82,3 +82,56 @@ describe('TAKATAK consent cookie', () => {
     expect(() => encodeConsent(handoff, {})).toThrow(/FIELD_ENCRYPTION_KEY/);
   });
 });
+
+// Claude (Anthropic) · 2026-11-13 — password accounts. Between "code verified" and "password saved" the
+// hub token waits in the same encrypted cookie, marked so the consent routes cannot be used to skip the step.
+describe('TAKATAK consent cookie: password stage', () => {
+  const waiting: ConsentHandoff = { ...handoff, authorizationId: '', stage: 'password' };
+
+  it('round-trips a password-stage handoff that has no authorization yet', () => {
+    const raw = encodeConsent(waiting, env);
+    expect(raw).not.toContain('at-secret-token');
+    expect(decodeConsent(raw, now + 1_000, env)).toEqual({ ...waiting, approvedRedirect: null });
+  });
+
+  it('refuses an empty authorization id unless the handoff is in the password stage', () => {
+    const raw = encodeConsent({ ...handoff, authorizationId: '' }, env);
+    expect(decodeConsent(raw, now + 1_000, env)).toBeNull();
+  });
+
+  it('a normal handoff has no stage', () => {
+    expect(decodeConsent(encodeConsent(handoff, env), now + 1_000, env)?.stage).toBeUndefined();
+  });
+
+  it('drops a stage it does not know instead of trusting it', () => {
+    const raw = encodeConsent({ ...handoff, stage: 'other' as unknown as 'password' }, env);
+    expect(decodeConsent(raw, now + 1_000, env)?.stage).toBeUndefined();
+  });
+});
+
+describe('TAKATAK flow cookie: sign-in intent', () => {
+  const base = { returnTo: '/#book', locale: 'fr' as const, terms: true, link: null, now };
+  const cookie = (p: object) => Buffer.from(JSON.stringify(p)).toString('base64url');
+
+  it('defaults to a plain sign-in', () => {
+    expect(newPending(base).intent).toBe('signin');
+    expect(newPending({ ...base, intent: 'signup' }).intent).toBe('signup');
+    expect(newPending({ ...base, intent: 'reset' }).intent).toBe('reset');
+  });
+
+  it('round-trips every intent', () => {
+    for (const intent of ['signin', 'signup', 'reset'] as const) {
+      expect(readPending(cookie(newPending({ ...base, intent })), now + 1_000)?.intent).toBe(intent);
+    }
+  });
+
+  it('reads a cookie written before intents existed as a plain sign-in', () => {
+    const { intent: _intent, ...old } = newPending(base);
+    expect(readPending(cookie(old), now + 1_000)?.intent).toBe('signin');
+  });
+
+  it('rejects an intent it does not know', () => {
+    expect(readPending(cookie({ ...newPending(base), intent: 'admin' }), now + 1_000)).toBeNull();
+  });
+});
+

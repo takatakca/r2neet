@@ -25,6 +25,12 @@ export interface ConsentHandoff {
    * Refuser drops it. Null when the hub is waiting for the person's own answer.
    */
   approvedRedirect?: string | null;
+  /**
+   * 'password' while the customer still has to choose a password (sign-up, or a forgotten password).
+   * No authorization exists yet in that stage (`authorizationId` is empty), and the consent routes
+   * refuse the handoff, so the password step cannot be skipped by going to the card directly.
+   */
+  stage?: 'password';
 }
 
 type Env = Record<string, string | undefined>;
@@ -48,6 +54,7 @@ export function encodeConsent(handoff: ConsentHandoff, env: Env = process.env): 
     email: handoff.email,
     token: handoff.accessToken,
     ok: handoff.approvedRedirect ?? null,
+    ...(handoff.stage ? { st: handoff.stage } : {}),
     createdAt: handoff.createdAt,
   };
   return encryptSecret(JSON.stringify(payload), env);
@@ -62,9 +69,10 @@ export function decodeConsent(raw: unknown, now: number, env: Env = process.env)
   if (typeof raw !== 'string' || !raw || raw.length > 8192) return null;
   try {
     const p = JSON.parse(decryptSecret(raw, env)) as Record<string, unknown>;
+    const stage = p.st === 'password' ? 'password' : undefined;
     if (
       p.v !== 2 ||
-      typeof p.id !== 'string' || !p.id ||
+      typeof p.id !== 'string' || (!p.id && !stage) ||
       typeof p.subject !== 'string' || !p.subject ||
       typeof p.token !== 'string' || !p.token ||
       typeof p.createdAt !== 'number' ||
@@ -79,6 +87,7 @@ export function decodeConsent(raw: unknown, now: number, env: Env = process.env)
       subject: p.subject,
       email: typeof p.email === 'string' && p.email ? p.email : null,
       approvedRedirect: typeof p.ok === 'string' && p.ok && p.ok.length <= 2048 ? p.ok : null,
+      ...(stage ? { stage } : {}),
       createdAt: p.createdAt,
     };
   } catch {

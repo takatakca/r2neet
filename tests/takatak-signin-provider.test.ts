@@ -211,3 +211,88 @@ describe('TAKATAK hub: consent on r2nette.ca', () => {
     expect(consentScopeText('', 'en')).toEqual([]);
   });
 });
+
+// Claude (Anthropic) · 2026-11-13 — passwords live in the hub: r2nette only sets one (after a code or Google)
+// and checks one (password sign-in). Neither call may ever put the password in an error.
+describe('TAKATAK hub: password', () => {
+  const secret = 'Correct-Horse-9!';
+  const user = { id: 'u1', email: 'marie@example.ca', email_confirmed_at: '2026-11-13T00:00:00Z', phone: '' };
+
+  it('checks a password through the hub password grant and returns the session', async () => {
+    const ok = fakeFetch(() => json({ access_token: 'pw-at', user }));
+    const p = new SupabaseTakatakOAuthProvider(env, ok.fetcher);
+    await expect(p.signInWithPassword('Marie@Example.ca', secret)).resolves.toEqual({ accessToken: 'pw-at', subject: 'u1', email: 'marie@example.ca', phone: null });
+    expect(ok.calls[0]!.url).toBe('https://auth.takatak.test/auth/v1/token?grant_type=password');
+    expect(ok.calls[0]!.init!.method).toBe('POST');
+    expect(bodyOf(ok.calls[0]!)).toEqual({ email: 'marie@example.ca', password: secret });
+    expect(headersOf(ok.calls[0]!).apikey).toBe('public-anon');
+    expect(headersOf(ok.calls[0]!).Authorization).toBeUndefined();
+  });
+
+  it('sends the password exactly as typed, spaces included', async () => {
+    const ok = fakeFetch(() => json({ access_token: 'pw-at', user }));
+    await new SupabaseTakatakOAuthProvider(env, ok.fetcher).signInWithPassword('marie@example.ca', '  Spaced-Out-9!  ');
+    expect(bodyOf(ok.calls[0]!).password).toBe('  Spaced-Out-9!  ');
+  });
+
+  it('answers the same INVALID_CREDENTIALS for a wrong password, an unknown email, an unconfirmed email and a mismatched user', async () => {
+    const cases = [
+      json({ error: 'invalid_grant', error_code: 'invalid_credentials' }, 400),
+      json({ error_code: 'email_not_confirmed' }, 400),
+      json({}, 401),
+      json({}, 422),
+      json({ access_token: 'x', user: { ...user, email: 'someone-else@example.ca' } }),
+      json({ access_token: 'x', user: { ...user, email_confirmed_at: null } }),
+      json({ user }), // no access token
+    ];
+    for (const response of cases) {
+      const p = new SupabaseTakatakOAuthProvider(env, fakeFetch(() => response.clone()).fetcher);
+      const error = await p.signInWithPassword('marie@example.ca', secret).catch((e: unknown) => e);
+      expect(error).toMatchObject({ code: 'INVALID_CREDENTIALS' });
+      expect(JSON.stringify(error)).not.toContain(secret);
+      expect(String((error as Error).message)).not.toContain(secret);
+    }
+  });
+
+  it('maps hub limits and outages on sign-in without calling them a wrong password', async () => {
+    const limited = new SupabaseTakatakOAuthProvider(env, fakeFetch(() => json({}, 429)).fetcher);
+    await expect(limited.signInWithPassword('marie@example.ca', secret)).rejects.toMatchObject({ code: 'PASSWORD_PROVIDER_LIMIT' });
+    const down = new SupabaseTakatakOAuthProvider(env, fakeFetch(() => { throw new TypeError('fetch failed'); }).fetcher);
+    await expect(down.signInWithPassword('marie@example.ca', secret)).rejects.toMatchObject({ code: 'TAKATAK_AUTH_UNAVAILABLE' });
+    const error500 = new SupabaseTakatakOAuthProvider(env, fakeFetch(() => json({}, 502)).fetcher);
+    await expect(error500.signInWithPassword('marie@example.ca', secret)).rejects.toMatchObject({ code: 'TAKATAK_AUTH_UNAVAILABLE' });
+  });
+
+  it('sets a password with PUT /user and the customer token', async () => {
+    const ok = fakeFetch(() => json({ id: 'u1' }));
+    await expect(new SupabaseTakatakOAuthProvider(env, ok.fetcher).setPassword('hub-at', secret)).resolves.toBeUndefined();
+    expect(ok.calls[0]!.url).toBe('https://auth.takatak.test/auth/v1/user');
+    expect(ok.calls[0]!.init!.method).toBe('PUT');
+    expect(headersOf(ok.calls[0]!).Authorization).toBe('Bearer hub-at');
+    expect(headersOf(ok.calls[0]!).apikey).toBe('public-anon');
+    expect(bodyOf(ok.calls[0]!)).toEqual({ password: secret });
+  });
+
+  it('translates the hub answers for setting a password, never echoing the password', async () => {
+    const cases: Array<[Response, string]> = [
+      [json({ error_code: 'weak_password', msg: 'Password should contain lowercase' }, 422), 'WEAK_PASSWORD'],
+      [json({ error_code: 'same_password' }, 422), 'PASSWORD_UNCHANGED'],
+      // Anything else is not about the password (our own rule was met): it must not be called "weak".
+      [json({ error_code: 'reauthentication_needed' }, 422), 'TAKATAK_AUTH_UNAVAILABLE'],
+      [json({}, 400), 'TAKATAK_AUTH_UNAVAILABLE'],
+      [json({}, 401), 'CONSENT_EXPIRED'],
+      [json({}, 403), 'CONSENT_EXPIRED'],
+      [json({}, 429), 'PASSWORD_PROVIDER_LIMIT'],
+      [json({}, 503), 'TAKATAK_AUTH_UNAVAILABLE'],
+    ];
+    for (const [response, code] of cases) {
+      const p = new SupabaseTakatakOAuthProvider(env, fakeFetch(() => response.clone()).fetcher);
+      const error = await p.setPassword('hub-at', secret).catch((e: unknown) => e);
+      expect(error).toMatchObject({ code });
+      expect(JSON.stringify(error)).not.toContain(secret);
+      expect(String((error as Error).message)).not.toContain(secret);
+    }
+    const down = new SupabaseTakatakOAuthProvider(env, fakeFetch(() => { throw new TypeError('fetch failed'); }).fetcher);
+    await expect(down.setPassword('hub-at', secret)).rejects.toMatchObject({ code: 'TAKATAK_AUTH_UNAVAILABLE' });
+  });
+});

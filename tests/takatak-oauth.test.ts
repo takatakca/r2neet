@@ -89,6 +89,8 @@ function setup(opts: { identity?: Partial<TakatakIdentity>; customers?: Row[]; p
     googleConfigured: true,
     sendEmailCode: vi.fn(),
     verifyEmailCode: vi.fn(),
+    signInWithPassword: vi.fn(),
+    setPassword: vi.fn(),
     googleAuthorizationUrl: vi.fn(() => 'https://auth.takatak.test/auth/v1/authorize'),
     exchangeGoogleCode: vi.fn(),
     beginAuthorization: vi.fn(),

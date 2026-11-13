@@ -54,6 +54,14 @@ export interface TakatakOAuthProvider {
    */
   sendEmailCode(email: string, options?: { redirectTo?: string }): Promise<void>;
   verifyEmailCode(email: string, code: string): Promise<HubSession>;
+  // Claude (Anthropic) · 2026-11-13 — password accounts. The password lives only in the hub.
+  /**
+   * Checks an email and password at the hub. Every refusal (wrong password, unknown email, email never
+   * confirmed) is the same `INVALID_CREDENTIALS`, so the answer never says whether an account exists.
+   */
+  signInWithPassword(email: string, password: string): Promise<HubSession>;
+  /** Sets (or replaces) the password of the hub account behind `accessToken`. Resolves with nothing. */
+  setPassword(accessToken: string, password: string): Promise<void>;
   /** The hub keeps its own state for Google and never returns ours; PKCE binds the code to this browser. */
   googleAuthorizationUrl(input: { redirectUri: string; challenge: string }): string;
   exchangeGoogleCode(input: { code: string; verifier: string }): Promise<HubSession>;
@@ -189,6 +197,37 @@ export class SupabaseTakatakOAuthProvider implements TakatakOAuthProvider {
     const confirmedAt = text(user?.email_confirmed_at, 64);
     if (!session || session.email !== email || !confirmedAt || !Number.isFinite(Date.parse(confirmedAt))) throw invalid();
     return session;
+  }
+
+  async signInWithPassword(email: string, password: string): Promise<HubSession> {
+    const response = await this.hub('/token?grant_type=password', {
+      method: 'POST',
+      headers: this.hubHeaders(),
+      body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+    });
+    if (response.status === 429) throw new IdentityError('Please wait before trying again.', 'PASSWORD_PROVIDER_LIMIT');
+    const refused = () => new IdentityError('The email or password is not right.', 'INVALID_CREDENTIALS');
+    if (!response.ok) throw refused();
+    const body = await SupabaseTakatakOAuthProvider.body(response);
+    const session = this.sessionFrom(body);
+    const user = (body?.user ?? null) as Record<string, unknown> | null;
+    const confirmedAt = text(user?.email_confirmed_at, 64);
+    if (!session || session.email !== email.trim().toLowerCase() || !confirmedAt || !Number.isFinite(Date.parse(confirmedAt))) throw refused();
+    return session;
+  }
+
+  async setPassword(accessToken: string, password: string): Promise<void> {
+    const response = await this.hub('/user', { method: 'PUT', headers: this.hubHeaders(accessToken), body: JSON.stringify({ password }) });
+    if (response.ok) return;
+    if (response.status === 429) throw new IdentityError('Please wait before trying again.', 'PASSWORD_PROVIDER_LIMIT');
+    if (response.status === 401 || response.status === 403) throw SupabaseTakatakOAuthProvider.gone();
+    const body = await SupabaseTakatakOAuthProvider.body(response);
+    const reason = typeof body?.error_code === 'string' ? body.error_code : '';
+    if (reason === 'same_password') throw new IdentityError('The new password is the same as the current one.', 'PASSWORD_UNCHANGED');
+    if (reason === 'weak_password') throw new IdentityError('The hub did not accept this password.', 'WEAK_PASSWORD');
+    // Any other refusal (a hub setting such as re-authentication, a change at the hub) is not the
+    // customer's password: our own rule was already met, so do not call it weak.
+    this.unavailable();
   }
 
   googleAuthorizationUrl(input: { redirectUri: string; challenge: string }): string {

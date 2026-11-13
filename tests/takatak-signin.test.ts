@@ -73,6 +73,8 @@ function setup(opts: { customers?: Row[]; phones?: Row[]; googleConfigured?: boo
     exchangeCode: vi.fn(async () => identity),
     sendEmailCode: vi.fn(async () => undefined),
     verifyEmailCode: vi.fn(async () => session),
+    signInWithPassword: vi.fn(async (_email: string, _password: string) => session),
+    setPassword: vi.fn(async (_accessToken: string, _password: string): Promise<void> => undefined),
     googleAuthorizationUrl: vi.fn(({ redirectUri }: { redirectUri: string; challenge: string }) => `https://auth.takatak.test/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUri)}`),
     exchangeGoogleCode: vi.fn(async () => session),
     beginAuthorization: vi.fn(async (input: { state: string; challenge: string }) => { begun.state = input.state; begun.challenge = input.challenge; return AUTH_ID; }),
@@ -570,5 +572,358 @@ describe('Sign in on r2nette.ca — config', () => {
   it('reports google in the config', async () => {
     expect((await request(setup().app).get('/api/v1/auth/takatak/config')).body).toEqual({ configured: true, google: true });
     expect((await request(setup({ googleConfigured: false }).app).get('/api/v1/auth/takatak/config')).body).toEqual({ configured: true, google: false });
+  });
+});
+
+// Claude (Anthropic) · 2026-11-13 — password accounts. Sign up (email code or Google) ends with a chosen
+// password before the « Autoriser l’accès » card; existing customers sign in with email + password.
+// The password lives only in the hub: it is never stored, logged or put in a cookie by this server.
+describe('Sign in on r2nette.ca — password step (sign up and forgotten password)', () => {
+  const PW = 'Correct-Horse-9!x';
+  const verifyBody = (extra: Record<string, unknown> = {}) => ({ email: 'marie@example.ca', code: '123456', locale: 'fr', terms: true, ...extra });
+  async function waiting(extra: Record<string, unknown> = {}) {
+    const ctx = setup();
+    const jar = new Jar();
+    const verified = await post(ctx.app, jar, 'email/verify', verifyBody({ intent: 'signup', ...extra }));
+    return { ...ctx, jar, verified };
+  }
+
+  it('a sign-up code stops at the password step: no card, no authorization, nothing created yet', async () => {
+    const { provider, jar, verified, customers, sessions } = await waiting();
+    expect(verified.status).toBe(200);
+    expect(verified.body).toEqual({ password: true, email: 'marie@example.ca' });
+    expect(provider.verifyEmailCode).toHaveBeenCalledWith('marie@example.ca', '123456');
+    expect(provider.setPassword).not.toHaveBeenCalled();
+    expect(provider.beginAuthorization).not.toHaveBeenCalled();
+    expect(jar.has('r2n_takatak_consent')).toBe(true);
+    expect(jar.get('r2n_takatak_consent')).not.toContain('hub-at');
+    expect(decode(jar.get('r2n_takatak_oauth')!)).toMatchObject({ intent: 'signup', returnTo: '/#book', locale: 'fr', terms: true });
+    expect(customers).toHaveLength(0);
+    expect(sessions).toHaveLength(0);
+  });
+
+  it('a forgotten-password code stops at the same step', async () => {
+    const { verified, jar } = await waiting({ intent: 'reset' });
+    expect(verified.body).toEqual({ password: true, email: 'marie@example.ca' });
+    expect(decode(jar.get('r2n_takatak_oauth')!).intent).toBe('reset');
+  });
+
+  it('a plain sign-in code still goes straight to the card, and an unknown intent is refused', async () => {
+    const { app, provider } = setup();
+    const jar = new Jar();
+    expect((await post(app, jar, 'email/verify', verifyBody({ intent: 'signin' }))).body).toEqual({ consent: true });
+    expect((await post(app, new Jar(), 'email/verify', verifyBody())).body).toEqual({ consent: true });
+    const bad = await post(app, new Jar(), 'email/verify', verifyBody({ intent: 'admin' }));
+    expect([bad.status, bad.body.error.code]).toEqual([400, 'VALIDATION_ERROR']);
+    expect(provider.verifyEmailCode).toHaveBeenCalledTimes(2);
+  });
+
+  it('the card cannot be reached while the password is still to be chosen', async () => {
+    const { app, jar, provider } = await waiting();
+    const read = await get(app, jar, 'consent');
+    expect([read.status, read.body.error.code]).toEqual([409, 'PASSWORD_REQUIRED']);
+    const decide = await post(app, jar, 'consent', { decision: 'approve' });
+    expect([decide.status, decide.body.error.code]).toEqual([409, 'PASSWORD_REQUIRED']);
+    expect(provider.decideConsent).not.toHaveBeenCalled();
+    expect(jar.has('r2n_takatak_consent')).toBe(true); // still there for the password step
+  });
+
+  it('status says whether a password step is waiting, and for which address', async () => {
+    const { app, jar } = await waiting();
+    expect((await get(app, new Jar(), 'password/status')).status).toBe(410);
+    const status = await get(app, jar, 'password/status');
+    expect([status.status, status.body]).toEqual([200, { email: 'marie@example.ca', intent: 'signup' }]);
+    // Someone mid-way through a plain sign-in has no password step.
+    const plain = new Jar();
+    await post(app, plain, 'email/verify', verifyBody());
+    expect((await get(app, plain, 'password/status')).status).toBe(410);
+  });
+
+  it('refuses a mismatch or a weak password without calling the hub, and keeps the step open for a retry', async () => {
+    const { app, jar, provider } = await waiting();
+    const mismatch = await post(app, jar, 'password/set', { password: PW, confirm: PW + 'x' });
+    expect([mismatch.status, mismatch.body.error.code]).toEqual([400, 'PASSWORD_MISMATCH']);
+    for (const weak of ['short1A!', 'alllowercase1!', 'NOLOWERCASE1!', 'NoDigitsHere!!', 'NoSymbolsHere12', 'Marie-Password-1!']) {
+      const res = await post(app, jar, 'password/set', { password: weak, confirm: weak });
+      expect([res.status, res.body.error.code]).toEqual([400, 'WEAK_PASSWORD']);
+    }
+    expect(provider.setPassword).not.toHaveBeenCalled();
+    expect((await get(app, jar, 'password/status')).status).toBe(200);
+    expect((await post(app, jar, 'password/set', { password: PW, confirm: PW })).status).toBe(200);
+  });
+
+  it('sets the password at the hub, shows the card, and Autoriser signs in and returns to the page the customer left', async () => {
+    const { app, jar, provider, customers, sessions, begun } = await waiting({ returnTo: '/account' });
+    const saved = await post(app, jar, 'password/set', { password: PW, confirm: PW });
+    expect([saved.status, saved.body]).toEqual([200, { consent: true }]);
+    expect(provider.setPassword).toHaveBeenCalledTimes(1);
+    expect(provider.setPassword).toHaveBeenCalledWith('hub-at', PW);
+    expect(provider.beginAuthorization).toHaveBeenCalledTimes(1);
+
+    const card = await get(app, jar, 'consent');
+    expect(card.status).toBe(200);
+    expect(card.body.app).toBe('R2NETTE');
+    const approved = await post(app, jar, 'consent', { decision: 'approve' });
+    expect(approved.status).toBe(200);
+    const next = new URL(approved.body.next);
+    const finished = await get(app, jar, next.pathname + next.search);
+    expect(finished.status).toBe(303);
+    expect(finished.headers.location).toBe('/account');
+    expect(begun.state).toBeTruthy();
+    expect(customers).toHaveLength(1);
+    expect(sessions).toHaveLength(1);
+  });
+
+  it('sends the password exactly as typed, spaces included', async () => {
+    const { app, jar, provider } = await waiting();
+    const spaced = '  Correct-Horse-9!x  ';
+    expect((await post(app, jar, 'password/set', { password: spaced, confirm: spaced })).status).toBe(200);
+    expect(provider.setPassword).toHaveBeenCalledWith('hub-at', spaced);
+  });
+
+  it('never stores or returns the password: not in a cookie, not in any body', async () => {
+    const { app, jar, provider } = await waiting();
+    const saved = await post(app, jar, 'password/set', { password: PW, confirm: PW });
+    const card = await get(app, jar, 'consent');
+    expect(jar.header()).not.toContain(PW);
+    expect(JSON.stringify([saved.body, card.body])).not.toContain(PW);
+    for (const cookie of ['r2n_takatak_consent', 'r2n_takatak_oauth']) {
+      const raw = jar.get(cookie)!;
+      expect(raw).not.toContain(encodeURIComponent(PW));
+      expect(Buffer.from(raw, 'base64url').toString('utf8')).not.toContain(PW);
+    }
+    expect(provider.revokeSession).not.toHaveBeenCalled();
+  });
+
+  it('answers 410, never 500, with no password step, after it was used, or after it expired', async () => {
+    const { app, jar, tick } = await waiting();
+    expect((await post(app, new Jar(), 'password/set', { password: PW, confirm: PW })).status).toBe(410);
+    // A customer in the middle of a plain sign-in cannot use this route to change anything.
+    const plain = new Jar();
+    await post(app, plain, 'email/verify', verifyBody());
+    const wrongStage = await post(app, plain, 'password/set', { password: PW, confirm: PW });
+    expect([wrongStage.status, wrongStage.body.error.code]).toEqual([410, 'CONSENT_EXPIRED']);
+    // Used: the second try finds the card stage, not the password stage.
+    expect((await post(app, jar, 'password/set', { password: PW, confirm: PW })).status).toBe(200);
+    const again = await post(app, jar, 'password/set', { password: PW, confirm: PW });
+    expect([again.status, again.body.error.code]).toEqual([410, 'CONSENT_EXPIRED']);
+    // Expired.
+    const late = new Jar();
+    await post(app, late, 'email/verify', verifyBody({ intent: 'signup' }));
+    tick(11 * 60_000);
+    expect((await post(app, late, 'password/set', { password: PW, confirm: PW })).status).toBe(410);
+    expect((await get(app, late, 'password/status')).status).toBe(410);
+  });
+
+  it('treats "the hub already has this password" as done, so a retry after a hiccup carries on', async () => {
+    const { app, jar, provider } = await waiting();
+    provider.setPassword.mockRejectedValueOnce(new IdentityError('same', 'PASSWORD_UNCHANGED'));
+    const saved = await post(app, jar, 'password/set', { password: PW, confirm: PW });
+    expect([saved.status, saved.body]).toEqual([200, { consent: true }]);
+  });
+
+  it('keeps the step open when the hub is down after the password was set, and the retry finishes', async () => {
+    const { app, jar, provider } = await waiting();
+    provider.beginAuthorization.mockRejectedValueOnce(new IdentityError('down', 'TAKATAK_AUTH_UNAVAILABLE'));
+    const first = await post(app, jar, 'password/set', { password: PW, confirm: PW });
+    expect([first.status, first.body.error.code]).toEqual([503, 'TAKATAK_AUTH_UNAVAILABLE']);
+    provider.setPassword.mockRejectedValueOnce(new IdentityError('same', 'PASSWORD_UNCHANGED'));
+    const retry = await post(app, jar, 'password/set', { password: PW, confirm: PW });
+    expect([retry.status, retry.body]).toEqual([200, { consent: true }]);
+  });
+
+  it('maps what the hub says about a password to the documented codes', async () => {
+    const { app, jar, provider } = await waiting();
+    provider.setPassword.mockRejectedValueOnce(new IdentityError('weak', 'WEAK_PASSWORD'));
+    let res = await post(app, jar, 'password/set', { password: PW, confirm: PW });
+    expect([res.status, res.body.error.code]).toEqual([400, 'WEAK_PASSWORD']);
+    provider.setPassword.mockRejectedValueOnce(new IdentityError('limit', 'PASSWORD_PROVIDER_LIMIT'));
+    res = await post(app, jar, 'password/set', { password: PW, confirm: PW });
+    expect([res.status, res.body.error.code]).toEqual([429, 'PASSWORD_PROVIDER_LIMIT']);
+    provider.setPassword.mockRejectedValueOnce(new IdentityError('gone', 'CONSENT_EXPIRED'));
+    res = await post(app, jar, 'password/set', { password: PW, confirm: PW });
+    expect([res.status, res.body.error.code]).toEqual([410, 'CONSENT_EXPIRED']);
+    expect(provider.beginAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed bodies and other-site posts', async () => {
+    const { app, jar } = await waiting();
+    for (const body of [{}, { password: PW }, { password: '', confirm: '' }, { password: PW, confirm: PW, extra: 1 }, { password: 'x'.repeat(300), confirm: 'x'.repeat(300) }]) {
+      const res = await post(app, jar, 'password/set', body);
+      expect([res.status, res.body.error.code]).toEqual([400, 'VALIDATION_ERROR']);
+    }
+    const cross = await post(app, jar, 'password/set', { password: PW, confirm: PW }, { 'Sec-Fetch-Site': 'cross-site' });
+    expect(cross.status).toBe(403);
+  });
+
+  it('replaces a forged returnTo on the sign-up path as well', async () => {
+    const { jar } = await waiting({ returnTo: `${ORIGIN}//evil.example` });
+    expect(decode(jar.get('r2n_takatak_oauth')!).returnTo).toBe('/#book');
+  });
+});
+
+describe('Sign in on r2nette.ca — password step with Google', () => {
+  const PW = 'Correct-Horse-9!x';
+
+  it('a Google sign-up comes back to the password step; a Google sign-in goes straight to the card', async () => {
+    const { app, provider, customers } = setup();
+    const signup = new Jar();
+    const started = await get(app, signup, 'google/start?locale=fr&returnTo=%2Faccount&terms=1&intent=signup');
+    expect(started.status).toBe(303);
+    expect(decode(signup.get('r2n_takatak_google')!)).toMatchObject({ intent: 'signup', returnTo: '/account' });
+    const back = await get(app, signup, 'google/callback?code=g');
+    expect(back.status).toBe(303);
+    expect(back.headers.location).toBe('/login?step=password&returnTo=%2Faccount');
+    expect(provider.beginAuthorization).not.toHaveBeenCalled();
+    expect(customers).toHaveLength(0);
+    expect((await get(app, signup, 'password/status')).body).toEqual({ email: 'marie@example.ca', intent: 'signup' });
+    expect((await get(app, signup, 'consent')).status).toBe(409);
+    const saved = await post(app, signup, 'password/set', { password: PW, confirm: PW });
+    expect([saved.status, saved.body]).toEqual([200, { consent: true }]);
+    expect(provider.setPassword).toHaveBeenCalledWith('hub-at', PW);
+
+    const signin = new Jar();
+    await get(app, signin, 'google/start?locale=fr&returnTo=%2Faccount&terms=1');
+    expect(decode(signin.get('r2n_takatak_google')!).intent).toBe('signin');
+    const straight = await get(app, signin, 'google/callback?code=g');
+    expect(straight.headers.location).toBe('/login?consent=1&returnTo=%2Faccount');
+  });
+
+  it('an unknown intent in the address is a plain sign-in', async () => {
+    const { app } = setup();
+    const jar = new Jar();
+    await get(app, jar, 'google/start?intent=admin');
+    expect(decode(jar.get('r2n_takatak_google')!).intent).toBe('signin');
+  });
+
+  it('goes back to the sign-in page, not to a half-open step, when the password step cannot be held', async () => {
+    const { app } = setup();
+    const jar = new Jar();
+    await get(app, jar, 'google/start?intent=signup');
+    delete process.env.FIELD_ENCRYPTION_KEY;
+    try {
+      const back = await get(app, jar, 'google/callback?code=g');
+      expect(back.status).toBe(303);
+      expect(back.headers.location).toBe('/login?takatak=error');
+    } finally {
+      process.env.FIELD_ENCRYPTION_KEY = generateEncryptionKey();
+    }
+  });
+});
+
+describe('Sign in on r2nette.ca — email and password', () => {
+  const PW = 'Correct-Horse-9!x';
+  const login = (extra: Record<string, unknown> = {}) => ({ email: 'marie@example.ca', password: PW, locale: 'fr', terms: false, ...extra });
+
+  it('checks the password at the hub, then shows the card, then returns to the page the customer left', async () => {
+    const { app, provider, customers, sessions } = setup();
+    const jar = new Jar();
+    const res = await post(app, jar, 'password/login', login({ email: ' Marie@Example.CA ', returnTo: '/account', terms: true }));
+    expect([res.status, res.body]).toEqual([200, { consent: true }]);
+    expect(provider.signInWithPassword).toHaveBeenCalledWith('marie@example.ca', PW);
+    expect(provider.sendEmailCode).not.toHaveBeenCalled(); // a password sign-in sends no email
+    expect(decode(jar.get('r2n_takatak_oauth')!)).toMatchObject({ returnTo: '/account', intent: 'signin' });
+    expect(jar.header()).not.toContain(PW);
+    const card = await get(app, jar, 'consent');
+    expect(card.status).toBe(200);
+    const approved = await post(app, jar, 'consent', { decision: 'approve' });
+    const next = new URL(approved.body.next);
+    const finished = await get(app, jar, next.pathname + next.search);
+    expect(finished.headers.location).toBe('/account');
+    expect(sessions).toHaveLength(1);
+    expect(customers).toHaveLength(1);
+  });
+
+  it('gives the same 401 for a wrong password and for an address with no account', async () => {
+    const { app, provider } = setup();
+    provider.signInWithPassword.mockRejectedValue(new IdentityError('The email or password is not right.', 'INVALID_CREDENTIALS'));
+    const known = await post(app, new Jar(), 'password/login', login());
+    const unknown = await post(app, new Jar(), 'password/login', login({ email: 'nobody@example.ca' }));
+    expect(known.status).toBe(401);
+    expect(unknown.status).toBe(401);
+    expect(known.body.error.code).toBe('INVALID_CREDENTIALS');
+    expect(unknown.body.error.message).toBe(known.body.error.message);
+    expect(JSON.stringify([known.body, unknown.body])).not.toContain(PW);
+    expect(provider.beginAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('allows five wrong passwords per address in 15 minutes, answers 429 on the sixth, and lets them in again later', async () => {
+    const { app, provider, tick } = setup();
+    provider.signInWithPassword.mockRejectedValue(new IdentityError('no', 'INVALID_CREDENTIALS'));
+    for (let i = 0; i < 5; i += 1) expect((await post(app, new Jar(), 'password/login', login())).status).toBe(401);
+    const locked = await post(app, new Jar(), 'password/login', login());
+    expect([locked.status, locked.body.error.code]).toEqual([429, 'PASSWORD_LOGIN_LIMIT']);
+    expect(provider.signInWithPassword).toHaveBeenCalledTimes(5); // the sixth never reaches the hub
+    // Another address is not affected.
+    expect((await post(app, new Jar(), 'password/login', login({ email: 'paul@example.ca' }))).status).toBe(401);
+    // The code and Google routes are separate doors and still open.
+    expect((await post(app, new Jar(), 'email/send', { email: 'marie@example.ca' })).status).toBe(200);
+    tick(16 * 60_000);
+    provider.signInWithPassword.mockResolvedValue({ accessToken: 'hub-at', subject: 'takatak-user-1', email: 'marie@example.ca', phone: null });
+    expect((await post(app, new Jar(), 'password/login', login())).status).toBe(200);
+  });
+
+  it('a good password clears the count, and many parallel guesses cannot all slip through', async () => {
+    const { app, provider } = setup();
+    provider.signInWithPassword.mockRejectedValue(new IdentityError('no', 'INVALID_CREDENTIALS'));
+    for (let i = 0; i < 4; i += 1) await post(app, new Jar(), 'password/login', login());
+    provider.signInWithPassword.mockResolvedValueOnce({ accessToken: 'hub-at', subject: 'takatak-user-1', email: 'marie@example.ca', phone: null });
+    expect((await post(app, new Jar(), 'password/login', login())).status).toBe(200);
+    provider.signInWithPassword.mockRejectedValue(new IdentityError('no', 'INVALID_CREDENTIALS'));
+    // The count restarted: four more wrong ones are still answered by the hub.
+    for (let i = 0; i < 4; i += 1) expect((await post(app, new Jar(), 'password/login', login())).status).toBe(401);
+
+    const burst = setup();
+    burst.provider.signInWithPassword.mockRejectedValue(new IdentityError('no', 'INVALID_CREDENTIALS'));
+    const results = await Promise.all(Array.from({ length: 12 }, () => post(burst.app, new Jar(), 'password/login', login())));
+    expect(burst.provider.signInWithPassword.mock.calls.length).toBeLessThanOrEqual(5);
+    expect(results.filter((r) => r.status === 429).length).toBeGreaterThanOrEqual(7);
+  });
+
+  it('does not count a hub limit or outage as a wrong password', async () => {
+    const { app, provider } = setup();
+    provider.signInWithPassword.mockRejectedValue(new IdentityError('limit', 'PASSWORD_PROVIDER_LIMIT'));
+    for (let i = 0; i < 6; i += 1) {
+      const res = await post(app, new Jar(), 'password/login', login());
+      expect([res.status, res.body.error.code]).toEqual([429, 'PASSWORD_PROVIDER_LIMIT']);
+    }
+    provider.signInWithPassword.mockRejectedValue(new IdentityError('down', 'TAKATAK_AUTH_UNAVAILABLE'));
+    const down = await post(app, new Jar(), 'password/login', login());
+    expect([down.status, down.body.error.code]).toEqual([503, 'TAKATAK_AUTH_UNAVAILABLE']);
+    provider.signInWithPassword.mockResolvedValue({ accessToken: 'hub-at', subject: 'takatak-user-1', email: 'marie@example.ca', phone: null });
+    expect((await post(app, new Jar(), 'password/login', login())).status).toBe(200);
+  });
+
+  it('limits password sign-ins per visitor, whatever the address', async () => {
+    const { app, provider } = setup();
+    provider.signInWithPassword.mockRejectedValue(new IdentityError('no', 'INVALID_CREDENTIALS'));
+    for (let i = 0; i < 30; i += 1) expect((await post(app, new Jar(), 'password/login', login({ email: `person${i}@example.ca` }))).status).toBe(401);
+    const blocked = await post(app, new Jar(), 'password/login', login({ email: 'person99@example.ca' }));
+    expect([blocked.status, blocked.body.error.code]).toEqual([429, 'SIGNIN_IP_LIMIT']);
+  });
+
+  it('rejects malformed bodies before the hub, replaces a forged returnTo, and refuses other sites', async () => {
+    const { app, provider } = setup();
+    for (const body of [{}, login({ password: '' }), login({ email: 'nope' }), login({ locale: 'de' }), { ...login(), extra: 1 }, login({ password: 'x'.repeat(300) })]) {
+      const res = await post(app, new Jar(), 'password/login', body);
+      expect([res.status, res.body.error.code]).toEqual([400, 'VALIDATION_ERROR']);
+    }
+    expect(provider.signInWithPassword).not.toHaveBeenCalled();
+    const jar = new Jar();
+    expect((await post(app, jar, 'password/login', login({ returnTo: `${ORIGIN}//evil.example` }))).status).toBe(200);
+    expect(decode(jar.get('r2n_takatak_oauth')!).returnTo).toBe('/#book');
+    expect((await post(app, new Jar(), 'password/login', login(), { 'Sec-Fetch-Site': 'cross-site' })).status).toBe(403);
+  });
+
+  it('answers 503 when this server cannot hold the hub session', async () => {
+    const { app } = setup();
+    const saved = process.env.FIELD_ENCRYPTION_KEY;
+    delete process.env.FIELD_ENCRYPTION_KEY;
+    try {
+      const res = await post(app, new Jar(), 'password/login', login());
+      expect([res.status, res.body.error.code]).toEqual([503, 'TAKATAK_AUTH_UNAVAILABLE']);
+    } finally {
+      process.env.FIELD_ENCRYPTION_KEY = saved;
+    }
   });
 });
