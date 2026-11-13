@@ -277,8 +277,9 @@ describe('TAKATAK hub: password', () => {
     const cases: Array<[Response, string]> = [
       [json({ error_code: 'weak_password', msg: 'Password should contain lowercase' }, 422), 'WEAK_PASSWORD'],
       [json({ error_code: 'same_password' }, 422), 'PASSWORD_UNCHANGED'],
-      [json({ error_code: 'something_new' }, 422), 'WEAK_PASSWORD'],
-      [json({}, 400), 'WEAK_PASSWORD'],
+      // Anything else is not about the password (our own rule was met): it must not be called "weak".
+      [json({ error_code: 'reauthentication_needed' }, 422), 'TAKATAK_AUTH_UNAVAILABLE'],
+      [json({}, 400), 'TAKATAK_AUTH_UNAVAILABLE'],
       [json({}, 401), 'CONSENT_EXPIRED'],
       [json({}, 403), 'CONSENT_EXPIRED'],
       [json({}, 429), 'PASSWORD_PROVIDER_LIMIT'],

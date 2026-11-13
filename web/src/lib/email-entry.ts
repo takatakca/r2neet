@@ -114,8 +114,10 @@ const answers: Record<string, [string, string]> = {
   ],
   SIGNIN_IP_LIMIT: ['Trop d’essais depuis cet appareil. Réessayez plus tard.', 'Too many tries from this device. Try again later.'],
   PASSWORD_MISMATCH: ['Les deux mots de passe ne sont pas identiques.', 'The two passwords are not the same.'],
-  WEAK_PASSWORD: ['Ce mot de passe est trop faible. Respectez toute la liste ci-dessus.', 'This password is too weak. Meet every rule in the list above.'],
+  // The page already checks the list; this is TAKATAK refusing a password that passes it (too common, seen in a leak).
+  WEAK_PASSWORD: ['TAKATAK refuse ce mot de passe (trop courant ou trop faible). Choisissez-en un autre ou touchez « Suggérer un mot de passe fort ».', 'TAKATAK refuses this password (too common or too weak). Choose another one or tap “Suggest a strong password”.'],
 };
+const rulesMissing: [string, string] = ['Complétez la liste ci-dessus : le mot de passe doit respecter chaque règle.', 'Complete the list above: the password must meet every rule.'];
 
 function translate(): void {
   document.documentElement.lang = locale;
@@ -469,7 +471,7 @@ $('passwordForm').addEventListener('submit', async (e) => {
   const password = input('newPassword').value;
   const again = input('confirmPassword').value;
   if (passwordProblems(password, $('passwordEmail').textContent).length) {
-    status(pick(answers.WEAK_PASSWORD!));
+    status(pick(rulesMissing));
     input('newPassword').focus();
     return;
   }

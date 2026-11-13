@@ -224,7 +224,10 @@ export class SupabaseTakatakOAuthProvider implements TakatakOAuthProvider {
     const body = await SupabaseTakatakOAuthProvider.body(response);
     const reason = typeof body?.error_code === 'string' ? body.error_code : '';
     if (reason === 'same_password') throw new IdentityError('The new password is the same as the current one.', 'PASSWORD_UNCHANGED');
-    throw new IdentityError('The hub did not accept this password.', 'WEAK_PASSWORD');
+    if (reason === 'weak_password') throw new IdentityError('The hub did not accept this password.', 'WEAK_PASSWORD');
+    // Any other refusal (a hub setting such as re-authentication, a change at the hub) is not the
+    // customer's password: our own rule was already met, so do not call it weak.
+    this.unavailable();
   }
 
   googleAuthorizationUrl(input: { redirectUri: string; challenge: string }): string {
