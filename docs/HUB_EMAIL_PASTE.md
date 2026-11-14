@@ -6,6 +6,12 @@ management API answers "No access token provided" to this session, and no Supaba
 settings). The r2nette.ca server already tells the hub which site asked (`redirect_to`). These pastes make the hub
 answer in R2NETTE's voice for r2nette.ca and keep TAKATAK's wording for takatak.ca, so takatak.ca's emails do not change.
 
+**Applied 2026-11-13 by the assistant through the Supabase management API** (with a temporary access token the owner supplied
+through the secure form): the redirect URL below was added to the allow-list, and the two templates below replaced the
+`Confirm signup` and `Magic Link` ones. The `{{ else }}` halves are the exact text the hub held before (backup of the whole
+Auth config kept outside the repository), so takatak.ca's own emails do not change. The old allow-list entry
+`https://r2nette.ca/api/v1/auth/google/callback` was kept.
+
 Open: Supabase dashboard → project `pcjfahhlozsseqqevimi` → **Authentication**.
 
 ## 1. URL Configuration → Redirect URLs → Add URL
@@ -34,8 +40,9 @@ Without this line the hub ignores the marker and keeps the TAKATAK wording.
 </div>
 {{ else }}
 <h2>Confirm your email address</h2>
+
 <p>Follow the link below to confirm this email address and finish signing up.</p>
-<p><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email">Confirm email address</a></p>
+<p><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&amp;type=email">Confirm email address</a></p>
 {{ end }}
 ```
 
@@ -50,7 +57,7 @@ cannot use up the code. Optional: add a French line under the English one, for e
 **Subject:**
 
 ```
-{{ if eq .RedirectTo "https://r2nette.ca/api/v1/auth/takatak/google/callback" }}OTP for r2nette.ca{{ else }}Votre code de connexion / Your sign-in code{{ end }}
+{{ if eq .RedirectTo "https://r2nette.ca/api/v1/auth/takatak/google/callback" }}OTP for r2nette.ca{{ else }}You've been invited{{ end }}
 ```
 
 **Message body** (replace everything in the box):
@@ -63,12 +70,19 @@ cannot use up the code. Optional: add a French line under the English one, for e
 </div>
 {{ else }}
 <h2>Join a TAKATAK workspace</h2>
+
 <p>You have been invited to join a TAKATAK workspace.</p>
-<p><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=magiclink">Continue to workspace</a></p>
+
+<p>
+  <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=magiclink">
+    Continue to workspace
+  </a>
+</p>
+
 <hr>
 <h2>Code de connexion / Sign-in code</h2>
 <p>Pour la connexion par code, saisissez le code suivant sur la page où vous l’avez demandé :</p>
-<p style="font-size:30px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p>
+<p style="font-size: 28px; font-weight: bold; letter-spacing: 4px;">{{ .Token }}</p>
 <p>For code sign-in, enter this code only on the page where you requested it.</p>
 <p>Si vous n’avez pas demandé ce code, ignorez ce courriel. Ne communiquez ce code à personne.</p>
 <p>If you did not request this code, ignore this email. Do not share this code.</p>
